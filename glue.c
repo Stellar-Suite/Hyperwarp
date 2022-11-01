@@ -1,5 +1,5 @@
-#include <GL/gl.h>
-#include <FTGL/ftgl.h>
+// #include <GL/gl.h>
+// #include <FTGL/ftgl.h>
 #include <stdio.h>
 #include <dlfcn.h>
 
