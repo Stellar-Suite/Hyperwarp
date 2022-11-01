@@ -4,11 +4,11 @@
 #include <dlfcn.h>
 
 static void init () __attribute__((constructor));
-void performOverlay();
+//void performOverlay();
 
-void (*_glfwSwapBuffers)() = NULL;
+// void (*_glfwSwapBuffers)() = NULL;
 
-void glfwSwapBuffers()
+/*void glfwSwapBuffers()
 {
   if (_glfwSwapBuffers == NULL) {
     void *handle = dlopen("libglfw.so", RTLD_LAZY);
@@ -21,14 +21,14 @@ void glfwSwapBuffers()
   performOverlay();
   
   _glfwSwapBuffers();
-}
+}*/
 
 static void init()
 {
   printf("Init");
 }
 
-void performOverlay()
+/* void performOverlay()
 {
   static FTGLfont *font = NULL;
 
@@ -57,4 +57,4 @@ void performOverlay()
   glPopMatrix();
 
   glMatrixMode(GL_MODELVIEW);
-}
+} */
