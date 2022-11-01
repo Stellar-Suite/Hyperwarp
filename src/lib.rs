@@ -1,4 +1,4 @@
-use libc::
+mod utils;
 
 fn main() {
     println!("Hello, world!");
@@ -10,6 +10,6 @@ redhook::hook! {
     }
 
     unsafe fn XOpenDisplay(c_char) => xopen_display_hook {
-        println!("Premain starting. Please wait. ");
+        println!("Display open requestedc. ");
     }
 }
