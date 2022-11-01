@@ -1,2 +1,2 @@
 gluer: glue.c
-	gcc -o libhyperglue.so -shared -fPIC glue.c
+	gcc -o libhyperglue.so -shared -D_GNU_SOURCE -fPIC glue.c -ldl

@@ -2,6 +2,8 @@
 // #include <FTGL/ftgl.h>
 #include <stdio.h>
 #include <dlfcn.h>
+#include <stdlib.h>
+static int DEBUG = 0;
 
 static void init () __attribute__((constructor));
 //void performOverlay();
@@ -25,7 +27,14 @@ static void init () __attribute__((constructor));
 
 static void init()
 {
-  printf("Init");
+  if(DEBUG) printf("Init");
+}
+
+void prepare(){
+  if(getenv("DEBUG") != NULL){
+    DEBUG = 1;
+  }
+  // printf("debug %s",getenv("DEBUG"));
 }
 
 /* void performOverlay()
@@ -58,3 +67,48 @@ static void init()
 
   glMatrixMode(GL_MODELVIEW);
 } */
+
+typedef int (*main_t)(int, char **, char **);
+static main_t real_main;
+
+// Rust overrides these
+void premain_plugin(){
+  if(DEBUG){
+    printf("Oops, premain not override. ");
+  }
+}
+
+void postmain_plugin(){
+
+}
+// end rust override
+
+int wrap_main(int argc, char **argv, char **envp) {
+    prepare();
+    if(DEBUG) printf("Pre-main\n");
+    premain_plugin();
+    int main_res = real_main(argc, argv, envp);
+    if(DEBUG) printf("Post-main\n");
+    return main_res;
+}
+
+// wrap __libc_start_main: replace real_main with wrap_main
+int __libc_start_main(
+    main_t main, int argc, char **argv,
+    main_t init,
+    void (*fini)(void), void (*rtld_fini)(void), void *stack_end
+) {
+    static int (*real___libc_start_main)() = NULL;
+    if (!real___libc_start_main) {
+        if(DEBUG) printf("real___libc_start_main = %p (empty)\n", real___libc_start_main);
+        char *error;
+        real___libc_start_main = dlsym(RTLD_NEXT, "__libc_start_main");
+        if(DEBUG) printf("real___libc_start_main = %p\n", real___libc_start_main);
+        if ((error = dlerror()) != NULL) {
+            printf("%s\n", error);
+            exit(1);
+        }
+    }
+    real_main = main;
+    return real___libc_start_main(wrap_main, argc, argv, init, fini, rtld_fini, stack_end);
+}
