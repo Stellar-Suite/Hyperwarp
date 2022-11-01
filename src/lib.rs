@@ -1,3 +1,6 @@
+use libc::c_char;
+use libc::c_void;
+
 mod utils;
 
 fn main() {
@@ -8,8 +11,12 @@ redhook::hook! {
     unsafe fn premain_plugin() => premain_plugin_first {
         println!("Premain starting. Please wait. ");
     }
+    
+}
 
-    unsafe fn XOpenDisplay(c_char) => xopen_display_hook {
-        println!("Display open requestedc. ");
+redhook::hook! {
+    unsafe fn XOpenDisplay(name: c_char) -> *const c_void => XOpenDisplay_first {
+        println!("Attempted to open {}", name);
+        return std::ptr::null();
     }
 }
