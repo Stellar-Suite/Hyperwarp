@@ -1,6 +1,6 @@
 use std::{env, str::FromStr};
 
-pub struct Config{
+pub struct Config {
     pub enable_x11: bool,
     pub enable_gl: bool,
     pub debug_mode: bool,
@@ -9,55 +9,49 @@ pub struct Config{
     pub window_height_override: Option<u32>,
 }
 
-fn get<T: FromStr>(key: &str, default: T) -> T{
-    match env::var(key){
+fn get<T: FromStr>(key: &str, default: T) -> T {
+    match env::var(key) {
         Ok(val) => val.parse::<T>().unwrap_or(default),
         Err(_) => default,
     }
 }
 
-fn try_get<T: FromStr>(key: &str) -> Option<T>{
-    match env::var(key){
-        Ok(val) => {
-            match val.parse::<T>(){
-                Ok(val) => Some(val),
-                Err(_) => None,
-            }
+fn try_get<T: FromStr>(key: &str) -> Option<T> {
+    match env::var(key) {
+        Ok(val) => match val.parse::<T>() {
+            Ok(val) => Some(val),
+            Err(_) => None,
         },
-        Err(_) => None
+        Err(_) => None,
     }
 }
 
-fn intify(key: &str, default: i32) -> i32{
-    match env::var(key){
+fn intify(key: &str, default: i32) -> i32 {
+    match env::var(key) {
         Ok(val) => val.parse::<i32>().unwrap_or(default),
         Err(_) => default,
     }
 }
 
-fn u_intify(key: &str, default: u32) -> u32{
-    match env::var(key){
+fn u_intify(key: &str, default: u32) -> u32 {
+    match env::var(key) {
         Ok(val) => val.parse::<u32>().unwrap_or(default),
         Err(_) => default,
     }
 }
 
-fn booleanify(key: &str, default: bool) -> bool{
+fn booleanify(key: &str, default: bool) -> bool {
     match env::var(key) {
-        Ok(value) => {
-            match value.as_str() {
-                "true" => true,
-                "false" => false,
-                "1" => true,
-                "0" => false,
-                "yes" => true,
-                "no" => false,
-                _ => default,
-            }
-        }
-        Err(_) => {
-            default
-        }
+        Ok(value) => match value.as_str() {
+            "true" => true,
+            "false" => false,
+            "1" => true,
+            "0" => false,
+            "yes" => true,
+            "no" => false,
+            _ => default,
+        },
+        Err(_) => default,
     }
 }
 
@@ -73,7 +67,7 @@ impl Config {
     }
 }
 
-impl Default for Config{
+impl Default for Config {
     fn default() -> Config {
         Config {
             enable_x11: true,
