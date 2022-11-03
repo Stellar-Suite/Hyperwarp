@@ -3,9 +3,10 @@ use libc::c_void;
 
 use crate::host::hosting::HOST;
 
-mod utils;
-mod host;
+mod constants;
 mod hooks;
+mod host;
+mod utils;
 
 fn main() {
     println!("Hello, world!");

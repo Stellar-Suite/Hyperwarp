@@ -3,6 +3,8 @@ use std::{env, str::FromStr};
 pub struct Config {
     pub enable_x11: bool,
     pub enable_gl: bool,
+    pub enable_glfw: bool,
+    pub enable_sdl2: bool,
     pub debug_mode: bool,
     // windowing
     pub window_width_override: Option<u32>,
@@ -60,6 +62,8 @@ impl Config {
         Config {
             enable_x11: booleanify("ENABLE_X11", true),
             enable_gl: booleanify("ENABLE_GL", true),
+            enable_glfw: booleanify("ENABLE_GLFW", true),
+            enable_sdl2: booleanify("ENABLE_SDL2", true),
             debug_mode: booleanify("DEBUG_HW", false),
             window_width_override: try_get::<u32>("WINDOW_WIDTH"),
             window_height_override: try_get::<u32>("WINDOW_HEIGHT"),
@@ -72,6 +76,8 @@ impl Default for Config {
         Config {
             enable_x11: true,
             enable_gl: true,
+            enable_glfw: true,
+            enable_sdl2: true,
             debug_mode: false,
             window_width_override: None,
             window_height_override: None,
