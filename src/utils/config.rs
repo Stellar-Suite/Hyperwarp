@@ -9,6 +9,7 @@ pub struct Config {
     // windowing
     pub window_width_override: Option<u32>,
     pub window_height_override: Option<u32>,
+    pub window_zero_origin: bool,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -67,6 +68,7 @@ impl Config {
             debug_mode: booleanify("DEBUG_HW", false),
             window_width_override: try_get::<u32>("WINDOW_WIDTH"),
             window_height_override: try_get::<u32>("WINDOW_HEIGHT"),
+            window_zero_origin: booleanify("WINDOW_ZERO_ORIGIN", false),
         }
     }
 }
@@ -81,6 +83,7 @@ impl Default for Config {
             debug_mode: false,
             window_width_override: None,
             window_height_override: None,
+            window_zero_origin: false,
         }
     }
 }

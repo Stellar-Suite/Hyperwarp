@@ -9,7 +9,7 @@ pub mod glfw {
 
 pub mod sdl2 {
     pub type Uint32 = u32;
-    pub enum SDL_Window {};
+    pub enum SDL_Window {}
 }
 
 pub mod libc {
