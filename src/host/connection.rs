@@ -5,12 +5,12 @@ use std::thread;
 
 use super::message::Message;
 
-trait Transport {
+pub trait Transport {
     fn send(&mut self, data: &[u8]) -> Result<(), Error>; // block
     fn recv(&mut self, data: &mut [u8]) -> Result<(), Error>; // block
 }
 
-struct Connection<T: Transport> {
+pub struct Connection<T: Transport> {
     transport: T,
     // message output queue
     outgoing: (Sender<Message>, Receiver<Message>),
@@ -24,7 +24,7 @@ struct Connection<T: Transport> {
 }*/
 
 impl<T: Transport> Connection<T> {
-    fn new(transport: T) -> Self {
+    pub fn new(transport: T) -> Self {
         let (tx1, rx1) = mpsc::channel();
         let (tx2, rx2) = mpsc::channel();
         let conn = Connection::<T> {
