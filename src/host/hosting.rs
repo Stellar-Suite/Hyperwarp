@@ -1,5 +1,5 @@
-use lazy_static::lazy_static;
 use crate::utils::config::Config;
+use lazy_static::lazy_static;
 
 pub struct ApplicationHost {
     pub config: Config,
