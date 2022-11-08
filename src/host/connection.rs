@@ -8,6 +8,9 @@ use super::message::Message;
 pub trait Transport {
     fn send(&mut self, data: &[u8]) -> Result<(), Error>; // block
     fn recv(&mut self, data: &mut [u8]) -> Result<(), Error>; // block
+    fn init(&mut self) -> Result<(), Error> {
+        Ok(())
+    } // this should block until we establish a connection
 }
 
 pub struct Connection<T: Transport> {
@@ -36,7 +39,10 @@ impl<T: Transport> Connection<T> {
         conn
     }
 
-    fn start() {
+    fn start_read_write_threads() {
+        thread::spawn(move || {});
         thread::spawn(move || {});
     }
+
+    fn start() {}
 }

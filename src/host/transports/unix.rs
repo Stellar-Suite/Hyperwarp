@@ -5,8 +5,8 @@ use std::{
 
 use super::super::connection::{Connection, Transport};
 
-struct UnixTransport {
-    stream: UnixStream,
+pub struct UnixTransport {
+    pub stream: UnixStream,
 }
 
 impl Transport for UnixTransport {

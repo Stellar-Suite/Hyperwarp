@@ -10,6 +10,9 @@ pub struct Config {
     pub window_width_override: Option<u32>,
     pub window_height_override: Option<u32>,
     pub window_zero_origin: bool,
+    // connection
+    pub connection_type: String,
+    pub connection_timeout: Option<u32>,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -69,6 +72,8 @@ impl Config {
             window_width_override: try_get::<u32>("WINDOW_WIDTH"),
             window_height_override: try_get::<u32>("WINDOW_HEIGHT"),
             window_zero_origin: booleanify("WINDOW_ZERO_ORIGIN", false),
+            connection_timeout: None,
+            connection_type: try_get::<String>("CONNECTION_TYPE").unwrap_or("null".to_owned()),
         }
     }
 }
@@ -84,6 +89,8 @@ impl Default for Config {
             window_width_override: None,
             window_height_override: None,
             window_zero_origin: false,
+            connection_type: "null".to_owned(),
+            connection_timeout: None,
         }
     }
 }
