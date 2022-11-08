@@ -13,7 +13,7 @@ pub trait Transport {
     } // this should block until we establish a connection
 }
 
-pub struct Connection<T: Transport> {
+pub struct Connection<T: Transport + Send + Sync + 'static> {
     transport: T,
     // message output queue
     outgoing: (Sender<Message>, Receiver<Message>),
@@ -26,7 +26,7 @@ pub struct Connection<T: Transport> {
     let b = mpsc::channel();
 }*/
 
-impl<T: Transport> Connection<T> {
+impl<T: Transport + Send + Sync + 'static> Connection<T> {
     pub fn new(transport: T) -> Self {
         let (tx1, rx1) = mpsc::channel();
         let (tx2, rx2) = mpsc::channel();
@@ -39,10 +39,15 @@ impl<T: Transport> Connection<T> {
         conn
     }
 
-    fn start_read_write_threads() {
+    fn start_read_write_threads(&mut self) {
         thread::spawn(move || {});
         thread::spawn(move || {});
     }
 
-    fn start() {}
+    fn start(mut self) {
+        let mut transport = self.transport;
+        thread::spawn(move || {
+            transport.init().expect("Transport initalization fail. ");
+        });
+    }
 }
