@@ -39,15 +39,12 @@ impl<T: Transport + Send + Sync + 'static> Connection<T> {
         conn
     }
 
-    fn start_read_write_threads(&mut self) {
-        thread::spawn(move || {});
-        thread::spawn(move || {});
-    }
-
     fn start(mut self) {
         let mut transport = self.transport;
         thread::spawn(move || {
             transport.init().expect("Transport initalization fail. ");
+            // read/write queue here
+            
         });
     }
 }
