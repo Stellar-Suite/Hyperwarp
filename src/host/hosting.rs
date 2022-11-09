@@ -10,7 +10,7 @@ use super::{
 
 pub struct ApplicationHost {
     pub config: Config,
-    pub connection: Option<Box<dyn Transport + Send + Sync>>,
+    pub connection: Option<Connection>,
 }
 
 impl ApplicationHost {
@@ -25,16 +25,22 @@ impl ApplicationHost {
 
 fn create_host() -> ApplicationHost {
     let config = Config::from_env();
-    let conn;
-    match config.connection_type.as_ref() {
+    let mut host = match config.connection_type.as_ref() {
         "unix_client" => {
-            conn = Connection::<UnixTransport>::new(UnixTransport {
+            let conn = Connection::new(UnixTransport {
                 stream: UnixStream::connect("/tmp/test").expect("Unix socket connect fail. "),
             });
             let host = ApplicationHost::new(config);
+            // host.connection = Some(Box::new(conn));
             host
         }
         _ => ApplicationHost::new(config),
+    };
+    if let Some(mut conn) = host.connection {
+        conn.transport.init();
+        host
+    } else {
+        host
     }
 }
 
