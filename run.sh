@@ -1,5 +1,5 @@
 #!/bin/bash
-echo Bootstraping
+echo Runner: Bootstraping
 BASE=$(pwd)
-echo $(pwd) is our base path. 
+echo Runner: $(pwd) is our base path. 
 LD_PRELOAD="$BASE/target/debug/libhyperwarphooker.so $BASE/libhyperglue.so" $@
