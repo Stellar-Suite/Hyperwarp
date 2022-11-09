@@ -81,6 +81,11 @@ void premain_plugin()
   {
     printf("Glue: Oops, premain not override. \n");
   }
+  // die?
+  if (getenv("IGNORE_INIT_ERRORS") == NULL)
+  {
+    exit(37);
+  }
 }
 
 void postmain_plugin()

@@ -19,7 +19,7 @@ pub struct ApplicationHost {
 
 impl ApplicationHost {
     pub fn new(config: Config) -> Self {
-        let mut host = ApplicationHost {
+        let host = ApplicationHost {
             config,
             connection: None,
         };
