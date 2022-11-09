@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdlib.h>
+#include <unistd.h>
 static int DEBUG = 0;
 
 static void init() __attribute__((constructor));
@@ -93,11 +94,19 @@ void postmain_plugin()
 }
 // end rust override
 
+void premain_debug()
+{
+  printf("Process id: %i, group: %i user: %i, parent pid: %i\n", getpid(), getgid(), getuid(), getppid());
+}
+
 int wrap_main(int argc, char **argv, char **envp)
 {
   prepare();
   if (DEBUG)
+  {
     printf("Glue: Pre-main\n");
+    premain_debug();
+  }
   premain_plugin();
   int main_res = real_main(argc, argv, envp);
   if (DEBUG)
