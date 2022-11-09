@@ -35,7 +35,7 @@ impl ApplicationHost {
 
 fn create_host() -> ApplicationHost {
     let config = Config::from_env();
-    let mut host = match config.connection_type.as_ref() {
+    let host = match config.connection_type.as_ref() {
         "unix_client" => {
             let conn = Connection::new(UnixTransport {
                 stream: UnixStream::connect("/tmp/test").expect("Unix socket connect fail. "),

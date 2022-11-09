@@ -5,6 +5,8 @@ use std::thread;
 
 use super::message::Message;
 
+pub const MAX_PAYLOAD: usize = 1024 * 1024 * 10; // 10 MB
+
 pub trait Transport {
     fn send(&mut self, data: &[u8]) -> Result<(), Error>; // block
     fn recv(&mut self, data: &mut [u8]) -> Result<(), Error>; // block
@@ -42,9 +44,17 @@ impl Connection {
     pub fn start(&mut self) {
         let transport = &mut self.transport;
         transport.init().expect("Transport initalization failure. ");
-        /*thread::spawn(move || {
+        /* thread::spawn(move || {
             transport.init().expect("Transport initalization fail. ");
             // read/write queue here
-        });*/
+        }); */
+        // rw threads
+        thread::spawn(move || {
+            // let tx_recieved = self.outgoing.0.clone();
+            let buf = [0; MAX_PAYLOAD];
+            loop {
+                transport.recv(&mut buf).expect("Transport recv fail. ");
+            }
+        });
     }
 }
