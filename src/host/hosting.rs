@@ -50,6 +50,9 @@ fn create_host() -> ApplicationHost {
     if let Some(ref conn_arc) = host.connection {
         host
     } else {
+        if host.config.debug_mode {
+            println!("No connection type specified. ");
+        }
         host
     }
 }
