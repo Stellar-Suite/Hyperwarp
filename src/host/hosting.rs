@@ -1,4 +1,7 @@
-use std::os::unix::net::UnixStream;
+use std::{
+    os::unix::net::UnixStream,
+    sync::{Arc, Mutex},
+};
 
 use crate::utils::config::Config;
 use lazy_static::lazy_static;
@@ -10,7 +13,7 @@ use super::{
 
 pub struct ApplicationHost {
     pub config: Config,
-    pub connection: Option<Connection>,
+    pub connection: Option<Arc<Mutex<Connection>>>,
 }
 
 impl ApplicationHost {
@@ -31,13 +34,13 @@ fn create_host() -> ApplicationHost {
                 stream: UnixStream::connect("/tmp/test").expect("Unix socket connect fail. "),
             });
             let host = ApplicationHost::new(config);
-            // host.connection = Some(Box::new(conn));
+            host.connection = Some(Arc::new(Mutex::new(conn)));
             host
         }
         _ => ApplicationHost::new(config),
     };
-    if let Some(mut conn) = host.connection {
-        conn.transport.init();
+    if let Some(mut conn_arc) = host.connection {
+        conn_arc.lock().unwrap().start();
         host
     } else {
         host

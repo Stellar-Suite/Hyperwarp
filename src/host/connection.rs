@@ -27,7 +27,7 @@ pub struct Connection {
 }*/
 
 impl Connection {
-    pub fn new(transport: impl Transport) -> Self {
+    pub fn new(transport: impl Transport + Send + Sync + 'static) -> Self {
         // let (tx1, rx1) = mpsc::channel();
         // let (tx2, rx2) = mpsc::channel();
         let conn = Connection {
