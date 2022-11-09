@@ -5,6 +5,7 @@ use std::{
 
 use super::super::connection::{Connection, Transport};
 
+#[derive(Copy, Clone, Debug)] // debug should be easy
 pub struct NullTransport {}
 
 impl Transport for NullTransport {
