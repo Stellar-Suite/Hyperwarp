@@ -96,7 +96,7 @@ void postmain_plugin()
 
 void premain_debug()
 {
-  printf("Process id: %i, group: %i user: %i, parent pid: %i\n", getpid(), getgid(), getuid(), getppid());
+  printf("Glue: Process id: %i, group: %i user: %i, parent pid: %i\n", getpid(), getgid(), getuid(), getppid());
 }
 
 int wrap_main(int argc, char **argv, char **envp)
