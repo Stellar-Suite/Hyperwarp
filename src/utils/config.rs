@@ -1,5 +1,6 @@
 use std::{env, str::FromStr};
 
+#[derive(Debug, Clone)]
 pub struct Config {
     pub enable_x11: bool,
     pub enable_gl: bool,

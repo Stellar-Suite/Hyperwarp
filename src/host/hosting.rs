@@ -11,6 +11,7 @@ use super::{
     transports::{null::NullTransport, unix::UnixTransport},
 };
 
+#[derive(Clone)]
 pub struct ApplicationHost {
     pub config: Config,
     pub connection: Option<Arc<Mutex<Connection>>>,
@@ -24,6 +25,12 @@ impl ApplicationHost {
         };
         return host;
     }
+
+    pub fn start(&mut self) {
+        if let Some(conn) = &self.connection {
+            conn.lock().unwrap().start();
+        }
+    }
 }
 
 fn create_host() -> ApplicationHost {
@@ -33,14 +40,14 @@ fn create_host() -> ApplicationHost {
             let conn = Connection::new(UnixTransport {
                 stream: UnixStream::connect("/tmp/test").expect("Unix socket connect fail. "),
             });
-            let host = ApplicationHost::new(config);
+            let mut host = ApplicationHost::new(config);
             host.connection = Some(Arc::new(Mutex::new(conn)));
+            host.start();
             host
         }
         _ => ApplicationHost::new(config),
     };
-    if let Some(mut conn_arc) = host.connection {
-        conn_arc.lock().unwrap().start();
+    if let Some(ref conn_arc) = host.connection {
         host
     } else {
         host

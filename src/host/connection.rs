@@ -39,8 +39,9 @@ impl Connection {
         conn
     }
 
-    pub fn start(mut self) {
-        let mut transport = self.transport;
+    pub fn start(&mut self) {
+        let transport = &mut self.transport;
+        transport.init().expect("Transport initalization failure. ");
         /*thread::spawn(move || {
             transport.init().expect("Transport initalization fail. ");
             // read/write queue here
