@@ -4,7 +4,7 @@ use crate::host::hosting::HOST;
 
 // types
 type Display = *const c_void;
-type GLXDrawable = c_void;
+type GLXDrawable = *const c_void;
 
 // extern void glXSwapBuffers( Display *dpy, GLXDrawable drawable );
 redhook::hook! {
@@ -15,7 +15,7 @@ redhook::hook! {
             if HOST.config.debug_mode {
                 // println!("Attempted to open {}", name);
             }
-            std::ptr::null()
+            // std::ptr::null()
         }
     }
 }
