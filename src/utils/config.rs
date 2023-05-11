@@ -5,6 +5,7 @@ pub struct Config {
     pub enable_x11: bool,
     pub enable_gl: bool,
     pub enable_glfw: bool,
+    pub enable_glx: bool,
     pub enable_sdl2: bool,
     pub debug_mode: bool,
     // windowing
@@ -67,6 +68,7 @@ impl Config {
         Config {
             enable_x11: booleanify("ENABLE_X11", true),
             enable_gl: booleanify("ENABLE_GL", true),
+            enable_glx: booleanify("ENABLE_GLX", true),
             enable_glfw: booleanify("ENABLE_GLFW", true),
             enable_sdl2: booleanify("ENABLE_SDL2", true),
             debug_mode: booleanify("DEBUG_HW", false),
@@ -84,6 +86,7 @@ impl Default for Config {
         Config {
             enable_x11: true,
             enable_gl: true,
+            enable_glx: true,
             enable_glfw: true,
             enable_sdl2: true,
             debug_mode: false,

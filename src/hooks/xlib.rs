@@ -1,9 +1,12 @@
-use libc::{c_void,c_char};
+use libc::{c_char, c_void};
 
 use crate::host::hosting::HOST;
 
+// types
+pub type Display = *const c_void;
+
 redhook::hook! {
-    unsafe fn XOpenDisplay(name: c_char) -> *const c_void => x_open_display_first {
+    unsafe fn XOpenDisplay(name: c_char) -> Display => x_open_display_first {
         if HOST.config.enable_x11 {
             redhook::real!(XOpenDisplay)(name)
         } else {
@@ -14,4 +17,3 @@ redhook::hook! {
         }
     }
 }
-
