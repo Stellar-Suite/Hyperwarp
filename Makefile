@@ -3,3 +3,6 @@ gluer: glue.c
 
 rust:
 	cargo build
+
+all: rust gluer
+.DEFAULT_GOAL := all

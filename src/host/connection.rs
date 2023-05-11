@@ -18,11 +18,11 @@ pub trait Transport {
 }
 
 pub struct Connection {
-    pub transport: Rc<dyn Transport + Send + Sync>, // super nesting lol
-                                                    // message output queue
-                                                    // outgoing: (Sender<Message>, Receiver<Message>),
-                                                    // message input queue
-                                                    // ingoing: (Sender<Message>, Receiver<Message>),
+    pub transport: Arc<Mutex<dyn Transport + Send + Sync>>, // super nesting lol
+                                                            // message output queue
+                                                            // outgoing: (Sender<Message>, Receiver<Message>),
+                                                            // message input queue
+                                                            // ingoing: (Sender<Message>, Receiver<Message>),
 }
 
 /*fn test() {
@@ -35,7 +35,7 @@ impl Connection {
         // let (tx1, rx1) = mpsc::channel();
         // let (tx2, rx2) = mpsc::channel();
         let conn = Connection {
-            transport: Rc::new(transport),
+            transport: Arc::new(Mutex::new(transport)),
             // outgoing: mpsc::channel(), // (tx1, rx1),
             // ingoing: mpsc::channel(),  // (tx2, rx2),
         };
@@ -45,7 +45,11 @@ impl Connection {
 
     pub fn start(&mut self) {
         let transport = &mut self.transport;
-        transport.init().expect("Transport initalization failure. ");
+        transport
+            .lock()
+            .unwrap()
+            .init()
+            .expect("Transport initalization failure. ");
         /* thread::spawn(move || {
             transport.init().expect("Transport initalization fail. ");
             // read/write queue here
