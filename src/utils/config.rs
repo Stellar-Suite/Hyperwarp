@@ -1,5 +1,7 @@
 use std::{env, str::FromStr};
 
+use super::utils::generate_random_id;
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub enable_x11: bool,
@@ -15,6 +17,11 @@ pub struct Config {
     // connection
     pub connection_type: String,
     pub connection_timeout: Option<u32>,
+    // session and user
+    pub session_id: String,
+    pub user_id: String,
+    // unix socket transport
+    pub unix_socket_path: Option<String>,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -65,6 +72,9 @@ fn booleanify(key: &str, default: bool) -> bool {
 
 impl Config {
     pub fn from_env() -> Config {
+        let sid = get("HW_SESSION_ID", generate_random_id());
+        let uid = get("HW_USER_ID", generate_random_id());
+        let socket_path = get("HW_SOCKET_PATH", format!("/tmp/hw-{}.sock", sid));
         Config {
             enable_x11: booleanify("ENABLE_X11", true),
             enable_gl: booleanify("ENABLE_GL", true),
@@ -77,12 +87,18 @@ impl Config {
             window_zero_origin: booleanify("WINDOW_ZERO_ORIGIN", false),
             connection_timeout: None,
             connection_type: try_get::<String>("CONNECTION_TYPE").unwrap_or("null".to_owned()),
+            session_id: sid,
+            user_id: uid,
+            unix_socket_path: Some(socket_path),
         }
     }
 }
 
 impl Default for Config {
     fn default() -> Config {
+        let sid = generate_random_id();
+        let uid = generate_random_id();
+        let socket_path = format!("/tmp/hw-{}.sock", sid);
         Config {
             enable_x11: true,
             enable_gl: true,
@@ -95,6 +111,9 @@ impl Default for Config {
             window_zero_origin: false,
             connection_type: "null".to_owned(),
             connection_timeout: None,
+            session_id: sid,
+            user_id: uid,
+            unix_socket_path: Some(socket_path),
         }
     }
 }

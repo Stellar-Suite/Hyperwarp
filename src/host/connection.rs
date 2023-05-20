@@ -32,12 +32,8 @@ pub struct Connection {
 
 impl Connection {
     pub fn new(transport: impl Transport + Send + Sync + 'static) -> Self {
-        // let (tx1, rx1) = mpsc::channel();
-        // let (tx2, rx2) = mpsc::channel();
         let conn = Connection {
             transport: Arc::new(Mutex::new(transport)),
-            // outgoing: mpsc::channel(), // (tx1, rx1),
-            // ingoing: mpsc::channel(),  // (tx2, rx2),
         };
 
         conn
@@ -50,17 +46,5 @@ impl Connection {
             .unwrap()
             .init()
             .expect("Transport initalization failure. ");
-        /* thread::spawn(move || {
-            transport.init().expect("Transport initalization fail. ");
-            // read/write queue here
-        }); */
-        // rw threads
-        /*let recv_transport = transport.clone();
-        thread::spawn(move || {
-            let buf = [0; MAX_PAYLOAD];
-            loop {
-                transport.recv(&mut buf).expect("Transport recv fail. ");
-            }
-        });*/
     }
 }

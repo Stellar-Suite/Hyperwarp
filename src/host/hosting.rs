@@ -35,10 +35,15 @@ impl ApplicationHost {
 
 fn create_host() -> ApplicationHost {
     let config = Config::from_env();
+    if config.debug_mode {
+        println!("Selected Connection type: {}", config.connection_type);
+        println!("Host config: {:?}", config);
+    }
     let host = match config.connection_type.as_ref() {
         "unix_client" => {
+            let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket path should be set in config");
             let conn = Connection::new(UnixTransport {
-                stream: UnixStream::connect("/tmp/test").expect("Unix socket connect fail. "),
+                stream: UnixStream::connect(unix_socket_path).expect("Unix socket connect fail. "),
             });
             let mut host = ApplicationHost::new(config);
             host.connection = Some(Arc::new(Mutex::new(conn)));
