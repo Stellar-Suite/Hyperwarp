@@ -3,18 +3,21 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use std::thread; // for test func
+
 use crate::utils::config::Config;
 use lazy_static::lazy_static;
 
 use super::{
     connection::{Connection, Transport},
     transports::{null::NullTransport, unix::UnixTransport},
+    feature_flags::FeatureFlags,
 };
 
-#[derive(Clone)]
 pub struct ApplicationHost {
     pub config: Config,
     pub connection: Option<Arc<Mutex<Connection>>>,
+    pub features: FeatureFlags,
 }
 
 impl ApplicationHost {
@@ -22,6 +25,7 @@ impl ApplicationHost {
         let host = ApplicationHost {
             config,
             connection: None,
+            features: FeatureFlags::new(),
         };
         return host;
     }
@@ -30,6 +34,10 @@ impl ApplicationHost {
         if let Some(conn) = &self.connection {
             conn.lock().unwrap().start();
         }
+    }
+
+    pub fn test(&self){
+        println!("test func called on thread {:?}", thread::current().id());
     }
 }
 
@@ -63,5 +71,6 @@ fn create_host() -> ApplicationHost {
 }
 
 lazy_static! {
+    // so look here, this might be unsafe yk, but all the important things are behind mutexes
     pub static ref HOST: ApplicationHost = create_host();
 }

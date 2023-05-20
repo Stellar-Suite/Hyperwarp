@@ -10,6 +10,7 @@ type GLXDrawable = *const c_void;
 redhook::hook! {
     unsafe fn glXSwapBuffers(name: Display, drawble: GLXDrawable) => gl_x_swap_buffers {
         if HOST.config.enable_x11 && HOST.config.enable_glx {
+            HOST.test();
             redhook::real!(glXSwapBuffers)(name, drawble)
         } else {
             if HOST.config.debug_mode {
