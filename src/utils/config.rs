@@ -10,6 +10,7 @@ pub struct Config {
     pub enable_glx: bool,
     pub enable_sdl2: bool,
     pub debug_mode: bool,
+    pub capture_mode: bool,
     // windowing
     pub window_width_override: Option<u32>,
     pub window_height_override: Option<u32>,
@@ -90,6 +91,7 @@ impl Config {
             session_id: sid,
             user_id: uid,
             unix_socket_path: Some(socket_path),
+            capture_mode: booleanify("CAPTURE_MODE", false),
         }
     }
 }
@@ -114,6 +116,7 @@ impl Default for Config {
             session_id: sid,
             user_id: uid,
             unix_socket_path: Some(socket_path),
+            capture_mode: false
         }
     }
 }

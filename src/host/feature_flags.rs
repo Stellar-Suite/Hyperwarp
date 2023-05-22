@@ -18,4 +18,16 @@ impl FeatureFlags {
             sdl2_enabled: false,
         }
     }
+
+    pub fn enable_x11(&mut self) {
+        self.x11_enabled = true;
+    }
+
+    pub fn enable_glx(&mut self) {
+        self.glx_enabled = true;
+        // this implies x11
+        self.x11_enabled = true;
+        // this implies gl
+        self.gl_enabled = true;
+    }
 }

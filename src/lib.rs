@@ -7,6 +7,7 @@ mod constants;
 mod hooks;
 mod host;
 mod utils;
+mod bind;
 
 fn main() {
     println!("Hello, world!");
