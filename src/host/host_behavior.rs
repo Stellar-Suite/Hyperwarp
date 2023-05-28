@@ -6,6 +6,9 @@ use crate::{utils::config::Config, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_R
 
 use super::hosting::HOST;
 
+use std::time::Duration;
+use std::thread::sleep;
+
 // for now we only handle a single window
 pub trait HostBehavior: Send {
     fn onStart(&mut self) {
@@ -61,7 +64,8 @@ impl HostBehavior for DefaultHostBehavior {
                 // use opengl to capture the framebuffer
                 glReadPixelsSafe(0, 0, self.fb_width.unwrap() as i32, self.fb_height.unwrap() as i32,RGBA, UNSIGNED_BYTE, self.fb.as_mut_ptr());
                 // pov: you are a rustacean and you are reading this code (copilot wrote this and the comment)
-                // println!("a sample of captured pixels {}", self.fb[std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos() as usize % (self.fb.len() - 1)]);
+                println!("a sample of captured pixels {}", self.fb[std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos() as usize % (self.fb.len() - 1)]);
+                sleep(Duration::from_millis(50));
             }
         }
     }

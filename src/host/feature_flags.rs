@@ -6,6 +6,7 @@ pub struct FeatureFlags {
     pub glfw_enabled: bool,
     pub glx_enabled: bool,
     pub sdl2_enabled: bool,
+    pub egl_enabled: bool,
 }
 
 impl FeatureFlags {
@@ -16,6 +17,7 @@ impl FeatureFlags {
             glfw_enabled: false,
             glx_enabled: false,
             sdl2_enabled: false,
+            egl_enabled: false,
         }
     }
 
