@@ -1,11 +1,11 @@
 use std::{
     os::unix::net::UnixStream,
-    sync::{Arc, Mutex, MutexGuard}, fs::File, io::Write,
+    sync::{Arc, Mutex, MutexGuard}, fs::File, io::Write, collections::HashMap,
 };
 
 use std::thread; // for test func
 
-use crate::utils::config::Config;
+use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
 use super::{
@@ -19,6 +19,7 @@ pub struct ApplicationHost {
     pub connection: Option<Arc<Mutex<Connection>>>,
     pub features: Mutex<FeatureFlags>,
     pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
+    pub func_pointers: Mutex<HashMap<String, Pointer>>,
 }
 
 impl ApplicationHost {
@@ -27,7 +28,8 @@ impl ApplicationHost {
             config,
             connection: None,
             features: Mutex::new(FeatureFlags::new()),
-            behavior: Arc::new(Mutex::new(Box::new(DefaultHostBehavior::new())))
+            behavior: Arc::new(Mutex::new(Box::new(DefaultHostBehavior::new()))),
+            func_pointers: Mutex::new(HashMap::new()),
         };
         return host;
     }
@@ -53,6 +55,7 @@ impl ApplicationHost {
     }
 
     pub fn test(&self){
+        // TODO: supress test func in non-debug mode
         println!("test func called on thread {:?}", thread::current().id());
     }
 }

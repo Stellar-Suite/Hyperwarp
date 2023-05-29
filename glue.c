@@ -1,5 +1,7 @@
 // #include <GL/gl.h>
 // #include <FTGL/ftgl.h>
+// this code originated from a glfw ld preload example
+#include <stdbool.h>
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdlib.h>
@@ -80,7 +82,20 @@ void premain_plugin()
 {
   if (DEBUG)
   {
-    printf("Glue: Oops, premain not override. \n");
+    printf("Glue: Oops, premain not overriden. \n");
+  }
+  // die?
+  if (getenv("IGNORE_INIT_ERRORS") == NULL)
+  {
+    exit(37);
+  }
+}
+
+void preglue_plugin()
+{
+  if (DEBUG)
+  {
+    printf("Glue: Oops, preglue not overridem. \n");
   }
   // die?
   if (getenv("IGNORE_INIT_ERRORS") == NULL)
@@ -107,11 +122,65 @@ int wrap_main(int argc, char **argv, char **envp)
     printf("Glue: Pre-main\n");
     premain_debug();
   }
+  preglue_plugin();
   premain_plugin();
   int main_res = real_main(argc, argv, envp);
   if (DEBUG)
     printf("Glue: Post-main\n");
   return main_res;
+}
+
+void* (*local_odlsym_func)(void *handle, const char *symbol);
+
+void* (*odlsym_func)(void *handle, const char *symbol);
+
+void* get_my_odlsym_from_postglue(){
+  printf("DLSYMING INVOKED\n");
+  void* (*real_dlsym_func)(void *handle, const char *symbol);
+  real_dlsym_func = dlvsym(RTLD_NEXT, "dlsym", "GLIBC_2.2.5");
+  return real_dlsym_func(RTLD_NEXT, "dlsym");
+}
+
+bool odlsym_inited = false;
+
+bool init_odlsym(){
+  printf("initalizing odlsym\n");
+  odlsym_inited = true;
+  odlsym_func = get_my_odlsym_from_postglue();
+  printf("odlsym func addr: %p and poisoned dlsym addr: %p \n", odlsym_func,dlsym);
+  // sleep(6969);
+  odlsym_func = odlsym_func(RTLD_NEXT, "dlsym");
+  if(odlsym_func == NULL){
+    printf("ERROR: dlsym failed\n");
+    return false;
+  }
+  printf("I got the real dlsym :D\n");
+  return true;
+}
+
+void init_if_needed(){
+  if(!odlsym_inited){
+    init_odlsym();
+  }
+}
+
+
+
+void *odlsym(void *handle, const char *symbol);
+
+void *odlsym(void *handle, const char *symbol){
+  // printf("dlsym called for %s\n", symbol);
+  // printf("odlsym func addr: %p and poisoned dlsym addr: %p \n", odlsym_func,dlsym);
+  
+  if(!odlsym_inited){
+    printf("tried to dlsym without fully loaded odlsym\n");
+    if(!init_odlsym()){
+      printf("could not init odlsym\n");
+      return NULL;
+    }
+  }
+  // printf("orig: %p\n",odlsym_func(handle, symbol));
+  return odlsym_func(handle, symbol);
 }
 
 // wrap __libc_start_main: replace real_main with wrap_main
@@ -126,7 +195,8 @@ int __libc_start_main(
     if (DEBUG)
       printf("real___libc_start_main = %p (empty)\n", real___libc_start_main);
     char *error;
-    real___libc_start_main = dlsym(RTLD_NEXT, "__libc_start_main");
+    local_odlsym_func = dlvsym(RTLD_NEXT, "dlsym", "GLIBC_2.2.5");
+    real___libc_start_main = local_odlsym_func(RTLD_NEXT, "__libc_start_main");
     if (DEBUG)
       printf("real___libc_start_main = %p\n", real___libc_start_main);
     if ((error = dlerror()) != NULL)
@@ -136,5 +206,6 @@ int __libc_start_main(
     }
   }
   real_main = main;
+  printf("launching main...\n");
   return real___libc_start_main(wrap_main, argc, argv, init, fini, rtld_fini, stack_end);
 }

@@ -6,6 +6,8 @@ use crate::utils::manual_types::sdl2::{SDL_Window, Uint32};
 
 use crate::host::hosting::HOST;
 
+pub type SDL_Renderer = *const c_void;
+
 redhook::hook! {
     unsafe fn SDL_Init(flags: Uint32) -> c_int => sdl_init_first {
         if HOST.config.debug_mode {
@@ -52,13 +54,29 @@ redhook::hook! {
 }
 
 redhook::hook! {
-    unsafe fn SDL_GL_SwapBuffers() -> *const c_void => sdl_gl_swapbuffers_first {
+    unsafe fn SDL_GL_SwapBuffers() => sdl_gl_swapbuffers_first {
         if HOST.config.debug_mode {
             println!("SDL_GL_SwapBuffers called");
         }
         if HOST.config.enable_sdl2 {
             HOST.get_behavior().onFrameSwapBegin();
             let result = redhook::real!(SDL_GL_SwapBuffers)();
+            HOST.get_behavior().onFrameSwapEnd();
+            result
+        } else {
+            // std::ptr::null()
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_RenderPresent(renderer: *mut SDL_Renderer) -> *const c_void => sdl_renderpresent_first {
+        if HOST.config.debug_mode {
+            println!("SDL_RenderPresent called");
+        }
+        if HOST.config.enable_sdl2 {
+            HOST.get_behavior().onFrameSwapBegin();
+            let result = redhook::real!(SDL_RenderPresent)(renderer);
             HOST.get_behavior().onFrameSwapEnd();
             result
         } else {
