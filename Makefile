@@ -7,5 +7,8 @@ pregluer: preglue.c
 rust:
 	cargo build
 
-all: rust pregluer gluer
+rust_release:
+	cargo build -r
+
+all: rust pregluer gluer rust_release
 .DEFAULT_GOAL := all
