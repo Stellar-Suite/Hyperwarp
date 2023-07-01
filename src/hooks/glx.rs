@@ -85,9 +85,9 @@ redhook::hook! {
 
 #[no_mangle]
 pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
-    println!("Entered glXSwapBuffersPA");
+    // println!("Entered glXSwapBuffersPA");
     let func_pointers = HOST.func_pointers.lock().unwrap();
-    println!("Locked pointer map");
+    // println!("Locked pointer map");
     let func = func_pointers.get("glXSwapBuffers").unwrap();
     match func {
         Pointer(func_ref) => {
@@ -99,7 +99,7 @@ pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
 
         },
         _ => {
-            println!("glXSwapBuffersPA: func is not a pointer");
+            // println!("glXSwapBuffersPA: func is not a pointer");
         }
     }
 }
