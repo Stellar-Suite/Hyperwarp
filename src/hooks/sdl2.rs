@@ -31,6 +31,10 @@ redhook::hook! {
         if HOST.config.debug_mode {
             println!("SDL_CreateWindow called");
         }
+        {
+            let mut features = HOST.features.lock().unwrap();
+            features.enable_sdl2();
+        }
         let mut final_x: c_int = x;
         let mut final_y: c_int = y;
         let mut final_w: c_int = w;

@@ -2,7 +2,7 @@ use std::{sync::{Arc, mpsc, Mutex}, time::{UNIX_EPOCH, Instant}, path::Path, thr
 
 use gl::{RGBA, UNSIGNED_BYTE};
 
-use crate::{utils::config::Config, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
+use crate::{utils::{config::Config, manual_types::sdl2}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
 use super::{hosting::HOST, window::Window};
 
@@ -73,7 +73,14 @@ impl HostBehavior for DefaultHostBehavior {
                 // let wh = sdl2_safe::SDL_GetWindowSize_safe();
                 // surely no one uses both sdl2 and something else
                 if features.sdl2_enabled {
-
+                    if let Some((width, height)) = self.get_largest_sdl2_window() {
+                        if self.fb_width != Some(width.try_into().unwrap()) || self.fb_height != Some(height.try_into().unwrap()) {
+                            println!("resize fb {}x{}", width, height);
+                            self.setup_framebuffer(width.try_into().unwrap(), height.try_into().unwrap());
+                        }
+                    } else {
+                       //  println!("sdl2 window not found");
+                    }
                 }
                 if let Some(_capture) = HOST.capture_helper.as_ref() {
                     if let (Some(fb_width), Some(fb_height)) = (self.fb_width, self.fb_height) {
@@ -118,6 +125,26 @@ impl DefaultHostBehavior {
             fb: Vec::new(),
             tx: None,
             windows: Vec::new(),
+        }
+    }
+
+    pub fn get_largest_sdl2_window(&self) -> Option<(i32, i32)> {
+        let mut lw = 0;
+        let mut lh = 0;
+        for window in &self.windows {
+            let (w, h) = sdl2_safe::SDL_GetWindowSize_safe(window.id as *mut sdl2::SDL_Window);
+            // println!("gws {} {}", w, h);
+            if w > lw {
+                lw = w;
+            }
+            if h > lh {
+                lh = h;
+            }
+        }
+        if lw == 0 || lh == 0 {
+            None
+        } else {
+            Some((lw, lh))
         }
     }
 

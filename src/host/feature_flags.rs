@@ -32,4 +32,9 @@ impl FeatureFlags {
         // this implies gl
         self.gl_enabled = true;
     }
+
+    pub fn enable_sdl2(&mut self) {
+        self.sdl2_enabled = true;
+        // maybe imply x11?
+    }
 }
