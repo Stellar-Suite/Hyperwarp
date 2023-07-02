@@ -14,22 +14,36 @@ use super::{
     feature_flags::FeatureFlags, host_behavior::{HostBehavior, DefaultHostBehavior},
 };
 
+pub struct CaptureHelper {
+    pub frameFile: Option<Mutex<File>>,
+}
+
 pub struct ApplicationHost {
     pub config: Config,
     pub connection: Option<Arc<Mutex<Connection>>>,
     pub features: Mutex<FeatureFlags>,
     pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
     pub func_pointers: Mutex<HashMap<String, Pointer>>,
+    pub capture_helper: Option<CaptureHelper>
 }
 
 impl ApplicationHost {
     pub fn new(config: Config) -> Self {
+        let mut default_behavior = DefaultHostBehavior::new();
+        if config.debug_mode {
+            println!("Spawning writer thread...");
+        }
+        let handle = default_behavior.spawn_writer_thread(&config);
+        if config.debug_mode {
+            println!("Default behavior thread handle: {:?}", handle);
+        }
         let host = ApplicationHost {
             config,
             connection: None,
             features: Mutex::new(FeatureFlags::new()),
-            behavior: Arc::new(Mutex::new(Box::new(DefaultHostBehavior::new()))),
+            behavior: Arc::new(Mutex::new(Box::new(default_behavior))),
             func_pointers: Mutex::new(HashMap::new()),
+            capture_helper: None,
         };
         return host;
     }
@@ -37,6 +51,11 @@ impl ApplicationHost {
     pub fn start(&mut self) {
         if let Some(conn) = &self.connection {
             conn.lock().unwrap().start();
+        }
+        if self.config.capture_mode {
+            self.capture_helper = Some(CaptureHelper {
+                frameFile: None,
+            });
         }
     }
 
@@ -77,7 +96,11 @@ fn create_host() -> ApplicationHost {
             host.start();
             host
         }
-        _ => ApplicationHost::new(config),
+        _ => {
+            let mut host = ApplicationHost::new(config);
+            host.start();
+            host
+        },
     };
     host.log();
     if let Some(ref conn_arc) = host.connection {

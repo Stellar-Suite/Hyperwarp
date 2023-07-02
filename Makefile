@@ -1,8 +1,8 @@
 gluer: glue.c
-	gcc -o libhyperglue.so -shared -D_GNU_SOURCE -fPIC glue.c -ldl
+	gcc -o libhyperglue.so -O3 -shared -D_GNU_SOURCE -fPIC glue.c -ldl
 
 pregluer: preglue.c
-	gcc -o libhyperpreglue.so -shared -D_GNU_SOURCE -fPIC preglue.c -ldl
+	gcc -o libhyperpreglue.so -O3 -shared -D_GNU_SOURCE -fPIC preglue.c -ldl
 
 rust:
 	cargo build
