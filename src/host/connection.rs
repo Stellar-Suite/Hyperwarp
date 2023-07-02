@@ -17,8 +17,20 @@ pub trait Transport {
     } // this should block until we establish a connection
 }
 
+
+
+// handles multiple transports
+pub trait Transporter {
+    fn get_transports(&self) -> &Vec<Box<Mutex<dyn Transport + Send + Sync>>>;
+
+    fn init(&mut self) -> Result<(), Error>{
+        // TODO: impl
+        Ok(())
+    }
+}
+
 pub struct Connection {
-    pub transport: Arc<Mutex<dyn Transport + Send + Sync>>, // super nesting lol
+    pub transporter: Arc<Mutex<dyn Transporter + Send + Sync>>, // super nesting lol
                                                             // message output queue
                                                             // outgoing: (Sender<Message>, Receiver<Message>),
                                                             // message input queue
@@ -31,20 +43,23 @@ pub struct Connection {
 }*/
 
 impl Connection {
-    pub fn new(transport: impl Transport + Send + Sync + 'static) -> Self {
+    // 'static mem leak?
+    pub fn new(transport: impl Transporter + Send + Sync + 'static) -> Self {
         let conn = Connection {
-            transport: Arc::new(Mutex::new(transport)),
+            transporter: Arc::new(Mutex::new(transport)),
         };
 
         conn
     }
 
     pub fn start(&mut self) {
-        let transport = &mut self.transport;
+        let transport = &mut self.transporter;
         transport
             .lock()
             .unwrap()
             .init()
-            .expect("Transport initalization failure. ");
+            .expect("Transporter initalization failure. ");
     }
 }
+
+pub static empty_transports: Vec<Box<Mutex<dyn Transport + Send + Sync>>>= vec![];

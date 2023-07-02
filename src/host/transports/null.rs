@@ -1,7 +1,9 @@
 use std::{
     io::{Read, Write},
-    os::unix::net::UnixStream,
+    os::unix::net::UnixStream, sync::Mutex,
 };
+
+use crate::host::connection::{Transporter, empty_transports};
 
 use super::super::connection::{Connection, Transport};
 
@@ -23,5 +25,13 @@ impl Transport for NullTransport {
             "Not implemented",
         ))*/
         Ok(())
+    }
+}
+
+pub struct NullTransporter {}
+
+impl Transporter for NullTransporter {
+    fn get_transports(&self) -> &Vec<Box<Mutex<dyn Transport + Send + Sync>>> {
+        &empty_transports // vec![Box::new(NullTransport {})]
     }
 }

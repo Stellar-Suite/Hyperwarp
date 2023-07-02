@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use super::{
     connection::{Connection, Transport},
-    transports::{null::NullTransport, unix::UnixTransport},
+    transports::{null::NullTransport, unix::{UnixTransport, UnixTransporter}},
     feature_flags::FeatureFlags, host_behavior::{HostBehavior, DefaultHostBehavior},
 };
 
@@ -88,9 +88,9 @@ fn create_host() -> ApplicationHost {
     let host = match config.connection_type.as_ref() {
         "unix_client" => {
             let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket path should be set in config");
-            let conn = Connection::new(UnixTransport {
+            let conn = Connection::new(UnixTransporter::new_with_unix_transport(UnixTransport {
                 stream: UnixStream::connect(unix_socket_path).expect("Unix socket connect fail. "),
-            });
+            }));
             let mut host = ApplicationHost::new(config);
             host.connection = Some(Arc::new(Mutex::new(conn)));
             host.start();
