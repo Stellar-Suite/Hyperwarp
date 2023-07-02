@@ -1,7 +1,7 @@
 #!/bin/bash
 echo Runner: Bootstraping
 BASE=$(pwd)
-MODE=release
+MODE=debug
 echo Runner: $(pwd) is our base path. $1
 echo "LD_PRELOAD=$BASE/libhyperpreglue.so:$BASE/target/$MODE/libhyperwarphooker.so:$BASE/libhyperglue.so $@" 
 cd "`dirname "$1"`"

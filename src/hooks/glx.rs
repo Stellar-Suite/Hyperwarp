@@ -131,7 +131,7 @@ redhook::hook! {
     unsafe fn glXGetProcAddress(name: *const c_char) -> c_func => gl_x_get_proc_address {
         let func = redhook::real!(glXGetProcAddress_hw_direct)(name);
         let func_name = std::ffi::CStr::from_ptr(name).to_str().unwrap();
-        println!("glx get proc addr {}", func_name);
+        // println!("glx get proc addr {}", func_name);
         let origPointer = Pointer(func);
         // insert orig pointer
         HOST.func_pointers.lock().unwrap().insert(func_name.to_owned(), Pointer(func));
@@ -151,7 +151,7 @@ redhook::hook! {
     unsafe fn glXGetProcAddressARB(name: *const c_char) -> c_func => gl_x_get_proc_address_arb {
         let func = redhook::real!(glXGetProcAddressARB_hw_direct)(name);
         let func_name = std::ffi::CStr::from_ptr(name).to_str().unwrap();
-        println!("glx get proc addr arb {}", func_name);
+        // println!("glx get proc addr arb {}", func_name);
         // insert orig pointer
         HOST.func_pointers.lock().unwrap().insert(func_name.to_owned(), Pointer(func));
         let origPointer = Pointer(func);

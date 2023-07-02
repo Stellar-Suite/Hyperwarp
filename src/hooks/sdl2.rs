@@ -2,11 +2,10 @@ use libc::{c_char, c_int, c_void};
 
 use crate::constants::sdl2::SDL_FALSE;
 
-use crate::utils::manual_types::sdl2::{SDL_Window, Uint32};
+use crate::host::window::Window;
+use crate::utils::manual_types::sdl2::{SDL_Window, Uint32, SDL_Renderer};
 
 use crate::host::hosting::HOST;
-
-pub type SDL_Renderer = *const c_void;
 
 redhook::hook! {
     unsafe fn SDL_Init(flags: Uint32) -> c_int => sdl_init_first {
@@ -18,6 +17,12 @@ redhook::hook! {
         } else {
             SDL_FALSE
         }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_CreateWindow_hw_direct(title: *const c_char, x: c_int, y: c_int, w: c_int, h: c_int, flags: Uint32) -> *const SDL_Window  => sdl_createwindow_hw_drect {
+        std::ptr::null() // Once again this is a shim so I can run redhook::real on it
     }
 }
 
@@ -37,19 +42,27 @@ redhook::hook! {
         if let Some(new_h) = HOST.config.window_height_override {
             final_h = new_h as c_int;
         }
+
+        let mut result = if HOST.config.enable_sdl2 {
+            redhook::real!(SDL_CreateWindow_hw_direct)(title, final_x, final_y, final_w, final_h, flags)
+        } else {
+            std::ptr::null()
+        };
+
         // this should never panic
         // who would have a negative window size?
-        HOST.get_behavior().onWindowCreate(Some(final_x), Some(final_y), Some(final_w.try_into().unwrap()), Some(final_h.try_into().unwrap()));
+        let window = Window {
+            id: result as usize,
+            is_SDL2: true,
+        };
+
+        HOST.get_behavior().onWindowCreate(window, Some(final_x), Some(final_y), Some(final_w.try_into().unwrap()), Some(final_h.try_into().unwrap()));
 
         if HOST.config.debug_mode {
             println!("SDL_CreateWindow called with x: {}, y: {}, w: {}, h: {}", final_x, final_y, final_w, final_h);
         }
 
-        if HOST.config.enable_sdl2 {
-            redhook::real!(SDL_CreateWindow)(title, final_x, final_y, final_w, final_h, flags)
-        } else {
-            std::ptr::null()
-        }
+        result
     }
 }
 

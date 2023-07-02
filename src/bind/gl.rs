@@ -1,5 +1,3 @@
-#![feature(linkage)]
-
 use gl::types::*;
 
 /*extern "C" {

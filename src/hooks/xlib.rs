@@ -7,6 +7,7 @@ use libc::{c_char, c_void};
 use crate::host::hosting::HOST;
 
 // types
+// TODO: convert them to without the pointer stuffs
 pub type Display = *const c_void;
 pub type Window = *const c_void;
 pub type Visual = *const c_void;
@@ -68,7 +69,13 @@ redhook::hook! {
             if HOST.config.debug_mode {
                 println!("XCreateWindow: {}", result as u64);
             }
-            HOST.get_behavior().onWindowCreate(Some(x), Some(y), Some(width), Some(height));
+
+            let window = crate::host::window::Window {
+                id: ((result) as *const c_void) as usize,
+                is_SDL2: false,
+            };
+
+            HOST.get_behavior().onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
             
             result
         } else {

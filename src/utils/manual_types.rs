@@ -8,8 +8,12 @@ pub mod glfw {
 }
 
 pub mod sdl2 {
+    use libc::c_void;
+
     pub type Uint32 = u32;
     pub enum SDL_Window {}
+
+    pub type SDL_Renderer = *const c_void;
 }
 
 pub mod libc {

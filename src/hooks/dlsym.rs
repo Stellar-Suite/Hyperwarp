@@ -4,7 +4,7 @@ use std::ffi::CString;
 
 use libc::{c_void, c_char};
 
-use super::glx;
+use super::{glx, sdl2};
 
 extern "C" {
     pub fn odlsym(handle: *const c_void, symbol: *const c_char) -> *mut c_void;
@@ -18,8 +18,10 @@ redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
         // println!("dlsym symbol name {}",symbol_name);
+        // TODO: refactor the long if else into a map?
         if symbol_name.ends_with("_hw_direct") {
             init_if_needed();
+            // this is only slow for the one lookup yk
             let symbol_string = CString::new(symbol_name.replace("_hw_direct","")).unwrap();
             odlsym(handle, symbol_string.as_ptr() as *const c_char)
         } else if symbol_name == "glXSwapBuffers" {
@@ -30,6 +32,9 @@ redhook::hook! {
             unsafe { std::mem::transmute(glx::gl_x_get_proc_address as *const c_void) }
         } else if symbol_name == "glXGetProcAddressARB" {
             unsafe { std::mem::transmute(glx::gl_x_get_proc_address as *const c_void) }
+        }else if symbol_name == "SDL_CreateWindow" {
+            println!("dropped SDL_CreateWindow modifacation");
+            unsafe { std::mem::transmute(sdl2::sdl_createwindow_first as *const c_void) }
         } else {
             // odlsym is from preglue
             // println!("using odlsym");
@@ -42,6 +47,7 @@ redhook::hook! {
             // println!("brace");
             let result = odlsym(handle, symbol);
             // println!("nothing exploded looking up {}",symbol_name);
+            // println!("dlsym({})",symbol_name);
             result
         }
     }

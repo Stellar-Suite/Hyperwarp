@@ -2,9 +2,9 @@ use std::{sync::{Arc, mpsc, Mutex}, time::{UNIX_EPOCH, Instant}, path::Path, thr
 
 use gl::{RGBA, UNSIGNED_BYTE};
 
-use crate::{utils::config::Config, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}}};
+use crate::{utils::config::Config, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
-use super::hosting::HOST;
+use super::{hosting::HOST, window::Window};
 
 use std::time::Duration;
 use std::thread::sleep;
@@ -16,7 +16,7 @@ pub trait HostBehavior: Send {
 
     }
 
-    fn onWindowCreate(&mut self, x: Option<i32>,y: Option<i32>,width: Option<u32>, height: Option<u32>) {
+    fn onWindowCreate(&mut self, win: Window, x: Option<i32>,y: Option<i32>,width: Option<u32>, height: Option<u32>) {
 
     }
 
@@ -42,6 +42,7 @@ pub struct DefaultHostBehavior {
     fb_enabled: bool,
     pub fb: Vec<u8>,
     pub tx: Option<mpsc::Sender<ThreadMessage>>,
+    pub windows: Vec<Window>,
 }
 
 impl DefaultHostBehavior {
@@ -55,7 +56,8 @@ impl DefaultHostBehavior {
 }
 
 impl HostBehavior for DefaultHostBehavior {
-    fn onWindowCreate(&mut self, x: Option<i32>,y: Option<i32>,width: Option<u32>, height: Option<u32>) {
+    fn onWindowCreate(&mut self, win: Window, x: Option<i32>,y: Option<i32>,width: Option<u32>, height: Option<u32>) {
+        self.windows.push(win);
         if let Some(width) = width {
             if let Some(height) = height {
                 self.setup_framebuffer(width, height);
@@ -68,22 +70,33 @@ impl HostBehavior for DefaultHostBehavior {
         if HOST.config.capture_mode {
             let features = HOST.features.lock().unwrap();
             if features.gl_enabled {
+                // let wh = sdl2_safe::SDL_GetWindowSize_safe();
+                // surely no one uses both sdl2 and something else
+                if features.sdl2_enabled {
+
+                }
                 if let Some(_capture) = HOST.capture_helper.as_ref() {
-                    // use opengl to capture the framebuffer if we have capture initalized
-                    glReadPixelsSafe(0, 0, self.fb_width.unwrap() as i32, self.fb_height.unwrap() as i32,RGBA, UNSIGNED_BYTE, self.fb.as_mut_ptr());
-                    // pov: you are a rustacean and you are reading this code (copilot wrote this and the comment)
-                    // println!("a sample of captured pixels {}", self.fb[std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos() as usize % (self.fb.len() - 1)]);
-                    // artifical lag debug
-                    // sleep(Duration::from_millis(150));
-                    if let Some(sender) = &self.tx {
-                        sender.send(ThreadMessage::NewFrame).unwrap();
+                    if let (Some(fb_width), Some(fb_height)) = (self.fb_width, self.fb_height) {
+                        // use opengl to capture the framebuffer if we have capture initalized
+                        glReadPixelsSafe(0, 0, fb_width as i32, fb_height as i32,RGBA, UNSIGNED_BYTE, self.fb.as_mut_ptr());
+                        // pov: you are a rustacean and you are reading this code (copilot wrote this and the comment)
+                        // println!("a sample of captured pixels {}", self.fb[std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos() as usize % (self.fb.len() - 1)]);
+                        // artifical lag debug
+                        // sleep(Duration::from_millis(150));
+                        if let Some(sender) = &self.tx {
+                            sender.send(ThreadMessage::NewFrame).unwrap();
+                        }
+                    }
+                } else {
+                    if HOST.config.debug_mode {
+                        println!("unknown framebuffer dimensions");
                     }
                 }
             } else{
                 // println!("gl not enabled");
             }
         }
-        println!("onFrameSwapBegin took {:?}", start.elapsed());
+        // println!("onFrameSwapBegin took {:?}", start.elapsed());
     }
 
     fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
@@ -104,6 +117,7 @@ impl DefaultHostBehavior {
             fb_enabled: false,
             fb: Vec::new(),
             tx: None,
+            windows: Vec::new(),
         }
     }
 
@@ -111,6 +125,7 @@ impl DefaultHostBehavior {
         let base_loc = Path::new("/dev/shm");
         let file_loc = base_loc.join(format!("{}{}",config.session_id, ".raw"));
 
+        println!("file_loc: {}", file_loc.display());
 
         let (tx, rx) = mpsc::channel::<ThreadMessage>(); // we use to signal to the thread to dump the frames. 
 
@@ -128,9 +143,11 @@ impl DefaultHostBehavior {
                         if HOST.config.debug_mode {
                             // println!("new frame writing");
                         }
+                        // let start = Instant::now();
                         let behavior = HOST.get_behavior();
                         file.write(behavior.getFramebufferForCapture().unwrap()).unwrap();
                         file.seek(SeekFrom::Start(0)).unwrap();
+                        // println!("shm write took {:?}", start.elapsed());
                     },
                     Err(e) => {
                         println!("Error in thread: {:?}", e);
