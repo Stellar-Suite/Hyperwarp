@@ -31,6 +31,10 @@ pub trait HostBehavior: Send {
     fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
         None
     }
+    // update whenever
+    fn tick(&mut self) {
+        
+    }
 }
 
 

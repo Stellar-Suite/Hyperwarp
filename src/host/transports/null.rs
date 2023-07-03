@@ -1,9 +1,9 @@
 use std::{
     io::{Read, Write},
-    os::unix::net::UnixStream, sync::Mutex,
+    os::unix::net::UnixStream, sync::{Mutex, Arc},
 };
 
-use crate::host::connection::{Transporter, empty_transports};
+use crate::host::connection::{Transporter, get_empty_transports_vec};
 
 use super::super::connection::{Connection, Transport};
 
@@ -31,7 +31,7 @@ impl Transport for NullTransport {
 pub struct NullTransporter {}
 
 impl Transporter for NullTransporter {
-    fn get_transports(&self) -> &Vec<Box<Mutex<dyn Transport + Send + Sync>>> {
-        &empty_transports // vec![Box::new(NullTransport {})]
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>> {
+        Arc::new(Mutex::new(get_empty_transports_vec())) // vec![Box::new(NullTransport {})]
     }
 }

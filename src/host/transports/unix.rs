@@ -1,6 +1,6 @@
 use std::{
     io::{Read, Write},
-    os::unix::net::UnixStream, sync::Mutex,
+    os::unix::net::UnixStream, sync::{Mutex, Arc},
 };
 
 use crate::host::connection::Transporter;
@@ -40,19 +40,19 @@ impl Transport for UnixTransport {
 }
 
 pub struct UnixTransporter {
-    pub transports: Vec<Box<Mutex<dyn Transport + Send + Sync>>>,
+    pub transports: Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>>,
 }
 
 impl Transporter for UnixTransporter {
-    fn get_transports(&self) -> &Vec<Box<Mutex<dyn Transport + Send + Sync>>> {
-        &self.transports
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>> {
+        self.transports.clone()
     }
 }
 
 impl UnixTransporter {
     pub fn new_with_unix_transport(ut: UnixTransport) -> UnixTransporter {
         UnixTransporter {
-            transports: vec![Box::new(Mutex::new(ut))],
+            transports: Arc::new(Mutex::new(vec![Box::new(ut)])),
         }
     }
 }

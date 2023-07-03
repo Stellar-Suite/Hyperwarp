@@ -21,7 +21,7 @@ pub trait Transport {
 
 // handles multiple transports
 pub trait Transporter {
-    fn get_transports(&self) -> &Vec<Box<Mutex<dyn Transport + Send + Sync>>>;
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>>;
 
     fn init(&mut self) -> Result<(), Error>{
         // TODO: impl
@@ -31,10 +31,6 @@ pub trait Transporter {
 
 pub struct Connection {
     pub transporter: Arc<Mutex<dyn Transporter + Send + Sync>>, // super nesting lol
-                                                            // message output queue
-                                                            // outgoing: (Sender<Message>, Receiver<Message>),
-                                                            // message input queue
-                                                            // ingoing: (Sender<Message>, Receiver<Message>),
 }
 
 /*fn test() {
@@ -62,4 +58,6 @@ impl Connection {
     }
 }
 
-pub static empty_transports: Vec<Box<Mutex<dyn Transport + Send + Sync>>>= vec![];
+pub fn get_empty_transports_vec() -> Vec<Box<dyn Transport + Send + Sync>> {
+    return vec![];
+}
