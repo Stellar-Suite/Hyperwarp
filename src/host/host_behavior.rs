@@ -70,6 +70,7 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn onFrameSwapBegin(&mut self) {
+        self.tick();
         let start = Instant::now();
         if HOST.config.capture_mode {
             let features = HOST.features.lock().unwrap();
@@ -110,8 +111,21 @@ impl HostBehavior for DefaultHostBehavior {
         // println!("onFrameSwapBegin took {:?}", start.elapsed());
     }
 
+    fn onFrameSwapEnd(&mut self) {
+        self.tick();
+    }
+
     fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
         Some(self.fb.as_ref())
+    }
+
+    fn tick(&mut self) {
+        if let Some(conn_arcmutex) = &HOST.connection {
+            let conn = conn_arcmutex.lock().unwrap();
+            let transporter = conn.transporter.lock().unwrap();
+            let transports = transporter.get_transports();
+            
+        }
     }
 }
 
