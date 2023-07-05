@@ -4,7 +4,7 @@ use gl::{RGBA, UNSIGNED_BYTE};
 
 use crate::{utils::{config::Config, manual_types::sdl2}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
-use super::{hosting::HOST, window::Window};
+use super::{hosting::HOST, window::Window, message::allocate_header_buffer};
 
 use std::time::Duration;
 use std::thread::sleep;
@@ -120,11 +120,35 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn tick(&mut self) {
+        let mut header_buf = allocate_header_buffer();
         if let Some(conn_arcmutex) = &HOST.connection {
-            let conn = conn_arcmutex.lock().unwrap();
-            let transporter = conn.transporter.lock().unwrap();
-            let transports = transporter.get_transports();
-            
+            let mut conn = conn_arcmutex.lock().unwrap();
+            let mut transporter = conn.transporter.lock().unwrap();
+            transporter.tick();
+            let transporters_lock = transporter.get_transports();
+            let mut transports = transporters_lock.lock().unwrap();
+            // iterate through each transport
+            // wow iter_mut exists
+            for transport in transports.iter_mut() {
+                loop {
+                    let polling_result = transport.recv(&mut header_buf);
+                    if let Ok(would_block) = polling_result {
+                        if would_block {
+                            break;
+                        }
+                        // actual message!
+                        // let's parse
+                        let message_type: u32 = u32::from_le_bytes([header_buf[0], header_buf[1], header_buf[2], header_buf[3]]);
+                        let message_size: u32 = u32::from_le_bytes([header_buf[4], header_buf[5], header_buf[6], header_buf[7]]);
+                        println!("recieved message type: {} size: {}", message_type, message_size); 
+                    } else {
+                        if HOST.config.debug_mode {
+                            println!("Error in recv: {:?}", polling_result);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 }
