@@ -15,6 +15,9 @@ pub trait Transport {
     fn init(&mut self) -> Result<(), Error> {
         Ok(())
     } // this should block until we establish a connection
+    fn close(&mut self) -> Result<(), Error> {
+        Ok(())
+    } // this should block until we close the connection
 }
 
 

@@ -33,7 +33,7 @@ pub trait HostBehavior: Send {
     }
     // update whenever
     fn tick(&mut self) {
-        
+        // TODO: impl in trait implementor
     }
 }
 
