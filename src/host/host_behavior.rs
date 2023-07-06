@@ -124,9 +124,18 @@ impl HostBehavior for DefaultHostBehavior {
         if let Some(conn_arcmutex) = &HOST.connection {
             let mut conn = conn_arcmutex.lock().unwrap();
             let mut transporter = conn.transporter.lock().unwrap();
-            transporter.tick();
+            match transporter.tick() {
+                Ok(_) => {},
+                Err(e) => {
+                    if HOST.config.debug_mode {
+                        println!("Error in tick (transporter): {:?}", e);
+                    }
+                }
+            }
             let transporters_lock = transporter.get_transports();
             let mut transports = transporters_lock.lock().unwrap();
+
+            transports.retain(|transport| transport.is_connected());
             // iterate through each transport
             // wow iter_mut exists
             for transport in transports.iter_mut() {

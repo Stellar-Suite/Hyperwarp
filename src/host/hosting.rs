@@ -90,6 +90,7 @@ fn create_host() -> ApplicationHost {
             let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket path should be set in config");
             let conn = Connection::new(UnixTransporter::new_with_unix_transport(UnixTransport {
                 stream: UnixStream::connect(unix_socket_path).expect("Unix socket connect fail. "),
+                closed: false,
             }));
             let mut host = ApplicationHost::new(config);
             host.connection = Some(Arc::new(Mutex::new(conn)));
@@ -97,6 +98,7 @@ fn create_host() -> ApplicationHost {
             host
         },
         "unix_listener" => {
+            println!("unix listener mode");
             let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket listening path should be set in config");
             let conn = Connection::new(UnixListenerTransporter::new_with_path(&unix_socket_path));
             let mut host = ApplicationHost::new(config);

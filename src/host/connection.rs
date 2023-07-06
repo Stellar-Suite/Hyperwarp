@@ -18,6 +18,9 @@ pub trait Transport {
     fn close(&mut self) -> Result<(), Error> {
         Ok(())
     } // this should block until we close the connection
+    fn is_connected(&self) -> bool {
+        true
+    }
 }
 
 
