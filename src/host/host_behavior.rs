@@ -113,6 +113,10 @@ impl HostBehavior for DefaultHostBehavior {
 
     fn onFrameSwapEnd(&mut self) {
         self.tick();
+        let _ = self.broadcast_message_no_type(MessagePayload::RenderedFrame {
+            width: self.fb_width.unwrap(),
+            height: self.fb_height.unwrap(),
+        });
     }
 
     fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
