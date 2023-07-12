@@ -9,7 +9,7 @@ pub struct Message {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-enum MessagePayload {
+pub enum MessagePayload {
     RenderedFrame {
         width: u32,
         height: u32,

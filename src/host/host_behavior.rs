@@ -2,9 +2,9 @@ use std::{sync::{Arc, mpsc, Mutex}, time::{UNIX_EPOCH, Instant}, path::Path, thr
 
 use gl::{RGBA, UNSIGNED_BYTE};
 
-use crate::{utils::{config::Config, manual_types::sdl2}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
+use crate::{utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
-use super::{hosting::HOST, window::Window, message::allocate_header_buffer};
+use super::{hosting::HOST, window::Window, message::{allocate_header_buffer, MessagePayload}};
 
 use std::time::Duration;
 use std::thread::sleep;
@@ -177,6 +177,41 @@ impl DefaultHostBehavior {
             tx: None,
             windows: Vec::new(),
         }
+    }
+
+    pub fn broadcast_message_no_type(&mut self, payload: MessagePayload) -> Result<(), std::io::Error>{ // do I really need to own this 
+        // TODO: explore other serialization?
+        // TODO: handle errors better cause serde_json introduces it's own error 
+        let serialized = serde_json::to_vec(&payload).expect("Unable to serialize broadcast message. ");
+        let mut header: [u32; 2] = [0,0];
+        header[1] = serialized.len() as u32;
+
+        let header_u8 = convert_header_to_u8(header);
+        
+        if let Some(conn_arcmutex) = &HOST.connection {
+            let mut conn = conn_arcmutex.lock().unwrap();
+            let mut transporter = conn.transporter.lock().unwrap();
+            match transporter.tick() {
+                Ok(_) => {},
+                Err(e) => {
+                    if HOST.config.debug_mode {
+                        println!("Error in tick (transporter): {:?}", e);
+                    }
+                }
+            }
+            let transporters_lock = transporter.get_transports();
+            let mut transports = transporters_lock.lock().unwrap();
+
+            transports.retain(|transport| transport.is_connected());
+            // iterate through each transport
+            // wow iter_mut exists
+            for transport in transports.iter_mut() {
+                transport.send(&header_u8)?;
+                transport.send_vec(&serialized)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn get_largest_sdl2_window(&self) -> Option<(i32, i32)> {
