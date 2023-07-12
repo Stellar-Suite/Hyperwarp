@@ -19,6 +19,14 @@ impl Transport for NullTransport {
         Ok(false)
     }
 
+    fn send_vec(&mut self, data: &Vec<u8>) -> Result<bool, std::io::Error> {
+        /*Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Not implemented",
+        ))*/
+        Ok(false)
+    }
+
     fn recv(&mut self, data: &mut [u8]) -> Result<bool, std::io::Error> {
         /*Err(std::io::Error::new(
             std::io::ErrorKind::Other,

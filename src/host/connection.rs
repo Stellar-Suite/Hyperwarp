@@ -11,6 +11,7 @@ pub const MAX_PAYLOAD: usize = 1024 * 1024 * 10; // 10 MB
 
 pub trait Transport {
     fn send(&mut self, data: &[u8]) -> Result<bool, Error>; // first is would block
+    fn send_vec(&mut self, data: &Vec<u8>) -> Result<bool, Error>;
     fn recv(&mut self, data: &mut [u8]) -> Result<bool, Error>; // first is would block
     fn init(&mut self) -> Result<(), Error> {
         Ok(())

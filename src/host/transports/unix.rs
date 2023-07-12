@@ -34,8 +34,8 @@ impl Transport for UnixTransport {
         !self.closed
     }
 
-    fn send(&mut self, data: &[u8]) -> Result<bool, std::io::Error> {
-        match self.stream.write(data) {
+    fn send_vec(&mut self, data: &Vec<u8>) -> Result<bool, std::io::Error> {
+        match self.stream.write(data) { // idk does this auto convert into array
             Ok(_) => return Ok(false),
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -44,6 +44,10 @@ impl Transport for UnixTransport {
                 return Err(e);
             }
         }
+    }
+
+    fn send(&mut self, data: &[u8]) -> Result<bool, std::io::Error> {
+        self.send_vec(&data.to_vec())
     }
 
     fn recv(&mut self, data: &mut [u8]) -> Result<bool, std::io::Error> {
