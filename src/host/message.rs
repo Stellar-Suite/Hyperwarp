@@ -14,6 +14,10 @@ pub enum MessagePayload {
         width: u32,
         height: u32,
     },
+    ForceResize {
+        width: u32,
+        height: u32,
+    },
 }
 
 // type id 4 bytes
