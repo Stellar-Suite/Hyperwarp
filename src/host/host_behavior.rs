@@ -108,7 +108,7 @@ impl HostBehavior for DefaultHostBehavior {
                 // println!("gl not enabled");
             }
         }
-        // println!("onFrameSwapBegin took {:?}", start.elapsed());
+        println!("onFrameSwapBegin took {:?}", start.elapsed());
     }
 
     fn onFrameSwapEnd(&mut self) {

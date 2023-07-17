@@ -17,7 +17,7 @@ extern "C" {
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
-        // println!("dlsym symbol name {}",symbol_name);
+        println!("dlsym: symbol name {}",symbol_name);
         // TODO: refactor the long if else into a map?
         if symbol_name.ends_with("_hw_direct") {
             init_if_needed();
@@ -35,6 +35,12 @@ redhook::hook! {
         }else if symbol_name == "SDL_CreateWindow" {
             println!("dropped SDL_CreateWindow modifacation");
             unsafe { std::mem::transmute(sdl2::sdl_createwindow_first as *const c_void) }
+        }else if symbol_name == "SDL_GL_SwapBuffers" {
+            println!("dropped SDL_GL_SwapBuffers modifacation");
+            unsafe { std::mem::transmute(sdl2::sdl_gl_swapbuffers_first as *const c_void) }
+        }else if symbol_name == "SDL_GL_SwapWindow" {
+            println!("dropped SDL_GL_SwapWindow modifacation");
+            unsafe { std::mem::transmute(sdl2::sdl_gl_swapwindow_first as *const c_void) }
         } else {
             // odlsym is from preglue
             // println!("using odlsym");

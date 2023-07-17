@@ -21,7 +21,7 @@ redhook::hook! {
 }
 
 redhook::hook! {
-    unsafe fn SDL_CreateWindow_hw_direct(title: *const c_char, x: c_int, y: c_int, w: c_int, h: c_int, flags: Uint32) -> *const SDL_Window  => sdl_createwindow_hw_drect {
+    unsafe fn SDL_CreateWindow_hw_direct(title: *const c_char, x: c_int, y: c_int, w: c_int, h: c_int, flags: Uint32) -> *const SDL_Window  => sdl_createwindow_hw_direct {
         std::ptr::null() // Once again this is a shim so I can run redhook::real on it
     }
 }
@@ -71,17 +71,42 @@ redhook::hook! {
 }
 
 redhook::hook! {
+    unsafe fn SDL_GL_SwapBuffers_hw_direct() => sdl_gl_swapbuffers_hw_direct {
+        // shim so I can run redhook::real on it   
+    }
+}
+
+redhook::hook! {
     unsafe fn SDL_GL_SwapBuffers() => sdl_gl_swapbuffers_first {
         if HOST.config.debug_mode {
             println!("SDL_GL_SwapBuffers called");
         }
         if HOST.config.enable_sdl2 {
             HOST.get_behavior().onFrameSwapBegin();
-            let result = redhook::real!(SDL_GL_SwapBuffers)();
+            let result = redhook::real!(SDL_GL_SwapBuffers_hw_direct)();
             HOST.get_behavior().onFrameSwapEnd();
             result
         } else {
             // std::ptr::null()
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_GL_SwapWindow_hw_direct(display: *mut SDL_Window) => sdl_gl_swapwindow_hw_direct {
+        // shim so I can run redhook::real on it   
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_GL_SwapWindow(display: *mut SDL_Window) => sdl_gl_swapwindow_first {
+        if HOST.config.debug_mode {
+            println!("SDL_GL_SwapWindow called");
+        }
+        if HOST.config.enable_sdl2 {
+            HOST.get_behavior().onFrameSwapBegin();
+            redhook::real!(SDL_GL_SwapWindow_hw_direct)(display);
+            HOST.get_behavior().onFrameSwapEnd();
         }
     }
 }

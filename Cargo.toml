@@ -18,3 +18,7 @@ bytemuck = "1.13.1"
 [lib]
 name = "hyperwarphooker"
 crate_type = ["dylib"]
+
+[[bin]]
+name = "streamerd"
+path = "src/streamer/main.rs"
