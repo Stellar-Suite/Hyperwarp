@@ -4,7 +4,7 @@ use gl::{RGBA, UNSIGNED_BYTE};
 
 use crate::{utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
-use super::{hosting::HOST, window::Window, message::{allocate_header_buffer, MessagePayload}};
+use super::{hosting::HOST, window::Window, message::{allocate_header_buffer, MessagePayload, BROADCAST_TYPE}};
 
 use std::time::Duration;
 use std::thread::sleep;
@@ -187,7 +187,7 @@ impl DefaultHostBehavior {
         // TODO: explore other serialization?
         // TODO: handle errors better cause serde_json introduces it's own error 
         let serialized = serde_json::to_vec(&payload).expect("Unable to serialize broadcast message. ");
-        let mut header: [u32; 2] = [0,0];
+        let mut header: [u32; 2] = [BROADCAST_TYPE,0];
         header[1] = serialized.len() as u32;
 
         let header_u8 = convert_header_to_u8(header);

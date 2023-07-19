@@ -18,7 +18,19 @@ pub enum MessagePayload {
         width: u32,
         height: u32,
     },
+    EnableFlag {
+        flag: u32
+    },
+    DisableFlag {
+        flag: u32
+    },
+    SetId {
+        id: u32
+    }
 }
+
+pub const BROADCAST_TYPE: u32 = 0;
+pub const CONTROL_TYPE: u32 = 1;
 
 // type id 4 bytes
 // payload_size 4 bytes
