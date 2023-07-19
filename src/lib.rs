@@ -3,11 +3,11 @@ use libc::c_void;
 
 use crate::host::hosting::HOST;
 
-mod constants;
-mod hooks;
-mod host;
-mod utils;
-mod bind;
+pub mod constants;
+pub mod hooks;
+pub mod host;
+pub mod utils;
+pub mod bind;
 
 fn main() {
     println!("Hello, world!");
