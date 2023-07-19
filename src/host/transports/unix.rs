@@ -5,7 +5,7 @@ use std::{
 
 use crate::host::{connection::Transporter, hosting::HOST};
 
-use super::super::connection::{Connection, Transport};
+use super::super::connection::{ConnectionManager, TransportLink};
 
 pub struct UnixTransport {
     pub stream: UnixStream,
@@ -24,7 +24,7 @@ impl Clone for UnixTransport {
     }
 }
 
-impl Transport for UnixTransport {
+impl TransportLink for UnixTransport {
     fn init(&mut self) -> Result<(), std::io::Error> {
         self.stream.set_nonblocking(true)?;
         Ok(())
@@ -79,11 +79,11 @@ impl Transport for UnixTransport {
 }
 
 pub struct UnixTransporter {
-    pub transports: Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>>,
+    pub transports: Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>>,
 }
 
 impl Transporter for UnixTransporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>> {
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>> {
         self.transports.clone()
     }
 }
@@ -97,12 +97,12 @@ impl UnixTransporter {
 }
 
 pub struct UnixListenerTransporter {
-    pub transports: Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>>,
+    pub transports: Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>>,
     pub listener: UnixListener,
 }
 
 impl Transporter for UnixListenerTransporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>> {
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>> {
         self.transports.clone()
     }
 

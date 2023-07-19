@@ -9,7 +9,7 @@ use super::message::Message;
 
 pub const MAX_PAYLOAD: usize = 1024 * 1024 * 10; // 10 MB
 
-pub trait Transport {
+pub trait TransportLink {
     fn send(&mut self, data: &[u8]) -> Result<bool, Error>; // first is would block
     fn send_vec(&mut self, data: &Vec<u8>) -> Result<bool, Error>;
     fn recv(&mut self, data: &mut [u8]) -> Result<bool, Error>; // first is would block
@@ -28,7 +28,7 @@ pub trait Transport {
 
 // handles multiple transports
 pub trait Transporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>>;
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>>;
 
     fn init(&mut self) -> Result<(), Error>{
         // TODO: impl
@@ -47,7 +47,7 @@ pub trait Transporter {
     }
 }
 
-pub struct Connection {
+pub struct ConnectionManager {
     pub transporter: Arc<Mutex<dyn Transporter + Send + Sync>>, // super nesting lol
 }
 
@@ -56,10 +56,10 @@ pub struct Connection {
     let b = mpsc::channel();
 }*/
 
-impl Connection {
+impl ConnectionManager {
     // 'static mem leak?
     pub fn new(transporter: impl Transporter + Send + Sync + 'static) -> Self {
-        let conn = Connection {
+        let conn = ConnectionManager {
             transporter: Arc::new(Mutex::new(transporter))
         };
 
@@ -76,6 +76,6 @@ impl Connection {
     }
 }
 
-pub fn get_empty_transports_vec() -> Vec<Box<dyn Transport + Send + Sync>> {
+pub fn get_empty_transports_vec() -> Vec<Box<dyn TransportLink + Send + Sync>> {
     return vec![];
 }

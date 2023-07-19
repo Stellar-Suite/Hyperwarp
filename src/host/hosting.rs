@@ -9,7 +9,7 @@ use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
 use super::{
-    connection::{Connection, Transport},
+    connection::{ConnectionManager, TransportLink},
     transports::{null::NullTransport, unix::{UnixTransport, UnixTransporter, UnixListenerTransporter}},
     feature_flags::FeatureFlags, host_behavior::{HostBehavior, DefaultHostBehavior},
 };
@@ -20,7 +20,7 @@ pub struct CaptureHelper {
 
 pub struct ApplicationHost {
     pub config: Config,
-    pub connection: Option<Arc<Mutex<Connection>>>,
+    pub connection: Option<Arc<Mutex<ConnectionManager>>>,
     pub features: Mutex<FeatureFlags>,
     pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
     pub func_pointers: Mutex<HashMap<String, Pointer>>,
@@ -88,7 +88,7 @@ fn create_host() -> ApplicationHost {
     let host = match config.connection_type.as_ref() {
         "unix_client" => {
             let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket path should be set in config");
-            let conn = Connection::new(UnixTransporter::new_with_unix_transport(UnixTransport {
+            let conn = ConnectionManager::new(UnixTransporter::new_with_unix_transport(UnixTransport {
                 stream: UnixStream::connect(unix_socket_path).expect("Unix socket connect fail. "),
                 closed: false,
             }));
@@ -100,7 +100,7 @@ fn create_host() -> ApplicationHost {
         "unix_listener" => {
             println!("unix listener mode");
             let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket listening path should be set in config");
-            let conn = Connection::new(UnixListenerTransporter::new_with_path(&unix_socket_path));
+            let conn = ConnectionManager::new(UnixListenerTransporter::new_with_path(&unix_socket_path));
             let mut host = ApplicationHost::new(config);
             host.connection = Some(Arc::new(Mutex::new(conn)));
             host.start();

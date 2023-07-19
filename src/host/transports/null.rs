@@ -5,12 +5,12 @@ use std::{
 
 use crate::host::connection::{Transporter, get_empty_transports_vec};
 
-use super::super::connection::{Connection, Transport};
+use super::super::connection::{ConnectionManager, TransportLink};
 
 #[derive(Copy, Clone, Debug)] // debug should be easy
 pub struct NullTransport {}
 
-impl Transport for NullTransport {
+impl TransportLink for NullTransport {
     fn send(&mut self, data: &[u8]) -> Result<bool, std::io::Error> {
         /*Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -39,7 +39,7 @@ impl Transport for NullTransport {
 pub struct NullTransporter {}
 
 impl Transporter for NullTransporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn Transport + Send + Sync>>>> {
+    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>> {
         Arc::new(Mutex::new(get_empty_transports_vec())) // vec![Box::new(NullTransport {})]
     }
 }
