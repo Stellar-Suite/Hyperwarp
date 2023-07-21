@@ -3,7 +3,7 @@ use std::{
     os::unix::net::UnixStream, sync::{Mutex, Arc},
 };
 
-use crate::host::connection::{Transporter, get_empty_transports_vec};
+use crate::host::connection::{Transporter, get_empty_transports_vec, Transport};
 
 use super::super::connection::{ConnectionManager, TransportLink};
 
@@ -39,7 +39,7 @@ impl TransportLink for NullTransport {
 pub struct NullTransporter {}
 
 impl Transporter for NullTransporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>> {
+    fn get_transports(&self) -> Arc<Mutex<Vec<Transport>>> {
         Arc::new(Mutex::new(get_empty_transports_vec())) // vec![Box::new(NullTransport {})]
     }
 }

@@ -139,12 +139,12 @@ impl HostBehavior for DefaultHostBehavior {
             let transporters_lock = transporter.get_transports();
             let mut transports = transporters_lock.lock().unwrap();
 
-            transports.retain(|transport| transport.is_connected());
+            transports.retain(|transport| transport.link.is_connected());
             // iterate through each transport
             // wow iter_mut exists
             for transport in transports.iter_mut() {
                 loop {
-                    let polling_result = transport.recv(&mut header_buf);
+                    let polling_result = transport.link.recv(&mut header_buf);
                     if let Ok(would_block) = polling_result {
                         if would_block {
                             break;
@@ -206,12 +206,12 @@ impl DefaultHostBehavior {
             let transporters_lock = transporter.get_transports();
             let mut transports = transporters_lock.lock().unwrap();
 
-            transports.retain(|transport| transport.is_connected());
+            transports.retain(|transport| transport.link.is_connected());
             // iterate through each transport
             // wow iter_mut exists
             for transport in transports.iter_mut() {
-                transport.send(&header_u8)?;
-                transport.send_vec(&serialized)?;
+                transport.link.send(&header_u8)?;
+                transport.link.send_vec(&serialized)?;
             }
         }
 

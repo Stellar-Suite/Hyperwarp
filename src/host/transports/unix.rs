@@ -3,7 +3,7 @@ use std::{
     os::unix::net::{UnixStream, UnixListener}, sync::{Mutex, Arc},
 };
 
-use crate::host::{connection::Transporter, hosting::HOST};
+use crate::host::{connection::{Transporter, Transport}, hosting::HOST};
 
 use super::super::connection::{ConnectionManager, TransportLink};
 
@@ -79,11 +79,11 @@ impl TransportLink for UnixTransport {
 }
 
 pub struct UnixTransporter {
-    pub transports: Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>>,
+    pub transports: Arc<Mutex<Vec<Transport>>>,
 }
 
 impl Transporter for UnixTransporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>> {
+    fn get_transports(&self) -> Arc<Mutex<Vec<Transport>>> {
         self.transports.clone()
     }
 }
@@ -91,18 +91,18 @@ impl Transporter for UnixTransporter {
 impl UnixTransporter {
     pub fn new_with_unix_transport(ut: UnixTransport) -> UnixTransporter {
         UnixTransporter {
-            transports: Arc::new(Mutex::new(vec![Box::new(ut)])),
+            transports: Arc::new(Mutex::new(vec![Transport::new(Box::new(ut))])),
         }
     }
 }
 
 pub struct UnixListenerTransporter {
-    pub transports: Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>>,
+    pub transports: Arc<Mutex<Vec<Transport>>>,
     pub listener: UnixListener,
 }
 
 impl Transporter for UnixListenerTransporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>> {
+    fn get_transports(&self) -> Arc<Mutex<Vec<Transport>>> {
         self.transports.clone()
     }
 
@@ -117,12 +117,12 @@ impl Transporter for UnixListenerTransporter {
                 if HOST.config.debug_mode {
                     println!("New connection from {:?}", addr);
                 }
-                let mut transport = UnixTransport {
+                let mut transport_link = UnixTransport {
                     stream: stream,
                     closed: false
                 };
-                transport.init()?; // shouldnt cause issues as it only sets nonblocking on that too
-                self.transports.lock().unwrap().push(Box::new(transport));
+                transport_link.init()?; // shouldnt cause issues as it only sets nonblocking on that too
+                self.transports.lock().unwrap().push(Transport::new(Box::new(transport_link)));
                 Ok(())
             },
             Err(e) => {

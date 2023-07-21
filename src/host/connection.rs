@@ -24,11 +24,53 @@ pub trait TransportLink {
     }
 }
 
+static nextId: Mutex<u64> = Mutex::new(1);
+static CAP: u64 = 0xFFFFFFFFFFFFFFF;
 
+// cycling id generator
+pub fn gen_id() -> u64{
+    let mut locked = nextId.lock().unwrap();
+    let id = *locked;
+    *locked += 1;
+    if(*locked > CAP){
+        *locked = 1;
+    }
+
+    id
+}
+
+
+pub struct TransportIdentity {
+    pub id: u64,
+    pub flags: u64,
+}
+
+impl TransportIdentity {
+    pub fn new() -> Self {
+        TransportIdentity {
+            id: gen_id(),
+            flags: 0,
+        }
+    }
+}
+
+pub struct Transport {
+    pub link: Box<dyn TransportLink + Send + Sync>,
+    pub identity: TransportIdentity,
+}
+
+impl Transport {
+    pub fn new(link: Box<dyn TransportLink + Send + Sync>) -> Self {
+        Transport {
+            link: link,
+            identity: TransportIdentity::new(),
+        }
+    }
+}
 
 // handles multiple transports
 pub trait Transporter {
-    fn get_transports(&self) -> Arc<Mutex<Vec<Box<dyn TransportLink + Send + Sync>>>>;
+    fn get_transports(&self) -> Arc<Mutex<Vec<Transport>>>;
 
     fn init(&mut self) -> Result<(), Error>{
         // TODO: impl
@@ -76,6 +118,6 @@ impl ConnectionManager {
     }
 }
 
-pub fn get_empty_transports_vec() -> Vec<Box<dyn TransportLink + Send + Sync>> {
+pub fn get_empty_transports_vec() -> Vec<Transport> {
     return vec![];
 }
