@@ -4,7 +4,7 @@ use gl::{RGBA, UNSIGNED_BYTE};
 
 use crate::{utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
-use super::{hosting::HOST, window::Window, message::{allocate_header_buffer, MessagePayload, BROADCAST_TYPE}};
+use super::{hosting::HOST, window::Window, message::{allocate_header_buffer, MessagePayload, BROADCAST_TYPE}, connection::TransportIdentity};
 
 use std::time::Duration;
 use std::thread::sleep;
@@ -153,6 +153,8 @@ impl HostBehavior for DefaultHostBehavior {
                         // let's parse
                         let message_type: u32 = u32::from_le_bytes([header_buf[0], header_buf[1], header_buf[2], header_buf[3]]);
                         let message_size: u32 = u32::from_le_bytes([header_buf[4], header_buf[5], header_buf[6], header_buf[7]]);
+                        let payload: Vec<u8> = vec![0; message_size as usize];
+
                         println!("recieved message type: {} size: {}", message_type, message_size); 
                     } else {
                         if HOST.config.debug_mode {
@@ -163,6 +165,12 @@ impl HostBehavior for DefaultHostBehavior {
                 }
             }
         }
+    }
+}
+
+impl DefaultHostBehavior {
+    fn process_message(&mut self, source: TransportIdentity, message_type: u32) {
+        
     }
 }
 
