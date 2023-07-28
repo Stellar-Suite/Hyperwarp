@@ -13,3 +13,5 @@ void *odlsym(void *handle, const char *symbol);
 void preglue_plugin(){
     
 }
+
+void init_if_needed();

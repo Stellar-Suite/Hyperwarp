@@ -7,10 +7,11 @@ fn main() {
     println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
     // println!("cargo:rustc-flags=-Wl,--allow-multiple-definition");
     // Use the `cc` crate to build a C file and statically link it.
-    cc::Build::new()
+    /*cc::Build::new()
         .file("glue.c")
-        .compile("libhyperglue");
+        .compile("libhyperglue");*/
     cc::Build::new()
-        .file("preglue.c")
-        .compile("libhyperpreglue");
+        .file("glue_header.c")
+        .compile("libhyperglueheader");
+    
 }   

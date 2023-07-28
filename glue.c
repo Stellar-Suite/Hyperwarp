@@ -166,8 +166,6 @@ void init_if_needed(){
   }
 }
 
-
-
 void *odlsym(void *handle, const char *symbol);
 
 void *odlsym(void *handle, const char *symbol){
@@ -208,6 +206,8 @@ int __libc_start_main(
     }
   }
   real_main = main;
-  printf("launching main...\n");
+  if(DEBUG){
+    printf("launching main...\n");
+  }
   return real___libc_start_main(wrap_main, argc, argv, init, fini, rtld_fini, stack_end);
 }
