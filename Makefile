@@ -10,5 +10,5 @@ rust:
 rust_release:
 	cargo build -r
 
-all: rust pregluer gluer rust_release
+all: pregluer gluer rust rust_release
 .DEFAULT_GOAL := all

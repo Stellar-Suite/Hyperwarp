@@ -1,11 +1,13 @@
 // #include <GL/gl.h>
 // #include <FTGL/ftgl.h>
 // this code originated from a glfw ld preload example
+#define _GNU_SOURCE
 #include <stdbool.h>
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 static int DEBUG = 0;
 
 static void init() __attribute__((constructor));
