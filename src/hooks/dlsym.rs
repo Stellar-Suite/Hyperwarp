@@ -14,7 +14,7 @@ extern "C" {
     pub fn init_if_needed();
 }
 
-#[cfg(crate_type="dylib")]
+// #[cfg(crate_type="dylib")]
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();

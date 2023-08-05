@@ -22,7 +22,3 @@ cc = "1.0"
 [lib]
 name = "hyperwarphooker"
 crate_type = ["dylib", "rlib"]
-
-[[bin]]
-name = "streamerd"
-path = "src/streamer/main.rs"
