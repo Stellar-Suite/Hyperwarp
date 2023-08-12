@@ -8,6 +8,7 @@ pub mod hooks;
 pub mod host;
 pub mod utils;
 pub mod bind;
+pub mod shim;
 
 fn main() {
     println!("Hello, world!");

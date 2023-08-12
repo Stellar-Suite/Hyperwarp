@@ -97,7 +97,7 @@ void preglue_plugin()
 {
   if (DEBUG)
   {
-    printf("Glue: Oops, preglue not overridem. \n");
+    printf("Glue: Oops, preglue not overriden. \n");
   }
   // die?
   if (getenv("IGNORE_INIT_ERRORS") == NULL)
