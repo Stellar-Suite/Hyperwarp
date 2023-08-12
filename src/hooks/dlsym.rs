@@ -4,6 +4,8 @@ use std::ffi::CString;
 
 use libc::{c_void, c_char};
 
+use crate::shim;
+
 use super::{glx, sdl2};
 
 extern "C" {
@@ -25,6 +27,10 @@ redhook::hook! {
             // this is only slow for the one lookup yk
             let symbol_string = CString::new(symbol_name.replace("_hw_direct","")).unwrap();
             odlsym(handle, symbol_string.as_ptr() as *const c_char)
+        }  else if symbol_name == "_internal_rust_launch" {
+            unsafe {
+                std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
+            }
         } else if symbol_name == "glXSwapBuffers" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers as *const c_void) }
         } else if symbol_name == "glXSwapBuffersMscOML" {
