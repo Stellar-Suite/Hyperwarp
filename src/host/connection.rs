@@ -32,7 +32,7 @@ pub fn gen_id() -> u64{
     let mut locked = nextId.lock().unwrap();
     let id = *locked;
     *locked += 1;
-    if(*locked > CAP){
+    if *locked > CAP {
         *locked = 1;
     }
 

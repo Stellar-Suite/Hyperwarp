@@ -8,8 +8,10 @@ pub mod hooks;
 pub mod host;
 pub mod utils;
 pub mod bind;
+pub mod standalone;
 pub mod shim;
 
+// I forgot what this is for. 
 fn main() {
     println!("Hello, world!");
 }
