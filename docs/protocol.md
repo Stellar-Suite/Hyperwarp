@@ -1,8 +1,9 @@
 # Fast data transfer network protocol
 ## Begin: Message Type (u32)
-* 0 - die out of confusion
+* 0 - MESSAGE
 * 1 - hello
 * 2 - my version is...
+* 3 - DIE OUT OF CONFUSION
 
 ## Second: Message Length (u32 so max 4gb)
 

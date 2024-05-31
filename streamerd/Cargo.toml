@@ -1,0 +1,12 @@
+[package]
+name = "streamerd"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.79"
+gstreamer = "0.22.0"
+message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1" }
+# stellar_core = { path = "../stellar_core" }
