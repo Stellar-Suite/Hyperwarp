@@ -80,7 +80,9 @@ impl HostBehavior for DefaultHostBehavior {
                 if features.sdl2_enabled {
                     if let Some((width, height)) = self.get_largest_sdl2_window() {
                         if self.fb_width != Some(width.try_into().unwrap()) || self.fb_height != Some(height.try_into().unwrap()) {
-                            println!("resize fb {}x{}", width, height);
+                            if HOST.config.debug_mode {
+                                println!("resize fb {}x{}", width, height);
+                            }
                             self.setup_framebuffer(width.try_into().unwrap(), height.try_into().unwrap());
                         }
                     } else {

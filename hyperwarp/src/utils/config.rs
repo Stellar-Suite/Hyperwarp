@@ -1,4 +1,4 @@
-use std::{env, str::FromStr};
+use std::{env, net::SocketAddr, str::FromStr};
 
 use super::utils::generate_random_id;
 
@@ -23,6 +23,8 @@ pub struct Config {
     pub user_id: String,
     // unix socket transport
     pub unix_socket_path: Option<String>,
+    pub bind_addr: Option<SocketAddr>, 
+    pub bind_type: Option<String>,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -92,6 +94,8 @@ impl Config {
             user_id: uid,
             unix_socket_path: Some(socket_path),
             capture_mode: booleanify("CAPTURE_MODE", false),
+            bind_addr: try_get::<SocketAddr>("SOCKET_ADDR"),
+            bind_type: try_get::<String>("SOCKET_TYPE").or(Some("udp".to_owned())),
         }
     }
 }
@@ -116,7 +120,9 @@ impl Default for Config {
             session_id: sid,
             user_id: uid,
             unix_socket_path: Some(socket_path),
-            capture_mode: false
+            capture_mode: false,
+            bind_addr: None,
+            bind_type: None,
         }
     }
 }

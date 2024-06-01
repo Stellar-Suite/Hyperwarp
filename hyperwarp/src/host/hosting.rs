@@ -1,3 +1,8 @@
+use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListenConfig};
+use message_io::node::{self, NodeEvent};
+use message_io::network::{NetEvent, Transport, TransportListen};
+
+use std::path::PathBuf;
 use std::{
     os::unix::net::UnixStream,
     sync::{Arc, Mutex, MutexGuard}, fs::File, io::Write, collections::HashMap,
@@ -15,6 +20,7 @@ use super::{
 pub struct CaptureHelper {
     pub frameFile: Option<Mutex<File>>,
 }
+
 
 pub struct ApplicationHost {
     pub config: Config,
@@ -44,8 +50,46 @@ impl ApplicationHost {
         return host;
     }
 
+    pub fn get_unix_socket_path(&self) -> PathBuf {
+        let mut path = PathBuf::from("/tmp");
+        path.push(format!("hw-{}.sock", self.config.session_id));
+        path
+    }
+
+    pub fn start_server(&mut self){
+
+        let (handler, listener) = node::split::<()>();
+        
+        // bind unix always
+        let unix_socket_path = match self.config.unix_socket_path.clone() {
+            Some(path) => path.into(),
+            None => self.get_unix_socket_path(),
+        };
+
+        handler.network().listen_with(TransportListen::UnixSocket(UnixSocketListenConfig::new(unix_socket_path)), create_null_socketaddr());
+
+        if let Some(bind_type) = &self.config.bind_type {
+            let addr = self.config.bind_addr.expect("bind address not set");
+            match bind_type.as_str() {
+                "udp" => {
+                    handler.network().listen(Transport::Udp, addr).unwrap();
+                },
+                "tcp" => {
+                    handler.network().listen(Transport::Tcp, addr).unwrap();
+                },
+                _ => {
+                    panic!("unknown bind type");
+                }
+            }
+           
+        }
+
+        
+    }
+
     pub fn start(&mut self) {
         // TODO: start server
+        self.start_server();
         if self.config.capture_mode {
             self.capture_helper = Some(CaptureHelper {
                 frameFile: None,
@@ -84,7 +128,7 @@ fn create_host() -> ApplicationHost {
         host.start();
         host
     };
-    
+
     host.log();
     host
 }
