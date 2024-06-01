@@ -1,7 +1,8 @@
 {
     "rust-analyzer.linkedProjects": [
         "./hyperwarp/Cargo.toml",
-        "./streamerd/Cargo.toml"
+        "./streamerd/Cargo.toml",
+        "./stellar_protocol/Cargo.toml"
     ],
     "files.associations": {
         "stdlib.h": "c"

@@ -10,3 +10,4 @@ anyhow = "1.0.79"
 gstreamer = "0.22.0"
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1" }
 # stellar_core = { path = "../stellar_core" }
+stellar_protocol = { path = "../stellar_protocol" }

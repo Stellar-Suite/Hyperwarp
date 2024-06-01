@@ -16,6 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 bytemuck = "1.13.1"
 tokio = { version = "1", features = ["full"] }
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1" }
+stellar_protocol = { path = "../stellar_protocol" }
 # stellar_core = { path = "../stellar_core" }
 
 [build-dependencies]

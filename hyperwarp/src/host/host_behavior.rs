@@ -4,7 +4,7 @@ use gl::{RGBA, UNSIGNED_BYTE};
 
 use crate::{utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
 
-use super::{hosting::HOST, window::Window, message::{allocate_header_buffer, MessagePayload, BROADCAST_TYPE}, connection::TransportIdentity};
+use super::{hosting::HOST, window::Window};
 
 use std::time::Duration;
 use std::thread::sleep;
@@ -113,10 +113,7 @@ impl HostBehavior for DefaultHostBehavior {
 
     fn onFrameSwapEnd(&mut self) {
         self.tick();
-        let _ = self.broadcast_message_no_type(MessagePayload::RenderedFrame {
-            width: self.fb_width.unwrap(),
-            height: self.fb_height.unwrap(),
-        });
+        // TODO: notify rendered frame
     }
 
     fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
@@ -124,54 +121,12 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn tick(&mut self) {
-        let mut header_buf = allocate_header_buffer();
-        if let Some(conn_arcmutex) = &HOST.connection {
-            let mut conn = conn_arcmutex.lock().unwrap();
-            let mut transporter = conn.transporter.lock().unwrap();
-            match transporter.tick() {
-                Ok(_) => {},
-                Err(e) => {
-                    if HOST.config.debug_mode {
-                        println!("Error in tick (transporter): {:?}", e);
-                    }
-                }
-            }
-            let transporters_lock = transporter.get_transports();
-            let mut transports = transporters_lock.lock().unwrap();
-
-            transports.retain(|transport| transport.link.is_connected());
-            // iterate through each transport
-            // wow iter_mut exists
-            for transport in transports.iter_mut() {
-                loop {
-                    let polling_result = transport.link.recv(&mut header_buf);
-                    if let Ok(would_block) = polling_result {
-                        if would_block {
-                            break;
-                        }
-                        // actual message!
-                        // let's parse
-                        let message_type: u32 = u32::from_le_bytes([header_buf[0], header_buf[1], header_buf[2], header_buf[3]]);
-                        let message_size: u32 = u32::from_le_bytes([header_buf[4], header_buf[5], header_buf[6], header_buf[7]]);
-                        let payload: Vec<u8> = vec![0; message_size as usize];
-
-                        println!("recieved message type: {} size: {}", message_type, message_size); 
-                    } else {
-                        if HOST.config.debug_mode {
-                            println!("Error in recv: {:?}", polling_result);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        
     }
 }
 
 impl DefaultHostBehavior {
-    fn process_message(&mut self, source: TransportIdentity, message_type: u32) {
-        
-    }
+    
 }
 
 pub enum ThreadMessage {
@@ -189,41 +144,6 @@ impl DefaultHostBehavior {
             tx: None,
             windows: Vec::new(),
         }
-    }
-
-    pub fn broadcast_message_no_type(&mut self, payload: MessagePayload) -> Result<(), std::io::Error>{ // do I really need to own this 
-        // TODO: explore other serialization?
-        // TODO: handle errors better cause serde_json introduces it's own error 
-        let serialized = serde_json::to_vec(&payload).expect("Unable to serialize broadcast message. ");
-        let mut header: [u32; 2] = [BROADCAST_TYPE,0];
-        header[1] = serialized.len() as u32;
-
-        let header_u8 = convert_header_to_u8(header);
-        
-        if let Some(conn_arcmutex) = &HOST.connection {
-            let mut conn = conn_arcmutex.lock().unwrap();
-            let mut transporter = conn.transporter.lock().unwrap();
-            match transporter.tick() {
-                Ok(_) => {},
-                Err(e) => {
-                    if HOST.config.debug_mode {
-                        println!("Error in tick (transporter): {:?}", e);
-                    }
-                }
-            }
-            let transporters_lock = transporter.get_transports();
-            let mut transports = transporters_lock.lock().unwrap();
-
-            transports.retain(|transport| transport.link.is_connected());
-            // iterate through each transport
-            // wow iter_mut exists
-            for transport in transports.iter_mut() {
-                transport.link.send(&header_u8)?;
-                transport.link.send_vec(&serialized)?;
-            }
-        }
-
-        Ok(())
     }
 
     pub fn get_largest_sdl2_window(&self) -> Option<(i32, i32)> {

@@ -244,6 +244,7 @@ dependencies = [
  "redhook",
  "serde",
  "serde_json",
+ "stellar_protocol",
  "tokio",
 ]
 
@@ -587,6 +588,10 @@ dependencies = [
  "libc",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "stellar_protocol"
+version = "0.1.0"
 
 [[package]]
 name = "strum"

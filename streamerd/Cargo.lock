@@ -686,12 +686,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar_protocol"
+version = "0.1.0"
+
+[[package]]
 name = "streamerd"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "gstreamer",
  "message-io",
+ "stellar_protocol",
 ]
 
 [[package]]

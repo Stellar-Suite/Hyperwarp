@@ -9,8 +9,6 @@ use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
 use super::{
-    connection::{ConnectionManager, TransportLink},
-    transports::{null::NullTransport, unix::{UnixTransport, UnixTransporter, UnixListenerTransporter}},
     feature_flags::FeatureFlags, host_behavior::{HostBehavior, DefaultHostBehavior},
 };
 
@@ -20,7 +18,6 @@ pub struct CaptureHelper {
 
 pub struct ApplicationHost {
     pub config: Config,
-    pub connection: Option<Arc<Mutex<ConnectionManager>>>,
     pub features: Mutex<FeatureFlags>,
     pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
     pub func_pointers: Mutex<HashMap<String, Pointer>>,
@@ -39,7 +36,6 @@ impl ApplicationHost {
         }
         let host = ApplicationHost {
             config,
-            connection: None,
             features: Mutex::new(FeatureFlags::new()),
             behavior: Arc::new(Mutex::new(Box::new(default_behavior))),
             func_pointers: Mutex::new(HashMap::new()),
@@ -49,9 +45,7 @@ impl ApplicationHost {
     }
 
     pub fn start(&mut self) {
-        if let Some(conn) = &self.connection {
-            conn.lock().unwrap().start();
-        }
+        // TODO: start server
         if self.config.capture_mode {
             self.capture_helper = Some(CaptureHelper {
                 frameFile: None,
@@ -85,42 +79,14 @@ fn create_host() -> ApplicationHost {
         println!("Selected Connection type: {}", config.connection_type);
         println!("Host config: {:?}", config);
     }
-    let host = match config.connection_type.as_ref() {
-        "unix_client" => {
-            let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket path should be set in config");
-            let conn = ConnectionManager::new(UnixTransporter::new_with_unix_transport(UnixTransport {
-                stream: UnixStream::connect(unix_socket_path).expect("Unix socket connect fail. "),
-                closed: false,
-            }));
-            let mut host = ApplicationHost::new(config);
-            host.connection = Some(Arc::new(Mutex::new(conn)));
-            host.start();
-            host
-        },
-        "unix_listener" => {
-            println!("unix listener mode");
-            let unix_socket_path = config.unix_socket_path.as_ref().expect("Unix socket listening path should be set in config");
-            let conn = ConnectionManager::new(UnixListenerTransporter::new_with_path(&unix_socket_path));
-            let mut host = ApplicationHost::new(config);
-            host.connection = Some(Arc::new(Mutex::new(conn)));
-            host.start();
-            host
-        }
-        _ => {
-            let mut host = ApplicationHost::new(config);
-            host.start();
-            host
-        },
+    let host =  {
+        let mut host = ApplicationHost::new(config);
+        host.start();
+        host
     };
+    
     host.log();
-    if let Some(ref conn_arc) = host.connection {
-        host
-    } else {
-        if host.config.debug_mode {
-            println!("No connection type specified. ");
-        }
-        host
-    }
+    host
 }
 
 lazy_static! {
