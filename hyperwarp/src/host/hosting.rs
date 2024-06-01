@@ -1,6 +1,6 @@
 use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListenConfig};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
-use message_io::network::{NetEvent, Transport, TransportListen};
+use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 
 use std::path::PathBuf;
 use std::{
@@ -107,6 +107,7 @@ impl ApplicationHost {
         let handler_signals = handler_wrapper.clone();
 
         std::thread::spawn (move || {
+            let mut frame_sub_endpoints: Vec<Endpoint> = vec![];
             listener.for_each(move |event| {
                 match event {
                     NodeEvent::Network(netevent) => {
@@ -144,7 +145,7 @@ impl ApplicationHost {
 
     pub fn notify_frame(&self){
         if let Some(handler) = &self.messaging_handler {
-            // let handler = handler.lock().unwrap();
+            let handler = handler.lock().unwrap();
             // handler.signals().send(InternalSignals::NewFrameSignal);
         }
     }
