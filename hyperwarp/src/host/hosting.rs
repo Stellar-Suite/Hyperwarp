@@ -28,7 +28,7 @@ pub struct ApplicationHost {
     pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
     pub func_pointers: Mutex<HashMap<String, Pointer>>,
     pub capture_helper: Option<CaptureHelper>,
-    pub messaging_handler: Option<Arc<Mutex<NodeHandler<()>>>>,
+    pub messaging_handler: Option<Arc<Mutex<NodeHandler<InternalSignals>>>>,
 }
 
 pub enum InternalSignals {
@@ -66,7 +66,7 @@ impl ApplicationHost {
 
     pub fn start_server(&mut self){
 
-        let (handler, listener) = node::split::<()>();
+        let (handler, listener) = node::split::<InternalSignals>();
         
         // bind unix always
         let unix_socket_path = match self.config.unix_socket_path.clone() {
@@ -104,23 +104,35 @@ impl ApplicationHost {
 
         let handler_wrapper = Arc::new(Mutex::new(handler));
         let handler_wrapper_2 = handler_wrapper.clone();
+        let handler_signals = handler_wrapper.clone();
 
-        listener.for_each(move |event| match event.network() {
-            NetEvent::Connected(_, _) => {
-                
-            },
-            NetEvent::Accepted(_endpoint, _listener) => {
-
-            },
-            NetEvent::Message(endpoint, data) => {
-                // ex. reply
-                handler_wrapper.lock().unwrap().network().send(endpoint, data);
-            },
-            NetEvent::Disconnected(_endpoint) => {
-                if is_debug {
-                    println!("One client disconnected. {}", _endpoint.addr());
+        std::thread::spawn (move || {
+            listener.for_each(move |event| {
+                match event {
+                    NodeEvent::Network(netevent) => {
+                        match netevent {
+                            NetEvent::Connected(_, _) => {
+                                
+                            },
+                            NetEvent::Accepted(_endpoint, _listener) => {
+        
+                            },
+                            NetEvent::Message(endpoint, data) => {
+                                // ex. reply
+                                handler_wrapper.lock().unwrap().network().send(endpoint, data);
+                            },
+                            NetEvent::Disconnected(_endpoint) => {
+                                if is_debug {
+                                    println!("One client disconnected. {}", _endpoint.addr());
+                                }
+                            }
+                        }
+                    },
+                    NodeEvent::Signal(signal) => {
+                        todo!("handle signal");
+                    },
                 }
-            }
+            });
         });
 
         self.messaging_handler = Some(handler_wrapper_2);
@@ -128,6 +140,13 @@ impl ApplicationHost {
         // handler.signals().send(event)
         // self.messaging_pair = Some((handler, listener));
         
+    }
+
+    pub fn notify_frame(&self){
+        if let Some(handler) = &self.messaging_handler {
+            // let handler = handler.lock().unwrap();
+            // handler.signals().send(InternalSignals::NewFrameSignal);
+        }
     }
 
     pub fn start(&mut self) {
