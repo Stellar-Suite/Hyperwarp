@@ -20,7 +20,7 @@ extern "C" {
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
-        println!("dlsym: symbol name {}",symbol_name);
+        // println!("dlsym: symbol name {}",symbol_name);
         // TODO: refactor the long if else into a map?
         if symbol_name.ends_with("_hw_direct") {
             init_if_needed();

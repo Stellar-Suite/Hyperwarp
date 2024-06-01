@@ -100,7 +100,7 @@ redhook::hook! {
 
 redhook::hook! {
     unsafe fn SDL_GL_SwapWindow(display: *mut SDL_Window) => sdl_gl_swapwindow_first {
-        if HOST.config.debug_mode {
+        if HOST.config.tracing_mode {
             println!("SDL_GL_SwapWindow called");
         }
         if HOST.config.enable_sdl2 {
@@ -113,7 +113,7 @@ redhook::hook! {
 
 redhook::hook! {
     unsafe fn SDL_RenderPresent(renderer: *mut SDL_Renderer) -> *const c_void => sdl_renderpresent_first {
-        if HOST.config.debug_mode {
+        if HOST.config.tracing_mode {
             println!("SDL_RenderPresent called");
         }
         if HOST.config.enable_sdl2 {

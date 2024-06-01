@@ -110,7 +110,9 @@ impl HostBehavior for DefaultHostBehavior {
                 // println!("gl not enabled");
             }
         }
-        println!("onFrameSwapBegin took {:?}", start.elapsed());
+        if HOST.config.tracing_mode {
+            println!("onFrameSwapBegin took {:?}", start.elapsed());
+        }
     }
 
     fn onFrameSwapEnd(&mut self) {

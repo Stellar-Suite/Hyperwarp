@@ -1,5 +1,5 @@
 use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListenConfig};
-use message_io::node::{self, NodeEvent};
+use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 use message_io::network::{NetEvent, Transport, TransportListen};
 
 use std::path::PathBuf;
@@ -27,7 +27,14 @@ pub struct ApplicationHost {
     pub features: Mutex<FeatureFlags>,
     pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
     pub func_pointers: Mutex<HashMap<String, Pointer>>,
-    pub capture_helper: Option<CaptureHelper>
+    pub capture_helper: Option<CaptureHelper>,
+    pub messaging_handler: Option<Arc<Mutex<NodeHandler<()>>>>,
+}
+
+pub enum InternalSignals {
+    TestSignal,
+    TracingSignal,
+    NewFrameSignal,
 }
 
 impl ApplicationHost {
@@ -46,6 +53,7 @@ impl ApplicationHost {
             behavior: Arc::new(Mutex::new(Box::new(default_behavior))),
             func_pointers: Mutex::new(HashMap::new()),
             capture_helper: None,
+            messaging_handler: None,
         };
         return host;
     }
@@ -66,10 +74,17 @@ impl ApplicationHost {
             None => self.get_unix_socket_path(),
         };
 
-        handler.network().listen_with(TransportListen::UnixSocket(UnixSocketListenConfig::new(unix_socket_path)), create_null_socketaddr());
+        if self.config.debug_mode {
+            println!("Listening on unix socket: {}", unix_socket_path.display());
+        }
+
+        handler.network().listen_with(TransportListen::UnixSocket(UnixSocketListenConfig::new(unix_socket_path)), create_null_socketaddr()).expect("Opening unix control socket failed.");
 
         if let Some(bind_type) = &self.config.bind_type {
             let addr = self.config.bind_addr.expect("bind address not set");
+            if self.config.debug_mode {
+                println!("Binding to address: {} (proto: {})", addr, bind_type);
+            }
             match bind_type.as_str() {
                 "udp" => {
                     handler.network().listen(Transport::Udp, addr).unwrap();
@@ -84,6 +99,34 @@ impl ApplicationHost {
            
         }
 
+        let is_debug = self.config.debug_mode;
+        let is_tracing = self.config.tracing_mode;
+
+        let handler_wrapper = Arc::new(Mutex::new(handler));
+        let handler_wrapper_2 = handler_wrapper.clone();
+
+        listener.for_each(move |event| match event.network() {
+            NetEvent::Connected(_, _) => {
+                
+            },
+            NetEvent::Accepted(_endpoint, _listener) => {
+
+            },
+            NetEvent::Message(endpoint, data) => {
+                // ex. reply
+                handler_wrapper.lock().unwrap().network().send(endpoint, data);
+            },
+            NetEvent::Disconnected(_endpoint) => {
+                if is_debug {
+                    println!("One client disconnected. {}", _endpoint.addr());
+                }
+            }
+        });
+
+        self.messaging_handler = Some(handler_wrapper_2);
+
+        // handler.signals().send(event)
+        // self.messaging_pair = Some((handler, listener));
         
     }
 
@@ -120,7 +163,7 @@ impl ApplicationHost {
 fn create_host() -> ApplicationHost {
     let config = Config::from_env();
     if config.debug_mode {
-        println!("Selected Connection type: {}", config.connection_type);
+        // println!("Selected Connection type: {}", config.connection_type);
         println!("Host config: {:?}", config);
     }
     let host =  {

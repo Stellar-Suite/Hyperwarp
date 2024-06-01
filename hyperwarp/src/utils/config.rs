@@ -10,6 +10,7 @@ pub struct Config {
     pub enable_glx: bool,
     pub enable_sdl2: bool,
     pub debug_mode: bool,
+    pub tracing_mode: bool,
     pub capture_mode: bool,
     // windowing
     pub window_width_override: Option<u32>,
@@ -85,6 +86,7 @@ impl Config {
             enable_glfw: booleanify("ENABLE_GLFW", true),
             enable_sdl2: booleanify("ENABLE_SDL2", true),
             debug_mode: booleanify("DEBUG_HW", false),
+            tracing_mode: booleanify("TRACING_HW", false),
             window_width_override: try_get::<u32>("WINDOW_WIDTH"),
             window_height_override: try_get::<u32>("WINDOW_HEIGHT"),
             window_zero_origin: booleanify("WINDOW_ZERO_ORIGIN", false),
@@ -95,7 +97,7 @@ impl Config {
             unix_socket_path: Some(socket_path),
             capture_mode: booleanify("CAPTURE_MODE", false),
             bind_addr: try_get::<SocketAddr>("SOCKET_ADDR"),
-            bind_type: try_get::<String>("SOCKET_TYPE").or(Some("udp".to_owned())),
+            bind_type: try_get::<String>("SOCKET_TYPE"),
         }
     }
 }
@@ -112,6 +114,7 @@ impl Default for Config {
             enable_glfw: true,
             enable_sdl2: true,
             debug_mode: false,
+            tracing_mode: false,
             window_width_override: None,
             window_height_override: None,
             window_zero_origin: false,
