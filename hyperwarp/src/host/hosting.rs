@@ -2,6 +2,7 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 
+use std::any::Any;
 use std::path::PathBuf;
 use std::{
     os::unix::net::UnixStream,
@@ -108,6 +109,14 @@ impl ApplicationHost {
 
         std::thread::spawn (move || {
             let mut frame_sub_endpoints: Vec<Endpoint> = vec![];
+
+            let check_subscribers = |subscribers: &mut Vec<Endpoint>| {
+                let handler_locked = handler_wrapper.lock().unwrap();
+                subscribers.retain_mut(|target_endpoint| {
+                    handler_locked.network().is_ready(target_endpoint.resource_id()).is_some()
+                });
+            };
+
             listener.for_each(move |event| {
                 match event {
                     NodeEvent::Network(netevent) => {
@@ -128,9 +137,25 @@ impl ApplicationHost {
                                 }
                             }
                         }
-                    },
+                },
                     NodeEvent::Signal(signal) => {
-                        todo!("handle signal");
+                        match signal {
+                            InternalSignals::TestSignal => {
+
+                            },
+                            InternalSignals::TracingSignal => {
+
+                            },
+                            InternalSignals::NewFrameSignal => {
+
+                            },
+                            _ => {
+                                // log unhandled signal
+                                if is_debug {
+                                    println!("Unhandled signal: {:?}", signal.type_id());
+                                }
+                            }
+                        }
                     },
                 }
             });
@@ -146,12 +171,11 @@ impl ApplicationHost {
     pub fn notify_frame(&self){
         if let Some(handler) = &self.messaging_handler {
             let handler = handler.lock().unwrap();
-            // handler.signals().send(InternalSignals::NewFrameSignal);
+            handler.signals().send(InternalSignals::NewFrameSignal);
         }
     }
 
     pub fn start(&mut self) {
-        // TODO: start server
         self.start_server();
         if self.config.capture_mode {
             self.capture_helper = Some(CaptureHelper {
