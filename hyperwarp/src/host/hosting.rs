@@ -180,12 +180,39 @@ impl ApplicationHost {
                             }
                             NetEvent::Accepted(_endpoint, _listener) => {}
                             NetEvent::Message(endpoint, data) => {
+
+                                match stellar_protocol::deserialize_safe(data) { 
+                                    Some(message) => {
+                                        match message {
+                                            StellarMessage::RequestResolutionBroadcast => {
+                                                command_queue.push(MainTickMessage::RequestResolutionBroadcast(endpoint));
+                                            },
+                                            StellarMessage::Hello => {
+                                                if config.debug_mode {
+                                                    println!("Hello message received from {:?}", endpoint.addr());
+                                                }
+                                            },
+                                            _ => {
+                                                if config.debug_mode {
+                                                    println!("Unhandled message: {:?}", message);
+                                                }
+                                            }
+                                        }
+                                    },
+                                    None => {
+                                        if config.debug_mode {
+                                            println!("Error deserializing message (malformed?):");
+                                        }
+                                    }
+                                }
+
                                 // ex. reply
-                                handler_wrapper
+                                // old echo test
+                                /*handler_wrapper
                                     .lock()
                                     .unwrap()
                                     .network()
-                                    .send(endpoint, data);
+                                    .send(endpoint, data);*/
                             }
                             NetEvent::Disconnected(_endpoint) => {
                                 if config.debug_mode {
