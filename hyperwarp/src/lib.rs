@@ -2,6 +2,7 @@ use libc::c_char;
 use libc::c_void;
 
 use crate::host::hosting::HOST;
+use crashreport::crashreport;
 
 pub mod constants;
 pub mod hooks;
@@ -18,7 +19,8 @@ fn main() {
 
 redhook::hook! {
     unsafe fn premain_plugin() => premain_plugin_first {
-        if HOST.config.debug_mode {
+        crashreport!();
+        if HOST.config.debug_mode { // this will trigger initalization of host
             println!("Premain starting. Please wait. ");
         }
     }

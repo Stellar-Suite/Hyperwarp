@@ -12,7 +12,7 @@ use gstreamer_app::AppSrc;
 use gstreamer_video::prelude::*;
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, node::{self, NodeEvent, NodeHandler}};
 
-use stellar_protocol::protocol::{self, StellarMessage};
+use stellar_protocol::protocol::{StellarMessage};
 
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
@@ -218,9 +218,11 @@ impl Streamer {
                                     println!("Connected to Hyperwarp socket");
                                     if ready {
                                         // say hello
+                                        println!("sending hello");
                                         handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::Hello));
-
+                                        println!("sending initial res request");
                                         handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::RequestResolutionBroadcast));
+                                        handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
                                     } else {
                                         println!("One client did not successfully ready. {}", endpoint.addr());
                                     }
@@ -255,7 +257,9 @@ impl Streamer {
                         },
                         NodeEvent::Signal(signal) => {
                             match signal {
-                                StreamerSignal::DataChannelContent(_) => todo!(),
+                                StreamerSignal::DataChannelContent(_) => {
+                                    
+                                },
                             }
                         }
                     }

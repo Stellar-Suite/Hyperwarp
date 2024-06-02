@@ -62,7 +62,7 @@ pub struct DefaultHostBehavior {
     fb_height: Option<u32>,
     fb_enabled: bool,
     pub fb: Vec<u8>,
-    pub tx: Option<mpsc::Sender<ThreadMessage>>,
+    pub tx: Option<mpsc::Sender<FrameWriterThreadMessage>>,
     pub windows: Vec<Window>,
 }
 
@@ -135,7 +135,7 @@ impl HostBehavior for DefaultHostBehavior {
                         // artifical lag debug
                         // sleep(Duration::from_millis(150));
                         if let Some(sender) = &self.tx {
-                            sender.send(ThreadMessage::NewFrame).unwrap();
+                            sender.send(FrameWriterThreadMessage::NewFrame).unwrap();
                         }
                     }
                 } else {
@@ -175,7 +175,7 @@ impl HostBehavior for DefaultHostBehavior {
 
 impl DefaultHostBehavior {}
 
-pub enum ThreadMessage {
+pub enum FrameWriterThreadMessage {
     Stop,
     NewFrame,
 }
@@ -218,7 +218,7 @@ impl DefaultHostBehavior {
 
         println!("file_loc: {}", file_loc.display());
 
-        let (tx, rx) = mpsc::channel::<ThreadMessage>(); // we use to signal to the thread to dump the frames.
+        let (tx, rx) = mpsc::channel::<FrameWriterThreadMessage>(); // we use to signal to the thread to dump the frames.
 
         self.tx = Some(tx);
 
@@ -226,10 +226,10 @@ impl DefaultHostBehavior {
             let mut file = File::create(file_loc).unwrap();
             loop {
                 match rx.recv() {
-                    Ok(ThreadMessage::Stop) => {
+                    Ok(FrameWriterThreadMessage::Stop) => {
                         break;
                     }
-                    Ok(ThreadMessage::NewFrame) => {
+                    Ok(FrameWriterThreadMessage::NewFrame) => {
                         // write the frame to the file
                         if HOST.config.debug_mode {
                             // println!("new frame writing");

@@ -44,6 +44,7 @@ pub struct ApplicationHost {
     pub command_queue: Arc<SegQueue<MainTickMessage>>,
 }
 
+#[derive(Debug)]
 pub enum InternalSignals {
     TestSignal,
     TracingSignal,
@@ -82,9 +83,14 @@ impl ApplicationHost {
     pub fn tick(&self) {
         self.get_behavior().tick();
 
+        // process commands from queue
+
         match self.command_queue.pop() {
             Some(command) => match command {
                 MainTickMessage::RequestResolutionBroadcast(endpoint) => {
+                    if self.config.debug_mode {
+                        println!("Responding to resolution request from {:?} with {:?}", endpoint.addr(), self.get_behavior().get_fb_size());
+                    }
                     self.send_to(endpoint, &StellarMessage::ResolutionBroadcastResponse(self.get_behavior().get_fb_size()));
                 },
             },
@@ -168,6 +174,7 @@ impl ApplicationHost {
             };
 
             listener.for_each(move |event| {
+                println!("got event: {:?}", event);
                 match event {
                     NodeEvent::Network(netevent) => {
                         match netevent {
@@ -180,12 +187,17 @@ impl ApplicationHost {
                             }
                             NetEvent::Accepted(_endpoint, _listener) => {}
                             NetEvent::Message(endpoint, data) => {
-
+                                if config.debug_mode {
+                                    println!("I got a message from {:?}", endpoint.addr());
+                                }
                                 match stellar_protocol::deserialize_safe(data) { 
                                     Some(message) => {
                                         match message {
                                             StellarMessage::RequestResolutionBroadcast => {
-                                                command_queue.push(MainTickMessage::RequestResolutionBroadcast(endpoint));
+                                                if config.debug_mode {
+                                                    println!("Attempting to fufill resolution request from {:?}", endpoint.addr());
+                                                }
+                                                send_main_tick_request(MainTickMessage::RequestResolutionBroadcast(endpoint));
                                             },
                                             StellarMessage::Hello => {
                                                 if config.debug_mode {
@@ -262,6 +274,7 @@ impl ApplicationHost {
         }
         false
     }
+
     pub fn start(&mut self) {
         self.start_server();
         if self.config.capture_mode {

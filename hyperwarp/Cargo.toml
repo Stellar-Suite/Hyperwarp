@@ -2,6 +2,7 @@
 name = "hyperwarp"
 version = "0.2.1"
 edition = "2021"
+repository = "https://github.com/javaarchive/Hyperwarp"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,6 +21,7 @@ message-io = { git = "https://github.com/javaarchive/message-io", version = "0.1
 stellar_protocol = { path = "../stellar_protocol" }
 crossbeam-queue = "0.3.11"
 # stellar_core = { path = "../stellar_core" }
+crashreport = "^1.0.0"
 
 [build-dependencies]
 cc = "1.0"
