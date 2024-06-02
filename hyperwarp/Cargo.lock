@@ -603,6 +603,7 @@ name = "stellar_protocol"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "lazy_static",
  "serde",
 ]
 
