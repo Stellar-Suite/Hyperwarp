@@ -171,7 +171,13 @@ impl ApplicationHost {
                 match event {
                     NodeEvent::Network(netevent) => {
                         match netevent {
-                            NetEvent::Connected(_, _) => {}
+                            NetEvent::Connected(endpoint, ready) => {
+                                if !ready {
+                                    if config.debug_mode {
+                                        println!("One client did not successfully ready. {}", endpoint.addr());
+                                    }
+                                }
+                            }
                             NetEvent::Accepted(_endpoint, _listener) => {}
                             NetEvent::Message(endpoint, data) => {
                                 // ex. reply

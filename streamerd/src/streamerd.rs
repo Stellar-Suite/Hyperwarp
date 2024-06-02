@@ -1,15 +1,18 @@
+use core::prelude::rust_2015;
 use std::{path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex}, thread::JoinHandle};
 
 use clap::{Parser, ValueEnum, command};
 
 use anyhow::{bail, Result};
 
+use crossbeam_queue::SegQueue;
 use gio::glib;
-use gstreamer::{prelude::*, ErrorMessage};
+use gstreamer::{prelude::*, Element, ErrorMessage};
+use gstreamer_app::AppSrc;
 use gstreamer_video::prelude::*;
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, node::{self, NodeEvent, NodeHandler}};
 
-use stellar_protocol::protocol::StellarMessage;
+use stellar_protocol::protocol::{self, StellarMessage};
 
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
@@ -17,6 +20,10 @@ use stellar_protocol::protocol::StellarMessage;
 enum OperationMode {
     Hyperwarp,
     Ingest
+}
+
+pub enum InternalMessage {
+    SetupResolution((u32, u32))
 }
 
 #[derive(Parser, Debug)]
@@ -49,6 +56,7 @@ pub struct Streamer {
     pub started: bool,
     pub handles: Vec<JoinHandle<()>>,
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<StreamerSignal>>>>,
+    pub streaming_command_queue: Arc<SegQueue<InternalMessage>>,
 }
 
 impl Streamer {
@@ -59,6 +67,7 @@ impl Streamer {
             started: false,
             handles: vec![],
             messaging_handler: None,
+            streaming_command_queue: Arc::new(SegQueue::new()),
         }
     }
 
@@ -87,15 +96,20 @@ impl Streamer {
 
             let pipeline = gstreamer::Pipeline::default();
 
+            let mut testing_phase = true;
+
             println!("pipeline initalizing");
 
-            let videotestsrc = gstreamer::ElementFactory::make("videotestsrc").build()?;
+            let videotestsrc = match config.test_mode {
+                true => gstreamer::ElementFactory::make("videotestsrc").build()?,
+                false => gstreamer::ElementFactory::make("videotestsrc").build()?,
+            };
             let videoconvert = gstreamer::ElementFactory::make("videoconvert").build()?;
             let sink = gstreamer::ElementFactory::make("autovideosink").build()?;
 
             // link
             pipeline.add_many(&[&videotestsrc, &videoconvert, &sink])?;
-            gstreamer::Element::link_many(&[videotestsrc, videoconvert, sink])?;
+            gstreamer::Element::link_many(&[&videotestsrc, &videoconvert, &sink])?;
 
             println!("pipeline linked");
 
@@ -107,19 +121,68 @@ impl Streamer {
 
             println!("begin event ingest");
 
-            for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-                use gstreamer::MessageView;
-        
-                match msg.view() {
-                    MessageView::Eos(..) => break,
-                    MessageView::Error(err) => {
-                        pipeline.set_state(gstreamer::State::Null)?;
-                        bail!("Error: {} {:?}", err.error(), err.debug());
+            
+            let mut running = true;
+            let mut prod_appsrc: Option<AppSrc> = None;
+
+            // TODO: better interleave
+            while running {
+                for msg in bus.iter_timed(gstreamer::ClockTime::from_mseconds(1)) {
+                    use gstreamer::MessageView;
+
+                    println!("{:?}", msg);
+            
+                    match msg.view() {
+                        MessageView::Eos(..) => break,
+                        MessageView::Error(err) => {
+                            pipeline.set_state(gstreamer::State::Null)?;
+                            running = false;
+                            bail!("Error: {} {:?}", err.error(), err.debug());
+                        }
+                        _ => (),
                     }
-                    _ => (),
+                }
+                if let Some(imsg) = self.streaming_command_queue.pop() {
+                    match imsg {
+                        InternalMessage::SetupResolution(res) => {
+                            println!("updating to {:?}", res);
+                            let video_info =
+                                gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Bgrx, res.0, res.1)
+                           //         .fps(gst::Fraction::new(2, 1))
+                                    .build()
+                                    .expect("Failed to create video info on demand for source");
+                            if testing_phase {
+                                gstreamer::Element::unlink_many(&[&videotestsrc, &videoconvert]);
+                                let appsrc = gstreamer_app::AppSrc::builder()
+                                .caps(&video_info.to_caps().expect("Cap generation failed"))
+                                .format(gstreamer::Format::Time)
+                                .build();
+
+                                pipeline.add_many([appsrc.upcast_ref::<Element>()]);
+                                gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &sink]);
+
+                                appsrc.set_callbacks(
+                                    gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
+                                        let mut buffer = gstreamer::Buffer::with_size(video_info.size()).unwrap();
+                                        // set pts to current time
+                                        {
+                                            let buffer = buffer.get_mut().unwrap();
+                                            buffer.set_pts(gstreamer::ClockTime::from_mseconds(0));
+                                        }
+                                    }).build()
+                                );
+
+                                prod_appsrc = Some(appsrc);
+                                testing_phase = false;
+                            } else {
+                                let appsrc = prod_appsrc.as_mut().unwrap();
+                                appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                                println!("Adjusted caps for resolution {:?}", res);
+                            }
+                        },
+                    }
                 }
             }
-        
 
             Ok(())
         };
@@ -134,11 +197,14 @@ impl Streamer {
         let socket_path = self.config.socket.clone().expect("socket path not set or not valid");
         let (handler, listener) = node::split::<StreamerSignal>();
         println!("Connecting to socket: {}", socket_path.display());
-        handler.network().connect_with(message_io::network::TransportConnect::UnixSocket(UnixSocketConnectConfig::new(socket_path)), create_null_socketaddr());
+        // _ is so rustc doesn't complain about unused variable
+        let _ = handler.network().connect_with(message_io::network::TransportConnect::UnixSocket(UnixSocketConnectConfig::new(socket_path)), create_null_socketaddr());
         let handler_wrapper = Arc::new(Mutex::new(handler));
         let handler_wrapper_2 = handler_wrapper.clone();
         self.messaging_handler = Some(handler_wrapper_2);
         println!("Starting Hyperwarp client event thread");
+
+        let streaming_cmd_queue = self.streaming_command_queue.clone();
 
         std::thread::spawn(move || {
 
@@ -148,8 +214,16 @@ impl Streamer {
                     match event {
                         NodeEvent::Network(netevent) => {
                             match netevent {
-                                message_io::network::NetEvent::Connected(_, _) => {
+                                message_io::network::NetEvent::Connected(endpoint, ready) => {
                                     println!("Connected to Hyperwarp socket");
+                                    if ready {
+                                        // say hello
+                                        handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::Hello));
+
+                                        handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::RequestResolutionBroadcast));
+                                    } else {
+                                        println!("One client did not successfully ready. {}", endpoint.addr());
+                                    }
                                 },
                                 message_io::network::NetEvent::Accepted(_, _) => {
                                     println!("Connect accepted from Hyperwarp socket");
@@ -158,6 +232,16 @@ impl Streamer {
                                     match stellar_protocol::deserialize_safe(&data) {
                                         Some(message) => {
                                             println!("{:?} message", message);
+                                            match message {
+                                                StellarMessage::ResolutionBroadcastResponse(res_opt) => {
+                                                    if let Some(res) = res_opt {
+                                                        streaming_cmd_queue.push(InternalMessage::SetupResolution(res));
+                                                    }
+                                                },
+                                                _ => {
+
+                                                }
+                                            }
                                         },
                                         None => {
                                             println!("Received invalid message from Hyperwarp socket...");

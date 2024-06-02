@@ -19,6 +19,8 @@ pub fn get_all_channels() -> Vec<StellarChannel> {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum StellarMessage {
     Test,
+    Hello,
+    HelloName(String),
     Version,
     NewFrame,
     ToggleDebugOverlay,
