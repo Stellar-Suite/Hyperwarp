@@ -9,8 +9,8 @@ pub mod protocol;
     
 // }
 
-pub fn serialize(msg: StellarMessage) -> Vec<u8> {
-    bincode::serialize(&msg).unwrap()
+pub fn serialize(msg: &StellarMessage) -> Vec<u8> {
+    bincode::serialize(msg).unwrap()
 }
 
 pub fn deserialize(data: &[u8]) -> StellarMessage {

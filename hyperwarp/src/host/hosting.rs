@@ -2,6 +2,8 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 
+use stellar_protocol::protocol::{StellarChannel, StellarMessage};
+
 use std::any::Any;
 use std::path::PathBuf;
 use std::{
@@ -108,8 +110,9 @@ impl ApplicationHost {
         let handler_signals = handler_wrapper.clone();
 
         std::thread::spawn (move || {
-            let mut frame_sub_endpoints: Vec<Endpoint> = vec![];
-
+            // let mut frame_sub_endpoints: Vec<Endpoint> = vec![];
+            let mut pubsub: HashMap<StellarChannel, Vec<Endpoint>> = HashMap::new();
+            StellarChannel::
             let check_subscribers = |subscribers: &mut Vec<Endpoint>| {
                 let handler_locked = handler_wrapper.lock().unwrap();
                 subscribers.retain_mut(|target_endpoint| {
@@ -175,6 +178,14 @@ impl ApplicationHost {
         }
     }
 
+    pub fn send_to(&self, endpoint: Endpoint, message: &StellarMessage) -> bool {
+        if let Some(handler) = &self.messaging_handler {
+            let handler = handler.lock().unwrap();
+            handler.network().send(endpoint, &stellar_protocol::serialize(message));
+            return true;
+        }
+        false
+    }
     pub fn start(&mut self) {
         self.start_server();
         if self.config.capture_mode {
