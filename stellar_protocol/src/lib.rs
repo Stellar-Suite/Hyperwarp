@@ -16,3 +16,7 @@ pub fn serialize(msg: &StellarMessage) -> Vec<u8> {
 pub fn deserialize(data: &[u8]) -> StellarMessage {
     bincode::deserialize(data).unwrap()
 }
+
+pub fn deserialize_safe(data: &[u8]) -> Option<StellarMessage> {
+    bincode::deserialize(data).ok()
+}

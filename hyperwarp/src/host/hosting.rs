@@ -31,7 +31,7 @@ pub struct CaptureHelper {
 }
 
 pub enum MainTickMessage {
-    RequestResolutionBroadcast,
+    RequestResolutionBroadcast(Endpoint),
 }
 
 pub struct ApplicationHost {
@@ -81,6 +81,15 @@ impl ApplicationHost {
 
     pub fn tick(&self) {
         self.get_behavior().tick();
+
+        match self.command_queue.pop() {
+            Some(command) => match command {
+                MainTickMessage::RequestResolutionBroadcast(endpoint) => {
+                    self.send_to(endpoint, &StellarMessage::ResolutionBroadcastResponse(self.get_behavior().get_fb_size()));
+                },
+            },
+            None => {}
+        }
     }
 
     pub fn start_server(&mut self) {
@@ -181,6 +190,7 @@ impl ApplicationHost {
                     }
                     NodeEvent::Signal(signal) => {
                         match signal {
+                            // WARNING: DO NOT SEND A SIGNAL HERE CAUSE IT'LL BE DEADLOCKED I THINK
                             InternalSignals::TestSignal => {}
                             InternalSignals::TracingSignal => {}
                             InternalSignals::NewFrameSignal => {}

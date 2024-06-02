@@ -49,6 +49,10 @@ pub trait HostBehavior: Send {
     fn tick(&mut self) {
         // TODO: impl in trait implementor
     }
+
+    fn get_fb_size(&self) -> Option<(u32, u32)> {
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -157,8 +161,15 @@ impl HostBehavior for DefaultHostBehavior {
         Some(self.fb.as_ref())
     }
 
-    fn tick(&mut self) {
-        
+    fn tick(&mut self) {}
+
+    fn get_fb_size(&self) -> Option<(u32, u32)> {
+        if let Some(width) = self.fb_width {
+            if let Some(height) = self.fb_height {
+                return Some((width, height));
+            }
+        }
+        None
     }
 }
 

@@ -24,5 +24,7 @@ pub enum StellarMessage {
     ToggleDebugOverlay,
     ToggleDebugOverlayResponse(bool),
     RequestShImgPath,
-    ShImgPathResponse(String)
+    ShImgPathResponse(String),
+    RequestResolutionBroadcast,
+    ResolutionBroadcastResponse(Option<(u32, u32)>),
 }

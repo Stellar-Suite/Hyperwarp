@@ -7,7 +7,14 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
+clap = { version = "4.5.4", features = ["derive"] }
+gio = "0.19.5"
 gstreamer = "0.22.0"
-message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1" }
+gstreamer-app = "0.22.0"
+gstreamer-base = "0.22.0"
+gstreamer-gl = "0.22.0"
+gstreamer-rtp = "0.22.5"
+gstreamer-video = "0.22.5"
+message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", rev = "d9a6af846e3f6373e48f72a3bce6627d3cd2f90d", features = ["udp", "tcp", "unixsocket" ] }
 # stellar_core = { path = "../stellar_core" }
 stellar_protocol = { path = "../stellar_protocol" }

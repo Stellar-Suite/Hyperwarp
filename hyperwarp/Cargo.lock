@@ -347,7 +347,7 @@ dependencies = [
 [[package]]
 name = "message-io"
 version = "0.18.1"
-source = "git+https://github.com/javaarchive/message-io#1b416ece67078a315d745f6bdbd943be635cca62"
+source = "git+https://github.com/javaarchive/message-io?rev=d9a6af846e3f6373e48f72a3bce6627d3cd2f90d#d9a6af846e3f6373e48f72a3bce6627d3cd2f90d"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-utils",
