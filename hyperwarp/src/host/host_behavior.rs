@@ -1,34 +1,48 @@
-use std::{sync::{Arc, mpsc, Mutex}, time::{UNIX_EPOCH, Instant}, path::Path, thread::{Thread, JoinHandle}, fs::File, io::{Write, SeekFrom, Seek}};
+use std::{
+    fs::File,
+    io::{Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
+    sync::{mpsc, Arc, Mutex},
+    thread::{JoinHandle, Thread},
+    time::{Instant, UNIX_EPOCH},
+};
 
 use gl::{RGBA, UNSIGNED_BYTE};
 
-use crate::{utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8}, bind::{gl_safe::glReadPixelsSafe, gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE}, sdl2_safe}};
+use crate::{
+    bind::{
+        gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE},
+        gl_safe::glReadPixelsSafe,
+        sdl2_safe,
+    },
+    utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8},
+};
 
 use super::{hosting::HOST, window::Window};
 
-use std::time::Duration;
-use std::thread::sleep;
 use std::thread;
+use std::thread::sleep;
+use std::time::Duration;
 
 // for now we only handle a single window
 pub trait HostBehavior: Send {
-    fn onStart(&mut self) {
+    fn onStart(&mut self) {}
 
+    fn onWindowCreate(
+        &mut self,
+        win: Window,
+        x: Option<i32>,
+        y: Option<i32>,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) {
     }
 
-    fn onWindowCreate(&mut self, win: Window, x: Option<i32>,y: Option<i32>,width: Option<u32>, height: Option<u32>) {
+    fn onFrameSwapBegin(&mut self) {}
 
-    }
+    fn onFrameSwapEnd(&mut self) {}
 
-    fn onFrameSwapBegin(&mut self) {
-
-    }
-
-    fn onFrameSwapEnd(&mut self){
-
-    }
-
-    fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
+    fn getFramebufferForCapture(&self) -> Option<&Vec<u8>> {
         None
     }
     // update whenever
@@ -36,7 +50,6 @@ pub trait HostBehavior: Send {
         // TODO: impl in trait implementor
     }
 }
-
 
 #[derive(Debug)]
 pub struct DefaultHostBehavior {
@@ -60,7 +73,14 @@ impl DefaultHostBehavior {
 }
 
 impl HostBehavior for DefaultHostBehavior {
-    fn onWindowCreate(&mut self, win: Window, x: Option<i32>,y: Option<i32>,width: Option<u32>, height: Option<u32>) {
+    fn onWindowCreate(
+        &mut self,
+        win: Window,
+        x: Option<i32>,
+        y: Option<i32>,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) {
         self.windows.push(win);
         if let Some(width) = width {
             if let Some(height) = height {
@@ -70,7 +90,7 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn onFrameSwapBegin(&mut self) {
-        self.tick();
+        HOST.tick();
         let start = Instant::now();
         if HOST.config.capture_mode {
             let features = HOST.features.lock().unwrap();
@@ -79,20 +99,33 @@ impl HostBehavior for DefaultHostBehavior {
                 // surely no one uses both sdl2 and something else
                 if features.sdl2_enabled {
                     if let Some((width, height)) = self.get_largest_sdl2_window() {
-                        if self.fb_width != Some(width.try_into().unwrap()) || self.fb_height != Some(height.try_into().unwrap()) {
+                        if self.fb_width != Some(width.try_into().unwrap())
+                            || self.fb_height != Some(height.try_into().unwrap())
+                        {
                             if HOST.config.debug_mode {
                                 println!("resize fb {}x{}", width, height);
                             }
-                            self.setup_framebuffer(width.try_into().unwrap(), height.try_into().unwrap());
+                            self.setup_framebuffer(
+                                width.try_into().unwrap(),
+                                height.try_into().unwrap(),
+                            );
                         }
                     } else {
-                       //  println!("sdl2 window not found");
+                        //  println!("sdl2 window not found");
                     }
                 }
                 if let Some(_capture) = HOST.capture_helper.as_ref() {
                     if let (Some(fb_width), Some(fb_height)) = (self.fb_width, self.fb_height) {
                         // use opengl to capture the framebuffer if we have capture initalized
-                        glReadPixelsSafe(0, 0, fb_width as i32, fb_height as i32,RGBA, UNSIGNED_BYTE, self.fb.as_mut_ptr());
+                        glReadPixelsSafe(
+                            0,
+                            0,
+                            fb_width as i32,
+                            fb_height as i32,
+                            RGBA,
+                            UNSIGNED_BYTE,
+                            self.fb.as_mut_ptr(),
+                        );
                         // pov: you are a rustacean and you are reading this code (copilot wrote this and the comment)
                         // println!("a sample of captured pixels {}", self.fb[std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos() as usize % (self.fb.len() - 1)]);
                         // artifical lag debug
@@ -106,7 +139,7 @@ impl HostBehavior for DefaultHostBehavior {
                         println!("unknown framebuffer dimensions");
                     }
                 }
-            } else{
+            } else {
                 // println!("gl not enabled");
             }
         }
@@ -116,11 +149,11 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn onFrameSwapEnd(&mut self) {
-        self.tick();
+        HOST.tick();
         // TODO: notify rendered frame
     }
 
-    fn getFramebufferForCapture (&self) -> Option<&Vec<u8>> {
+    fn getFramebufferForCapture(&self) -> Option<&Vec<u8>> {
         Some(self.fb.as_ref())
     }
 
@@ -129,13 +162,11 @@ impl HostBehavior for DefaultHostBehavior {
     }
 }
 
-impl DefaultHostBehavior {
-    
-}
+impl DefaultHostBehavior {}
 
 pub enum ThreadMessage {
     Stop,
-    NewFrame
+    NewFrame,
 }
 
 impl DefaultHostBehavior {
@@ -172,11 +203,11 @@ impl DefaultHostBehavior {
 
     pub fn spawn_writer_thread(&mut self, config: &Config) -> JoinHandle<()> {
         let base_loc = Path::new("/dev/shm");
-        let file_loc = base_loc.join(format!("{}{}",config.session_id, ".raw"));
+        let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
 
         println!("file_loc: {}", file_loc.display());
 
-        let (tx, rx) = mpsc::channel::<ThreadMessage>(); // we use to signal to the thread to dump the frames. 
+        let (tx, rx) = mpsc::channel::<ThreadMessage>(); // we use to signal to the thread to dump the frames.
 
         self.tx = Some(tx);
 
@@ -186,7 +217,7 @@ impl DefaultHostBehavior {
                 match rx.recv() {
                     Ok(ThreadMessage::Stop) => {
                         break;
-                    },
+                    }
                     Ok(ThreadMessage::NewFrame) => {
                         // write the frame to the file
                         if HOST.config.debug_mode {
@@ -194,10 +225,11 @@ impl DefaultHostBehavior {
                         }
                         // let start = Instant::now();
                         let behavior = HOST.get_behavior();
-                        file.write(behavior.getFramebufferForCapture().unwrap()).unwrap();
+                        file.write(behavior.getFramebufferForCapture().unwrap())
+                            .unwrap();
                         file.seek(SeekFrom::Start(0)).unwrap();
                         // println!("shm write took {:?}", start.elapsed());
-                    },
+                    }
                     Err(e) => {
                         println!("Error in thread: {:?}", e);
                         break;
@@ -205,5 +237,11 @@ impl DefaultHostBehavior {
                 }
             }
         })
+    }
+
+    pub fn get_shimg_path(&self, config: &Config) -> PathBuf {
+        let base_loc = Path::new("/dev/shm");
+        let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
+        file_loc
     }
 }
