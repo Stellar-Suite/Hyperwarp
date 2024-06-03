@@ -84,7 +84,7 @@ impl ApplicationHost {
         self.get_behavior().tick();
 
         // process commands from queue
-
+        println!("TICK");
         match self.command_queue.pop() {
             Some(command) => match command {
                 MainTickMessage::RequestResolutionBroadcast(endpoint) => {
@@ -114,7 +114,7 @@ impl ApplicationHost {
         handler
             .network()
             .listen_with(
-                TransportListen::UnixSocket(UnixSocketListenConfig::new(unix_socket_path)),
+                TransportListen::UnixDatagramSocket(UnixSocketListenConfig::new(unix_socket_path)),
                 create_null_socketaddr(),
             )
             .expect("Opening unix control socket failed.");

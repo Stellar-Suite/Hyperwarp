@@ -198,7 +198,7 @@ impl Streamer {
         let (handler, listener) = node::split::<StreamerSignal>();
         println!("Connecting to socket: {}", socket_path.display());
         // _ is so rustc doesn't complain about unused variable
-        let _ = handler.network().connect_with(message_io::network::TransportConnect::UnixSocket(UnixSocketConnectConfig::new(socket_path)), create_null_socketaddr());
+        let _ = handler.network().connect_with(message_io::network::TransportConnect::UnixSocketDatagram(UnixSocketConnectConfig::new(socket_path)), create_null_socketaddr().into());
         let handler_wrapper = Arc::new(Mutex::new(handler));
         let handler_wrapper_2 = handler_wrapper.clone();
         self.messaging_handler = Some(handler_wrapper_2);
@@ -219,10 +219,10 @@ impl Streamer {
                                     if ready {
                                         // say hello
                                         println!("sending hello");
-                                        handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::Hello));
+                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::Hello));
                                         println!("sending initial res request");
-                                        handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::RequestResolutionBroadcast));
-                                        handler_wrapper.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
+                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::RequestResolutionBroadcast));
+                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
                                     } else {
                                         println!("One client did not successfully ready. {}", endpoint.addr());
                                     }

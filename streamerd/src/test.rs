@@ -12,8 +12,9 @@ pub fn test_networking() {
     let a = thread::spawn(move || {
         // server
         let (handler, listener) = message_io::node::split::<StellarMessage>();
-        handler.network().listen_with(message_io::network::TransportListen::UnixSocket(UnixSocketListenConfig::new(test_path)), create_null_socketaddr());
+        handler.network().listen_with(message_io::network::TransportListen::UnixDatagramSocket(UnixSocketListenConfig::new(test_path)), create_null_socketaddr());
         handler.network().listen(message_io::network::Transport::Udp, "0.0.0.0:1234");
+        handler.network().listen(message_io::network::Transport::Tcp, "0.0.0.0:1235");
         listener.for_each(move |event| {
             match event {
                 NodeEvent::Network(netevent) => {
@@ -58,11 +59,15 @@ pub fn test_networking() {
         // client
         thread::sleep(std::time::Duration::from_secs(1)); // Give server time to init
         let (handler, listener) = message_io::node::split::<StellarMessage>();
-        // let (endpoint, addr) = handler.network().connect_with(message_io::network::TransportConnect::UnixSocket(UnixSocketConnectConfig::new(test_path_2)), create_null_socketaddr()).expect("client setup failed");
-        let (endpoint, addr) = handler.network().connect(message_io::network::Transport::Udp, "0.0.0.0:1234").expect("udp client setup failed");
+        // let mut config = UnixSocketConnectConfig::new(test_path_2);
+        // config.flush_on_send = true;
+        // let config_enum = message_io::network::TransportConnect::UnixSocketDatagram(config);
+        // let (endpoint, addr) = handler.network().connect_with(config_enum, create_null_socketaddr()).expect("client setup failed");
+        let (endpoint, addr) = handler.network().connect_with(message_io::network::TransportConnect::UnixSocketDatagram(UnixSocketConnectConfig::new(test_path_2)), create_null_socketaddr().into()).expect("client setup failed");
+        // let (endpoint, addr) = handler.network().connect(message_io::network::Transport::Tcp, "0.0.0.0:1235").expect("udp client setup failed");
         for _ in 0..10 {
-            handler.network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::HelloName("Kitty".to_string())));
-            handler.network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::HelloName("Kitty II".to_string())));
+            handler.network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Kitty".to_string())));
+            handler.network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Very Large Kitty II".to_string())));
 
             thread::sleep(std::time::Duration::from_millis(133));
         }

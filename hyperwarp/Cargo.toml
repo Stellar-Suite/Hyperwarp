@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 bytemuck = "1.13.1"
 tokio = { version = "1", features = ["full"] }
 # We don't need message-io websocket for now.
-message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", features = ["udp", "tcp", "unixsocket" ], rev = "d9a6af846e3f6373e48f72a3bce6627d3cd2f90d"  }
+message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 stellar_protocol = { path = "../stellar_protocol" }
 crossbeam-queue = "0.3.11"
 # stellar_core = { path = "../stellar_core" }
