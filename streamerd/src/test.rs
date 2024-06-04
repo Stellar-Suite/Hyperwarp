@@ -20,7 +20,7 @@ pub fn test_networking() {
                 NodeEvent::Network(netevent) => {
                     match netevent {
                         message_io::network::NetEvent::Connected(_, _) => {
-
+                            
                         },
                         message_io::network::NetEvent::Accepted(_, _) => {
 

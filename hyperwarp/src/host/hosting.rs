@@ -236,6 +236,7 @@ impl ApplicationHost {
                     NodeEvent::Signal(signal) => {
                         match signal {
                             // WARNING: DO NOT SEND A SIGNAL HERE CAUSE IT'LL BE DEADLOCKED I THINK
+                            // APPARENTLY NOT
                             InternalSignals::TestSignal => {}
                             InternalSignals::TracingSignal => {}
                             InternalSignals::NewFrameSignal => {}
