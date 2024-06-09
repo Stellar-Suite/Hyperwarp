@@ -19,6 +19,20 @@ pub fn get_all_channels() -> Vec<StellarChannel> {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Handshake {
+    pub resolution: (u32, u32),
+    pub shimg_path: PathBuf,
+}
+
+
+// things that can change but all optional
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct Synchornization {
+    pub resolution: Option<(u32, u32)>,
+}
+
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum StellarMessage {
     Test,
     Hello,

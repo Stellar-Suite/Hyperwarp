@@ -176,6 +176,31 @@ impl Streamer {
                                         {
                                             let buffer = buffer.get_mut().unwrap();
                                             buffer.set_pts(gstreamer::ClockTime::from_mseconds(0));
+                                            let mut vframe = gstreamer_video::VideoFrameRef::from_buffer_ref_writable(buffer, &video_info).unwrap();
+                                            // Remember some values from the frame for later usage
+                                            let width = vframe.width() as usize;
+                                            let height = vframe.height() as usize;
+
+                                            // Each line of the first plane has this many bytes
+                                            let stride = vframe.plane_stride()[0] as usize;
+
+                                            // Iterate over each of the height many lines of length stride
+                                            for line in vframe
+                                                .plane_data_mut(0)
+                                                .unwrap()
+                                                .chunks_exact_mut(stride)
+                                                .take(height)
+                                            {
+                                                // Iterate over each pixel of 4 bytes in that line
+                                                for pixel in line[..(4 * width)].chunks_exact_mut(4) {
+                                                    pixel[0] = 124;
+                                                    pixel[1] = 124;
+                                                    pixel[2] = 124;
+                                                    pixel[3] = 0;
+                                                }
+                                            }
+
+
                                         }
                                     }).build()
                                 );
