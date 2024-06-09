@@ -249,6 +249,7 @@ dependencies = [
 name = "hyperwarp"
 version = "0.2.1"
 dependencies = [
+ "backtrace",
  "bytemuck",
  "cc",
  "crossbeam-queue",
@@ -345,7 +346,7 @@ dependencies = [
 [[package]]
 name = "message-io"
 version = "0.18.1"
-source = "git+https://github.com/javaarchive/message-io?branch=netaddress-type#720883b497a8468b541caffb3e5845f09fff8a1c"
+source = "git+https://github.com/javaarchive/message-io?branch=netaddress-type#c468a9eae0c090430942b199308897a296bd9d40"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-utils",

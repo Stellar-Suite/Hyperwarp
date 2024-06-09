@@ -10,7 +10,7 @@ use gio::glib;
 use gstreamer::{prelude::*, Element, ErrorMessage};
 use gstreamer_app::AppSrc;
 use gstreamer_video::prelude::*;
-use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, node::{self, NodeEvent, NodeHandler}};
+use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
 use stellar_protocol::protocol::{StellarMessage};
 
@@ -158,8 +158,16 @@ impl Streamer {
                                 .format(gstreamer::Format::Time)
                                 .build();
 
-                                pipeline.add_many([appsrc.upcast_ref::<Element>()]);
-                                gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &sink]);
+                                if let Err(err) = pipeline.add_many([appsrc.upcast_ref::<Element>()]) {
+                                    println!("Error adding appsrc to pipeline: {:?}", err);
+                                }
+                                if let Err(err) = gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert]) {
+                                    println!("Error linking appsrc to videoconvert: {:?}", err);
+                                }
+                                // we need to remove the test src as well
+                                if let Err(err) = pipeline.remove(&videotestsrc){
+                                    println!("Error removing test source: {:?}", err);
+                                }
 
                                 appsrc.set_callbacks(
                                     gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
@@ -198,7 +206,8 @@ impl Streamer {
         let (handler, listener) = node::split::<StreamerSignal>();
         println!("Connecting to socket: {}", socket_path.display());
         // _ is so rustc doesn't complain about unused variable
-        let _ = handler.network().connect_with(message_io::network::TransportConnect::UnixSocketDatagram(UnixSocketConnectConfig::new(socket_path)), create_null_socketaddr().into());
+        let temp_socket_path: PathBuf = format!("/tmp/hyperwarp/client-{}.sock", std::process::id()).into();
+        let _ = handler.network().connect_with(message_io::network::TransportConnect::UnixSocketDatagram(UnixSocketConnectConfig::new(temp_socket_path)), NetworkAddr::Path(socket_path));
         let handler_wrapper = Arc::new(Mutex::new(handler));
         let handler_wrapper_2 = handler_wrapper.clone();
         self.messaging_handler = Some(handler_wrapper_2);

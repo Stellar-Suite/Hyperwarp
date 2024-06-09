@@ -1,3 +1,4 @@
+use backtrace::Backtrace;
 use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListenConfig};
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
@@ -18,9 +19,11 @@ use std::{
 
 use std::thread; // for test func
 
+use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
+use super::window::Window;
 use super::{
     feature_flags::FeatureFlags,
     host_behavior::{DefaultHostBehavior, HostBehavior},
@@ -32,6 +35,7 @@ pub struct CaptureHelper {
 
 pub enum MainTickMessage {
     RequestResolutionBroadcast(Endpoint),
+    RequestShImgPath(Endpoint),
 }
 
 pub struct ApplicationHost {
@@ -84,7 +88,9 @@ impl ApplicationHost {
         self.get_behavior().tick();
 
         // process commands from queue
-        println!("TICK");
+        if self.config.tracing_mode {
+            println!("tick()");
+        }
         match self.command_queue.pop() {
             Some(command) => match command {
                 MainTickMessage::RequestResolutionBroadcast(endpoint) => {
@@ -92,6 +98,18 @@ impl ApplicationHost {
                         println!("Responding to resolution request from {:?} with {:?}", endpoint.addr(), self.get_behavior().get_fb_size());
                     }
                     self.send_to(endpoint, &StellarMessage::ResolutionBroadcastResponse(self.get_behavior().get_fb_size()));
+                    if self.config.debug_mode {
+                        println!("Resolution response sent!");
+                    }
+                },
+                MainTickMessage::RequestShImgPath(endpoint) => {
+                    let path = self.get_behavior().get_shimg_path(&self.config);
+                    if self.config.debug_mode {
+                        println!("Responding to shimg path request from {:?} with {:?}", endpoint.addr(), path);
+                    }
+                    let path_copy = path.clone();
+                    self.send_to(endpoint.clone(), &StellarMessage::ShImgPathResponseStruct(path));
+                    self.send_to(endpoint.clone(), &StellarMessage::ShImgPathResponse(path_copy.display().to_string()));
                 },
             },
             None => {}
@@ -199,6 +217,12 @@ impl ApplicationHost {
                                                 }
                                                 send_main_tick_request(MainTickMessage::RequestResolutionBroadcast(endpoint));
                                             },
+                                            StellarMessage::RequestShImgPath => {
+                                                if config.debug_mode {
+                                                    println!("Attempting to fufill shimg path request from {:?}", endpoint.addr());
+                                                }
+                                                send_main_tick_request(MainTickMessage::RequestShImgPath(endpoint));
+                                            }
                                             StellarMessage::Hello => {
                                                 if config.debug_mode {
                                                     println!("Hello message received from {:?}", endpoint.addr());
@@ -277,7 +301,13 @@ impl ApplicationHost {
     }
 
     pub fn start(&mut self) {
-        self.start_server();
+        if !self.config.disable_control {
+            self.start_server();
+        } else {
+            if self.config.debug_mode {
+                println!("Control disabled. Not starting server.");
+            }
+        }
         if self.config.capture_mode {
             self.capture_helper = Some(CaptureHelper { frameFile: None });
         }
@@ -306,6 +336,27 @@ impl ApplicationHost {
         // TODO: supress test func in non-debug mode
         println!("test func called on thread {:?}", thread::current().id());
     }
+
+    pub fn onFrameSwapBegin(&self) {
+        self.get_behavior().onFrameSwapBegin();
+        self.tick();
+    }
+
+    pub fn onFrameSwapEnd(&self) {
+        self.get_behavior().onFrameSwapEnd();
+        self.tick();
+    }
+
+    pub fn onWindowCreate(
+        &self,
+        win: Window,
+        x: Option<i32>,
+        y: Option<i32>,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) {
+        self.get_behavior().onWindowCreate(win, x, y, width, height);
+    }
 }
 
 fn create_host() -> ApplicationHost {
@@ -313,6 +364,8 @@ fn create_host() -> ApplicationHost {
     if config.debug_mode {
         // println!("Selected Connection type: {}", config.connection_type);
         println!("Host config: {:?}", config);
+        let bt = Backtrace::new();
+        println!("Startup backtrace: {:?}", bt);
     }
     let host = {
         let mut host = ApplicationHost::new(config);

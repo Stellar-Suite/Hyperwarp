@@ -15,9 +15,9 @@ redhook::hook! {
                 let mut features = HOST.features.lock().unwrap();
             }
 
-            HOST.get_behavior().onFrameSwapBegin();            
+            HOST.onFrameSwapBegin();            
             let result = redhook::real!(eglSwapBuffers)(name, surface);
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
             result
         } else {
             if HOST.config.debug_mode {

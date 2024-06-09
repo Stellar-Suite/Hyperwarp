@@ -75,7 +75,7 @@ redhook::hook! {
                 is_SDL2: false,
             };
 
-            HOST.get_behavior().onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
+            HOST.onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
             
             result
         } else {

@@ -1,4 +1,6 @@
 
+use std::path::PathBuf;
+
 use serde::{Serialize, Deserialize};
 use strum_macros::{EnumString, Display, EnumIter, VariantArray};
 
@@ -27,6 +29,7 @@ pub enum StellarMessage {
     ToggleDebugOverlayResponse(bool),
     RequestShImgPath,
     ShImgPathResponse(String),
+    ShImgPathResponseStruct(PathBuf),
     RequestResolutionBroadcast,
     ResolutionBroadcastResponse(Option<(u32, u32)>),
 }

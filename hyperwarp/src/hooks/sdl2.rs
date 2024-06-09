@@ -60,7 +60,7 @@ redhook::hook! {
             is_SDL2: true,
         };
 
-        HOST.get_behavior().onWindowCreate(window, Some(final_x), Some(final_y), Some(final_w.try_into().unwrap()), Some(final_h.try_into().unwrap()));
+        HOST.onWindowCreate(window, Some(final_x), Some(final_y), Some(final_w.try_into().unwrap()), Some(final_h.try_into().unwrap()));
 
         if HOST.config.debug_mode {
             println!("SDL_CreateWindow called with x: {}, y: {}, w: {}, h: {}", final_x, final_y, final_w, final_h);
@@ -82,9 +82,9 @@ redhook::hook! {
             println!("SDL_GL_SwapBuffers called");
         }
         if HOST.config.enable_sdl2 {
-            HOST.get_behavior().onFrameSwapBegin();
+            HOST.onFrameSwapBegin();
             let result = redhook::real!(SDL_GL_SwapBuffers_hw_direct)();
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
             result
         } else {
             // std::ptr::null()
@@ -104,9 +104,9 @@ redhook::hook! {
             println!("SDL_GL_SwapWindow called");
         }
         if HOST.config.enable_sdl2 {
-            HOST.get_behavior().onFrameSwapBegin();
+            HOST.onFrameSwapBegin();
             redhook::real!(SDL_GL_SwapWindow_hw_direct)(display);
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
         }
     }
 }
@@ -117,9 +117,9 @@ redhook::hook! {
             println!("SDL_RenderPresent called");
         }
         if HOST.config.enable_sdl2 {
-            HOST.get_behavior().onFrameSwapBegin();
+            HOST.onFrameSwapBegin();
             let result = redhook::real!(SDL_RenderPresent)(renderer);
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
             result
         } else {
             std::ptr::null()

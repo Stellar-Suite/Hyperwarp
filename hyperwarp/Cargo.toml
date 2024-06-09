@@ -21,6 +21,7 @@ message-io = { git = "https://github.com/javaarchive/message-io", version = "0.1
 stellar_protocol = { path = "../stellar_protocol" }
 crossbeam-queue = "0.3.11"
 human-panic = "2.0.0"
+backtrace = "0.3.72"
 # stellar_core = { path = "../stellar_core" }
 
 [build-dependencies]

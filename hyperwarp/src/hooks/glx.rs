@@ -48,9 +48,9 @@ redhook::hook! {
                 features.enable_glx();
             }
 
-            HOST.get_behavior().onFrameSwapBegin();            
+            HOST.onFrameSwapBegin();            
             let result = redhook::real!(glXSwapBuffers_hw_direct)(name, drawble);
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
             result
         } else {
             if HOST.config.debug_mode {
@@ -70,9 +70,9 @@ redhook::hook! {
                 features.enable_glx();
             }
 
-            HOST.get_behavior().onFrameSwapBegin();            
+            HOST.onFrameSwapBegin();            
             let result = redhook::real!(glXSwapBuffersMscOML)(name, drawble, target_msc, divisor, remainder);
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
             result
         } else {
             if HOST.config.debug_mode {
@@ -93,9 +93,9 @@ pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
         Pointer(func_ref) => {
             let func: extern "C" fn(name: Display, drawble: GLXDrawable) = unsafe { std::mem::transmute(*func_ref) };
             
-            HOST.get_behavior().onFrameSwapBegin();
+            HOST.onFrameSwapBegin();
             func(name, drawble);
-            HOST.get_behavior().onFrameSwapEnd();
+            HOST.onFrameSwapEnd();
 
         },
         _ => {

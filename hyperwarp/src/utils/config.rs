@@ -26,6 +26,7 @@ pub struct Config {
     pub unix_socket_path: Option<String>,
     pub bind_addr: Option<SocketAddr>, 
     pub bind_type: Option<String>,
+    pub disable_control: bool,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -87,6 +88,7 @@ impl Config {
             enable_sdl2: booleanify("ENABLE_SDL2", true),
             debug_mode: booleanify("DEBUG_HW", false),
             tracing_mode: booleanify("TRACING_HW", false),
+            disable_control: booleanify("DISABLE_CONTROL", false),
             window_width_override: try_get::<u32>("WINDOW_WIDTH"),
             window_height_override: try_get::<u32>("WINDOW_HEIGHT"),
             window_zero_origin: booleanify("WINDOW_ZERO_ORIGIN", false),
@@ -126,6 +128,7 @@ impl Default for Config {
             capture_mode: false,
             bind_addr: None,
             bind_type: None,
+            disable_control: false,
         }
     }
 }

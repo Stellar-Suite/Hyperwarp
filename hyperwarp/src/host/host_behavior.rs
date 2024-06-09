@@ -53,6 +53,12 @@ pub trait HostBehavior: Send {
     fn get_fb_size(&self) -> Option<(u32, u32)> {
         None
     }
+
+    fn get_shimg_path(&self, config: &Config) -> PathBuf {
+        let base_loc = Path::new("/dev/shm");
+        let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
+        file_loc
+    }
 }
 
 #[derive(Debug)]
@@ -94,7 +100,7 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn onFrameSwapBegin(&mut self) {
-        HOST.tick();
+        // HOST.tick();
         let start = Instant::now();
         if HOST.config.capture_mode {
             let features = HOST.features.lock().unwrap();
@@ -153,8 +159,7 @@ impl HostBehavior for DefaultHostBehavior {
     }
 
     fn onFrameSwapEnd(&mut self) {
-        HOST.tick();
-        // TODO: notify rendered frame
+        // TODO: notify rendered frame\
     }
 
     fn getFramebufferForCapture(&self) -> Option<&Vec<u8>> {
@@ -248,11 +253,5 @@ impl DefaultHostBehavior {
                 }
             }
         })
-    }
-
-    pub fn get_shimg_path(&self, config: &Config) -> PathBuf {
-        let base_loc = Path::new("/dev/shm");
-        let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
-        file_loc
     }
 }
