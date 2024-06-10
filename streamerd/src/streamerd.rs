@@ -275,10 +275,8 @@ impl Streamer {
                                         Some(message) => {
                                             println!("{:?} message", message);
                                             match message {
-                                                StellarMessage::ResolutionBroadcastResponse(res_opt) => {
-                                                    if let Some(res) = res_opt {
-                                                        streaming_cmd_queue.push(InternalMessage::SetupResolution(res));
-                                                    }
+                                                StellarMessage::HandshakeResponse(handshake) => {
+                                                    streaming_cmd_queue.push(InternalMessage::HandshakeRecieved(handshake));
                                                 },
                                                 _ => {
 
