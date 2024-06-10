@@ -23,7 +23,7 @@ enum OperationMode {
 }
 
 pub enum InternalMessage {
-    SetupResolution((u32, u32))
+    HandshakeRecieved(stellar_protocol::protocol::StellarMessage)
 }
 
 #[derive(Parser, Debug)]
@@ -144,7 +144,12 @@ impl Streamer {
                 }
                 if let Some(imsg) = self.streaming_command_queue.pop() {
                     match imsg {
-                        InternalMessage::SetupResolution(res) => {
+                        InternalMessage::HandshakeRecieved(message) => {
+                            let handshake = match message {
+                                StellarMessage::HandshakeResponse(handshake) => handshake,
+                                _ => panic!("Received invalid handshake message")
+                            };
+                            let res=  handshake.resolution;
                             println!("updating to {:?}", res);
                             let video_info =
                                 gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Bgrx, res.0, res.1)
@@ -183,6 +188,7 @@ impl Streamer {
 
                                             // Each line of the first plane has this many bytes
                                             let stride = vframe.plane_stride()[0] as usize;
+                                            let buf_mut = vframe.planes_data_mut();
 
                                             // Iterate over each of the height many lines of length stride
                                             for line in vframe
@@ -254,8 +260,8 @@ impl Streamer {
                                         // say hello
                                         println!("sending hello");
                                         handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::Hello));
-                                        println!("sending initial res request");
-                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::RequestResolutionBroadcast));
+                                        println!("sending initial handshake request");
+                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HandshakeRequest));
                                         handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
                                     } else {
                                         println!("One client did not successfully ready. {}", endpoint.addr());

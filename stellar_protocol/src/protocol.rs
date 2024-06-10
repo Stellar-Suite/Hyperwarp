@@ -46,4 +46,7 @@ pub enum StellarMessage {
     ShImgPathResponseStruct(PathBuf),
     RequestResolutionBroadcast,
     ResolutionBroadcastResponse(Option<(u32, u32)>),
+    HandshakeRequest,
+    HandshakeResponse(Handshake),
+    SynchronizationEvent(Synchornization),
 }
