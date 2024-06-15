@@ -3,7 +3,7 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
-use stellar_protocol::protocol::{get_all_channels, StellarChannel, StellarMessage};
+use stellar_protocol::protocol::{get_all_channels, Handshake, StellarChannel, StellarMessage};
 
 use crossbeam_queue::SegQueue;
 
@@ -36,6 +36,7 @@ pub struct CaptureHelper {
 pub enum MainTickMessage {
     RequestResolutionBroadcast(Endpoint),
     RequestShImgPath(Endpoint),
+    RequestHandshake(Endpoint),
 }
 
 pub struct ApplicationHost {
@@ -84,6 +85,16 @@ impl ApplicationHost {
         path
     }
 
+    pub fn get_handshake(&self) -> Handshake {
+        let resolution = self.get_behavior().get_fb_size().or_else(|| Some((0,0))).unwrap();
+        let shimg_path = self.get_behavior().get_shimg_path(&self.config);
+        let handshake = Handshake {
+            resolution: resolution,
+            shimg_path: shimg_path,
+        };
+        handshake
+    }
+
     pub fn tick(&self) {
         self.get_behavior().tick();
 
@@ -111,6 +122,13 @@ impl ApplicationHost {
                     self.send_to(endpoint.clone(), &StellarMessage::ShImgPathResponseStruct(path));
                     self.send_to(endpoint.clone(), &StellarMessage::ShImgPathResponse(path_copy.display().to_string()));
                 },
+                MainTickMessage::RequestHandshake(endpoint) => {
+                    if self.config.debug_mode {
+                        println!("Responding to handshake request from {:?}", endpoint.addr());
+                    }
+                    let handshake = self.get_handshake();
+                    self.send_to(endpoint, &StellarMessage::HandshakeResponse(handshake));
+                }
             },
             None => {}
         }
@@ -192,7 +210,7 @@ impl ApplicationHost {
             };
 
             listener.for_each(move |event| {
-                println!("got event: {:?}", event);
+                // println!("got event: {:?}", event);
                 match event {
                     NodeEvent::Network(netevent) => {
                         match netevent {
@@ -211,18 +229,24 @@ impl ApplicationHost {
                                 match stellar_protocol::deserialize_safe(data) { 
                                     Some(message) => {
                                         match message {
-                                            StellarMessage::RequestResolutionBroadcast => {
+                                            StellarMessage::ResolutionRequest => {
                                                 if config.debug_mode {
                                                     println!("Attempting to fufill resolution request from {:?}", endpoint.addr());
                                                 }
                                                 send_main_tick_request(MainTickMessage::RequestResolutionBroadcast(endpoint));
                                             },
-                                            StellarMessage::RequestShImgPath => {
+                                            StellarMessage::ShImgPathRequest => {
                                                 if config.debug_mode {
                                                     println!("Attempting to fufill shimg path request from {:?}", endpoint.addr());
                                                 }
                                                 send_main_tick_request(MainTickMessage::RequestShImgPath(endpoint));
-                                            }
+                                            },
+                                            StellarMessage::HandshakeRequest => {
+                                                if config.debug_mode {
+                                                    println!("Attempting to fufill handshake request from {:?}", endpoint.addr());
+                                                }
+                                                send_main_tick_request(MainTickMessage::RequestHandshake(endpoint));
+                                            },
                                             StellarMessage::Hello => {
                                                 if config.debug_mode {
                                                     println!("Hello message received from {:?}", endpoint.addr());

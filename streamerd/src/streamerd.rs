@@ -1,5 +1,5 @@
 use core::prelude::rust_2015;
-use std::{path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex}, thread::JoinHandle};
+use std::{io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, RwLock}, thread::JoinHandle};
 
 use clap::{Parser, ValueEnum, command};
 
@@ -57,6 +57,7 @@ pub struct Streamer {
     pub handles: Vec<JoinHandle<()>>,
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<StreamerSignal>>>>,
     pub streaming_command_queue: Arc<SegQueue<InternalMessage>>,
+    pub frame: Arc<RwLock<Vec<u8>>>,
 }
 
 pub fn calc_offset(width: usize, height: usize, x: usize, y: usize) -> Option<usize> {
@@ -75,6 +76,7 @@ impl Streamer {
             handles: vec![],
             messaging_handler: None,
             streaming_command_queue: Arc::new(SegQueue::new()),
+            frame: Arc::new(RwLock::new(vec![])),
         }
     }
 
@@ -131,8 +133,10 @@ impl Streamer {
             
             let mut running = true;
             let mut prod_appsrc: Option<AppSrc> = None;
+            
 
             // TODO: better interleave
+            // TODO: genercify
             while running {
                 for msg in bus.iter_timed(gstreamer::ClockTime::from_mseconds(1)) {
                     use gstreamer::MessageView;
@@ -160,6 +164,8 @@ impl Streamer {
                                     .build()
                                     .expect("Failed to create video info on demand for source");
                             if testing_phase {
+                                println!("switching out of testing phase, changing pipeline");
+                                // pipeline setup happens here
                                 gstreamer::Element::unlink_many(&[&videotestsrc, &videoconvert]);
                                 let appsrc = gstreamer_app::AppSrc::builder()
                                 .caps(&video_info.to_caps().expect("Cap generation failed"))
@@ -176,7 +182,8 @@ impl Streamer {
                                 if let Err(err) = pipeline.remove(&videotestsrc){
                                     println!("Error removing test source: {:?}", err);
                                 }
-
+                                let frame_2 = self.frame.clone();
+                                // setup callbacks
                                 appsrc.set_callbacks(
                                     gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
                                         let mut buffer = gstreamer::Buffer::with_size(video_info.size()).unwrap();
@@ -193,6 +200,7 @@ impl Streamer {
                                             let stride = vframe.plane_stride()[0] as usize;
                                             let buf_mut = vframe.planes_data_mut();
                                             let mut y = 0;
+                                            let frame_reader = frame_2.read().unwrap();
                                             // Iterate over each of the height many lines of length stride
                                             for line in vframe
                                                 .plane_data_mut(0)
@@ -205,8 +213,12 @@ impl Streamer {
                                                 let mut x = 0;
                                                 for pixel in chunk {
                                                     if let Some(offset) = calc_offset(width, height, x, y) {
-                                                        
+                                                        pixel[0] = frame_reader[offset];
+                                                        pixel[1] = frame_reader[offset + 1];
+                                                        pixel[2] = frame_reader[offset + 2];
+                                                        pixel[3] = frame_reader[offset + 3];
                                                     } else {
+                                                        // does not exist color
                                                         pixel[0] = 124;
                                                         pixel[1] = 124;
                                                         pixel[2] = 124;
@@ -257,10 +269,14 @@ impl Streamer {
 
         let streaming_cmd_queue = self.streaming_command_queue.clone();
 
+        let frame = self.frame.clone();
+        
+
         std::thread::spawn(move || {
 
             let inner_run = || -> Result<()> {
                 println!("Enter Hyperwarp client event processing");
+                let mut shm_file: Option<std::fs::File> = None;
                 listener.for_each(move |event| {
                     match event {
                         NodeEvent::Network(netevent) => {
@@ -285,10 +301,29 @@ impl Streamer {
                                 message_io::network::NetEvent::Message(_endpoint, data) => {
                                     match stellar_protocol::deserialize_safe(&data) {
                                         Some(message) => {
-                                            println!("{:?} message", message);
+                                            if !matches!(message, StellarMessage::NewFrame) {
+                                                println!("{:?} message", message);
+                                            }
                                             match message {
                                                 StellarMessage::HandshakeResponse(handshake) => {
+                                                    // setup buffer
+                                                    {
+                                                        let mut writable_frame = frame.write().unwrap();
+                                                        writable_frame.clear();
+                                                        let resolution = handshake.resolution;
+                                                        writable_frame.resize((4 * resolution.0 * resolution.1) as usize, 0);
+                                                    }
+                                                    {
+                                                        shm_file = Some(std::fs::File::open(&handshake.shimg_path).expect("Failed to open shm file"));
+                                                    }
                                                     streaming_cmd_queue.push(InternalMessage::HandshakeRecieved(handshake));
+                                                },
+                                                StellarMessage::NewFrame => {
+                                                    if let Some(shm_file) = &mut shm_file {
+                                                        let mut writable_frame = frame.write().unwrap();
+                                                        shm_file.read_to_end(&mut writable_frame).unwrap();
+                                                        shm_file.seek(std::io::SeekFrom::Start(0)).unwrap();
+                                                    }
                                                 },
                                                 _ => {
 
