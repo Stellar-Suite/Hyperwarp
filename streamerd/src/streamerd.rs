@@ -23,7 +23,7 @@ enum OperationMode {
 }
 
 pub enum InternalMessage {
-    HandshakeRecieved(stellar_protocol::protocol::StellarMessage)
+    HandshakeRecieved(stellar_protocol::protocol::Handshake)
 }
 
 #[derive(Parser, Debug)]
@@ -57,6 +57,13 @@ pub struct Streamer {
     pub handles: Vec<JoinHandle<()>>,
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<StreamerSignal>>>>,
     pub streaming_command_queue: Arc<SegQueue<InternalMessage>>,
+}
+
+pub fn calc_offset(width: usize, height: usize, x: usize, y: usize) -> Option<usize> {
+    if x <= width && y <= height {
+        return Some(((y * width + x) * 4));
+    }
+    None
 }
 
 impl Streamer {
@@ -144,11 +151,7 @@ impl Streamer {
                 }
                 if let Some(imsg) = self.streaming_command_queue.pop() {
                     match imsg {
-                        InternalMessage::HandshakeRecieved(message) => {
-                            let handshake = match message {
-                                StellarMessage::HandshakeResponse(handshake) => handshake,
-                                _ => panic!("Received invalid handshake message")
-                            };
+                        InternalMessage::HandshakeRecieved(handshake) => {
                             let res=  handshake.resolution;
                             println!("updating to {:?}", res);
                             let video_info =
@@ -189,7 +192,7 @@ impl Streamer {
                                             // Each line of the first plane has this many bytes
                                             let stride = vframe.plane_stride()[0] as usize;
                                             let buf_mut = vframe.planes_data_mut();
-
+                                            let mut y = 0;
                                             // Iterate over each of the height many lines of length stride
                                             for line in vframe
                                                 .plane_data_mut(0)
@@ -198,12 +201,20 @@ impl Streamer {
                                                 .take(height)
                                             {
                                                 // Iterate over each pixel of 4 bytes in that line
-                                                for pixel in line[..(4 * width)].chunks_exact_mut(4) {
-                                                    pixel[0] = 124;
-                                                    pixel[1] = 124;
-                                                    pixel[2] = 124;
-                                                    pixel[3] = 0;
+                                                let chunk = line[..(4 * width)].chunks_exact_mut(4);
+                                                let mut x = 0;
+                                                for pixel in chunk {
+                                                    if let Some(offset) = calc_offset(width, height, x, y) {
+                                                        
+                                                    } else {
+                                                        pixel[0] = 124;
+                                                        pixel[1] = 124;
+                                                        pixel[2] = 124;
+                                                        pixel[3] = 0;
+                                                    }
+                                                    x += 1;
                                                 }
+                                                y += 1;
                                             }
 
 
