@@ -12,7 +12,7 @@ use gstreamer_app::AppSrc;
 use gstreamer_video::prelude::*;
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
-use stellar_protocol::protocol::{StellarMessage};
+use stellar_protocol::protocol::{StellarChannel, StellarMessage};
 
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
@@ -274,6 +274,7 @@ impl Streamer {
                                         println!("sending initial handshake request");
                                         handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HandshakeRequest));
                                         handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
+                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::SubscribeChannel(StellarChannel::Frame)));
                                     } else {
                                         println!("One client did not successfully ready. {}", endpoint.addr());
                                     }

@@ -49,4 +49,6 @@ pub enum StellarMessage {
     HandshakeRequest,
     HandshakeResponse(Handshake),
     SynchronizationEvent(Synchornization),
+    SubscribeChannel(StellarChannel),
+    UnsubscribeChannel(StellarChannel),
 }

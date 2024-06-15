@@ -228,6 +228,12 @@ impl ApplicationHost {
                                                     println!("Hello message received from {:?}", endpoint.addr());
                                                 }
                                             },
+                                            StellarMessage::SubscribeChannel(channel) => {
+                                                if config.debug_mode {
+                                                    println!("Subscribing to channel {:?} from {:?}", channel, endpoint.addr());
+                                                }
+                                                pubsub.get_mut(&channel).unwrap().push(endpoint.clone());
+                                            },
                                             _ => {
                                                 if config.debug_mode {
                                                     println!("Unhandled message: {:?}", message);
@@ -263,7 +269,16 @@ impl ApplicationHost {
                             // APPARENTLY NOT
                             InternalSignals::TestSignal => {}
                             InternalSignals::TracingSignal => {}
-                            InternalSignals::NewFrameSignal => {}
+                            InternalSignals::NewFrameSignal => {
+                                check_subscribers(&mut pubsub.get_mut(&StellarChannel::Frame).unwrap());
+                                for subscriber in pubsub.get_mut(&StellarChannel::Frame).unwrap() {
+                                    handler_wrapper
+                                        .lock()
+                                        .unwrap()
+                                        .network()
+                                        .send(subscriber.clone(), &stellar_protocol::serialize(&StellarMessage::NewFrame));
+                                }
+                            }
                             _ => {
                                 // log unhandled signal
                                 if config.debug_mode {
@@ -345,6 +360,8 @@ impl ApplicationHost {
     pub fn onFrameSwapEnd(&self) {
         self.get_behavior().onFrameSwapEnd();
         self.tick();
+        self.notify_frame();
+        self.tick();
     }
 
     pub fn onWindowCreate(
@@ -356,6 +373,7 @@ impl ApplicationHost {
         height: Option<u32>,
     ) {
         self.get_behavior().onWindowCreate(win, x, y, width, height);
+        self.tick();
     }
 }
 
