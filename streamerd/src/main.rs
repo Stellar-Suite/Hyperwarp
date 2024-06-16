@@ -1,12 +1,12 @@
 use clap::Parser;
 
 // allocator debug
-#[cfg(not(target_env = "msvc"))]
-use tikv_jemallocator::Jemalloc;
+// #[cfg(not(target_env = "msvc"))]
+// use tikv_jemallocator::Jemalloc;
 
-#[cfg(not(target_env = "msvc"))]
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+// #[cfg(not(target_env = "msvc"))]
+// #[global_allocator]
+// static GLOBAL: Jemalloc = Jemalloc;
 
 use crate::streamerd::{Streamer, StreamerConfig};
 pub mod producer;

@@ -327,6 +327,7 @@ impl Streamer {
                                                 StellarMessage::NewFrame => {
                                                     if let Some(shm_file) = &mut shm_file {
                                                         let mut writable_frame = frame.write().unwrap();
+                                                        writable_frame.clear(); // because read_to_end "appends"
                                                         shm_file.read_to_end(&mut writable_frame).expect("Reading from shm file failed");
                                                         shm_file.seek(std::io::SeekFrom::Start(0)).expect("Seeking to start of image failed");
                                                     } else {
@@ -334,7 +335,7 @@ impl Streamer {
                                                     }
                                                 },
                                                 _ => {
-
+                                                    
                                                 }
                                             }
                                         },
