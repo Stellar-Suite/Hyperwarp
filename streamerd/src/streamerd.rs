@@ -94,31 +94,48 @@ impl Streamer {
     pub fn run_gstreamer(&mut self) {
         let config = self.config.clone();
         let stopper = self.stop.clone();
+        
 
         gstreamer::init().expect("bruh gstreamer didn't load");
 
         let inner_run = || -> Result<()> {
+            println!("grabbing a main loop");
+            let main_loop = glib::MainLoop::new(None, false);
+
             println!("initalizing streaming");
-            // gstreamer::init()?;
+            gstreamer::init()?;
 
             print!("loaded streaming library");
 
             let pipeline = gstreamer::Pipeline::default();
 
-            let mut testing_phase = true;
-
             println!("pipeline initalizing");
 
-            let videotestsrc = match config.test_mode {
-                true => gstreamer::ElementFactory::make("videotestsrc").build()?,
-                false => gstreamer::ElementFactory::make("videotestsrc").build()?,
-            };
             let videoconvert = gstreamer::ElementFactory::make("videoconvert").build()?;
             let sink = gstreamer::ElementFactory::make("autovideosink").build()?;
+            
+            let mut running = true;
+            let streaming_cmd_queue_2 = self.streaming_command_queue.clone();
+            let self_frame = self.frame.clone();
+
+            let mut video_info =
+            // default to 100x100
+            gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, 100, 100)
+       //         .fps(gst::Fraction::new(2, 1))
+                .build()
+                .expect("Failed to create video info on demand for source");
+
+            let appsrc = gstreamer_app::AppSrc::builder()
+            .caps(&video_info.to_caps().expect("Cap generation failed"))
+            .is_live(true)
+            .block(false)
+            .do_timestamp(true)
+            .format(gstreamer::Format::Time)
+            .build();
 
             // link
-            pipeline.add_many(&[&videotestsrc, &videoconvert, &sink])?;
-            gstreamer::Element::link_many(&[&videotestsrc, &videoconvert, &sink])?;
+            pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &sink])?;
+            gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &sink])?;
 
             println!("pipeline linked");
 
@@ -127,17 +144,90 @@ impl Streamer {
             // println!("pipeline started");
 
             let bus = pipeline.bus().expect("Bus not found?");
+            let sys_clock = gstreamer::SystemClock::obtain();
 
             println!("begin event ingest");
 
-            
-            let mut running = true;
-            let mut prod_appsrc: Option<AppSrc> = None;
-            
+            let should_update = Arc::new(AtomicBool::new(false));
 
-            // TODO: better interleave
-            // TODO: genercify
-            while running {
+            let update_frame_func = move |appsrc: &AppSrc| {
+                let mut buffer = gstreamer::Buffer::with_size(video_info.size()).unwrap();
+                // set pts to current time
+                {
+                    let buffer = buffer.get_mut().unwrap();
+                    buffer.set_pts(sys_clock.time());
+                    let mut vframe = gstreamer_video::VideoFrameRef::from_buffer_ref_writable(buffer, &video_info).unwrap();
+                    // Remember some values from the frame for later usage
+                    let width = vframe.width() as usize;
+                    let height = vframe.height() as usize;
+
+                    // Each line of the first plane has this many bytes
+                    let stride = vframe.plane_stride()[0] as usize;
+                    // let buf_mut = vframe.planes_data_mut();
+                    let mut y = 0;
+                    let frame_reader = self_frame.read().unwrap();
+                    // Iterate over each of the height many lines of length stride
+                    for line in vframe
+                        .plane_data_mut(0)
+                        .unwrap()
+                        .chunks_exact_mut(stride)
+                        .take(height)
+                    {
+                        // Iterate over each pixel of 4 bytes in that line
+                        let chunk = line[..(4 * width)].chunks_exact_mut(4);
+                        let mut x = 0;
+                        for pixel in chunk {
+                            if let Some(offset) = calc_offset(width, height, x, y) {
+                                if offset + 3 < frame_reader.len() {
+                                    // RGBA color format
+                                    pixel[0] = frame_reader[offset];
+                                    pixel[1] = frame_reader[offset + 1];
+                                    pixel[2] = frame_reader[offset + 2];
+                                    pixel[3] = frame_reader[offset + 3];
+                                } else {
+                                    // mismatch
+                                    pixel[0] = 255;
+                                    pixel[1] = 0;
+                                    pixel[2] = 0;
+                                    pixel[3] = 0;
+                                }
+                            } else {
+                                // does not exist color
+                                pixel[0] = 128;
+                                pixel[1] = 128;
+                                pixel[2] = 128;
+                                pixel[3] = 0;
+                            }
+                            x += 1;
+                        }
+                        y += 1;
+                    }
+                    // println!("cped {}x{}", width, height)
+                }
+                let _ = appsrc.push_buffer(buffer);
+            };
+
+            // TODO: why is borrow checker a bit annoying here
+            let should_update_2 = should_update.clone();
+            let should_update_3 = should_update.clone();
+
+            appsrc.set_callbacks(
+                gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
+                    println!("want data");
+                    should_update_2.store(true, std::sync::atomic::Ordering::Relaxed);
+                }).enough_data(move |appsrc| {
+                    println!("enough data");
+                    should_update_3.store(false, std::sync::atomic::Ordering::Relaxed);
+                }).build()
+            );
+
+        
+
+            // glib::idle_add(move );
+            println!("attempting to set play pipeline");
+            pipeline.set_state(gstreamer::State::Playing).expect("Could not set pipeline to playing");
+
+            /*while running {
                 for msg in bus.iter_timed(gstreamer::ClockTime::from_mseconds(1)) {
                     use gstreamer::MessageView;
 
@@ -153,101 +243,45 @@ impl Streamer {
                         _ => (),
                     }
                 }
-                if let Some(imsg) = self.streaming_command_queue.pop() {
+                
+            }*/
+            println!("entering run loop");
+            update_frame_func(&appsrc);
+            while running {
+                // println!("iter loop");
+                while let Some(msg) = bus.pop() {
+                    use gstreamer::MessageView;
+
+                    println!("{:?}", msg);
+            
+                    match msg.view() {
+                        MessageView::Eos(..) => break,
+                        MessageView::Error(err) => {
+                            pipeline.set_state(gstreamer::State::Null)?;
+                            running = false;
+                            bail!("Error: {} {:?}", err.error(), err.debug());
+                        }
+                        _ => (),
+                    }
+                }
+                // main_loop.context().iteration(true);
+                if let Some(imsg) = streaming_cmd_queue_2.pop() {
                     match imsg {
                         InternalMessage::HandshakeRecieved(handshake) => {
                             let res=  handshake.resolution;
                             println!("updating to {:?}", res);
-                            let video_info =
+                            video_info =
                                 gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
                            //         .fps(gst::Fraction::new(2, 1))
                                     .build()
                                     .expect("Failed to create video info on demand for source");
-                            if testing_phase {
-                                println!("switching out of testing phase, changing pipeline");
-                                // pipeline setup happens here
-                                gstreamer::Element::unlink_many(&[&videotestsrc, &videoconvert]);
-                                let appsrc = gstreamer_app::AppSrc::builder()
-                                .caps(&video_info.to_caps().expect("Cap generation failed"))
-                                .format(gstreamer::Format::Time)
-                                .build();
-
-                                if let Err(err) = pipeline.add_many([appsrc.upcast_ref::<Element>()]) {
-                                    println!("Error adding appsrc to pipeline: {:?}", err);
-                                }
-                                if let Err(err) = gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert]) {
-                                    println!("Error linking appsrc to videoconvert: {:?}", err);
-                                }
-                                // we need to remove the test src as well
-                                if let Err(err) = pipeline.remove(&videotestsrc){
-                                    println!("Error removing test source: {:?}", err);
-                                }
-                                let frame_2 = self.frame.clone();
-                                // setup callbacks
-                                appsrc.set_callbacks(
-                                    gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
-                                        let mut buffer = gstreamer::Buffer::with_size(video_info.size()).unwrap();
-                                        // set pts to current time
-                                        {
-                                            let buffer = buffer.get_mut().unwrap();
-                                            buffer.set_pts(gstreamer::ClockTime::from_mseconds(0));
-                                            let mut vframe = gstreamer_video::VideoFrameRef::from_buffer_ref_writable(buffer, &video_info).unwrap();
-                                            // Remember some values from the frame for later usage
-                                            let width = vframe.width() as usize;
-                                            let height = vframe.height() as usize;
-
-                                            // Each line of the first plane has this many bytes
-                                            let stride = vframe.plane_stride()[0] as usize;
-                                            // let buf_mut = vframe.planes_data_mut();
-                                            let mut y = 0;
-                                            let frame_reader = frame_2.read().unwrap();
-                                            // Iterate over each of the height many lines of length stride
-                                            for line in vframe
-                                                .plane_data_mut(0)
-                                                .unwrap()
-                                                .chunks_exact_mut(stride)
-                                                .take(height)
-                                            {
-                                                // Iterate over each pixel of 4 bytes in that line
-                                                let chunk = line[..(4 * width)].chunks_exact_mut(4);
-                                                let mut x = 0;
-                                                for pixel in chunk {
-                                                    if let Some(offset) = calc_offset(width, height, x, y) {
-                                                        // RGBA color format
-                                                        if offset < 100 {
-                                                            println!("sync frame: {} {} {} {} {}", offset, frame_reader[offset], frame_reader[offset + 1], frame_reader[offset + 2], frame_reader[offset + 3]);
-                                                        }
-                                                        pixel[0] = frame_reader[offset];
-                                                        pixel[1] = frame_reader[offset + 1];
-                                                        pixel[2] = frame_reader[offset + 2];
-                                                        pixel[3] = frame_reader[offset + 3];
-                                                    } else {
-                                                        // does not exist color
-                                                        pixel[0] = 124;
-                                                        pixel[1] = 124;
-                                                        pixel[2] = 124;
-                                                        pixel[3] = 0;
-                                                    }
-                                                    x += 1;
-                                                }
-                                                y += 1;
-                                            }
-                                            println!("cped {}x{}", width, height)
-
-
-                                        }
-                                    }).build()
-                                );
-                                pipeline.set_state(gstreamer::State::Playing)?;
-                                prod_appsrc = Some(appsrc);
-                                testing_phase = false;
-                            } else {
-                                let appsrc = prod_appsrc.as_mut().unwrap();
-                                appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
-                                println!("Adjusted caps for resolution {:?}", res);
-                            }
+                            appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                            println!("Adjusted caps for resolution {:?}", res);
                         },
-                    }
+                    };
+                }
+                if should_update.load(std::sync::atomic::Ordering::Relaxed) {
+                    update_frame_func(&appsrc);
                 }
             }
 
@@ -335,7 +369,7 @@ impl Streamer {
                                                     }
                                                 },
                                                 _ => {
-                                                    
+
                                                 }
                                             }
                                         },
