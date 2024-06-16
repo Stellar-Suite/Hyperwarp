@@ -122,9 +122,9 @@ impl Streamer {
 
             println!("pipeline linked");
 
-            pipeline.set_state(gstreamer::State::Playing)?;
+            // pipeline.set_state(gstreamer::State::Playing)?;
 
-            println!("pipeline started");
+            // println!("pipeline started");
 
             let bus = pipeline.bus().expect("Bus not found?");
 
@@ -159,7 +159,7 @@ impl Streamer {
                             let res=  handshake.resolution;
                             println!("updating to {:?}", res);
                             let video_info =
-                                gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Bgrx, res.0, res.1)
+                                gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
                            //         .fps(gst::Fraction::new(2, 1))
                                     .build()
                                     .expect("Failed to create video info on demand for source");
@@ -198,7 +198,7 @@ impl Streamer {
 
                                             // Each line of the first plane has this many bytes
                                             let stride = vframe.plane_stride()[0] as usize;
-                                            let buf_mut = vframe.planes_data_mut();
+                                            // let buf_mut = vframe.planes_data_mut();
                                             let mut y = 0;
                                             let frame_reader = frame_2.read().unwrap();
                                             // Iterate over each of the height many lines of length stride
@@ -213,6 +213,10 @@ impl Streamer {
                                                 let mut x = 0;
                                                 for pixel in chunk {
                                                     if let Some(offset) = calc_offset(width, height, x, y) {
+                                                        // RGBA color format
+                                                        if offset < 100 {
+                                                            println!("sync frame: {} {} {} {} {}", offset, frame_reader[offset], frame_reader[offset + 1], frame_reader[offset + 2], frame_reader[offset + 3]);
+                                                        }
                                                         pixel[0] = frame_reader[offset];
                                                         pixel[1] = frame_reader[offset + 1];
                                                         pixel[2] = frame_reader[offset + 2];
@@ -228,12 +232,13 @@ impl Streamer {
                                                 }
                                                 y += 1;
                                             }
+                                            println!("cped {}x{}", width, height)
 
 
                                         }
                                     }).build()
                                 );
-
+                                pipeline.set_state(gstreamer::State::Playing)?;
                                 prod_appsrc = Some(appsrc);
                                 testing_phase = false;
                             } else {
@@ -268,7 +273,6 @@ impl Streamer {
         println!("Starting Hyperwarp client event thread");
 
         let streaming_cmd_queue = self.streaming_command_queue.clone();
-
         let frame = self.frame.clone();
         
 
@@ -312,17 +316,21 @@ impl Streamer {
                                                         writable_frame.clear();
                                                         let resolution = handshake.resolution;
                                                         writable_frame.resize((4 * resolution.0 * resolution.1) as usize, 0);
+                                                        println!("init streamer frame buffer {} bytes", (4 * resolution.0 * resolution.1));
                                                     }
                                                     {
                                                         shm_file = Some(std::fs::File::open(&handshake.shimg_path).expect("Failed to open shm file"));
+                                                        println!("opened shm file for frame buffer");
                                                     }
                                                     streaming_cmd_queue.push(InternalMessage::HandshakeRecieved(handshake));
                                                 },
                                                 StellarMessage::NewFrame => {
                                                     if let Some(shm_file) = &mut shm_file {
                                                         let mut writable_frame = frame.write().unwrap();
-                                                        shm_file.read_to_end(&mut writable_frame).unwrap();
-                                                        shm_file.seek(std::io::SeekFrom::Start(0)).unwrap();
+                                                        shm_file.read_to_end(&mut writable_frame).expect("Reading from shm file failed");
+                                                        shm_file.seek(std::io::SeekFrom::Start(0)).expect("Seeking to start of image failed");
+                                                    } else {
+                                                        println!("shm file not setup yet, can't acquire frame");
                                                     }
                                                 },
                                                 _ => {
