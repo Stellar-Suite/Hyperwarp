@@ -6,10 +6,10 @@ use clap::{Parser, ValueEnum, command};
 use anyhow::{bail, Result};
 
 use crossbeam_queue::SegQueue;
-use gio::glib;
-use gstreamer::{prelude::*, Element, ErrorMessage};
+use gio::glib::{self, bitflags::Flags};
+use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_app::AppSrc;
-use gstreamer_video::prelude::*;
+use gstreamer_video::{prelude::*, VideoInfo};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
 use stellar_protocol::protocol::{StellarChannel, StellarMessage};
@@ -127,7 +127,7 @@ impl Streamer {
 
             let appsrc = gstreamer_app::AppSrc::builder()
             .caps(&video_info.to_caps().expect("Cap generation failed"))
-            .is_live(true)
+            // .is_live(true)
             .block(false)
             .do_timestamp(true)
             .format(gstreamer::Format::Time)
@@ -150,12 +150,16 @@ impl Streamer {
 
             let should_update = Arc::new(AtomicBool::new(false));
 
-            let update_frame_func = move |appsrc: &AppSrc| {
+            let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
+                let caps = appsrc.caps().unwrap();
                 let mut buffer = gstreamer::Buffer::with_size(video_info.size()).unwrap();
+
+               
                 // set pts to current time
                 {
                     let buffer = buffer.get_mut().unwrap();
-                    buffer.set_pts(sys_clock.time());
+                    // buffer.set_pts(sys_clock.time());
+                    // buffer.set_flags(BufferFlags::LIVE);
                     let mut vframe = gstreamer_video::VideoFrameRef::from_buffer_ref_writable(buffer, &video_info).unwrap();
                     // Remember some values from the frame for later usage
                     let width = vframe.width() as usize;
@@ -166,6 +170,9 @@ impl Streamer {
                     // let buf_mut = vframe.planes_data_mut();
                     let mut y = 0;
                     let frame_reader = self_frame.read().unwrap();
+
+                    // println!("producing frame of {}x{}", width, height);
+
                     // Iterate over each of the height many lines of length stride
                     for line in vframe
                         .plane_data_mut(0)
@@ -213,10 +220,10 @@ impl Streamer {
 
             appsrc.set_callbacks(
                 gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
-                    println!("want data");
+                    // println!("want data");
                     should_update_2.store(true, std::sync::atomic::Ordering::Relaxed);
                 }).enough_data(move |appsrc| {
-                    println!("enough data");
+                    // println!("enough data");
                     should_update_3.store(false, std::sync::atomic::Ordering::Relaxed);
                 }).build()
             );
@@ -246,14 +253,14 @@ impl Streamer {
                 
             }*/
             println!("entering run loop");
-            update_frame_func(&appsrc);
             while running {
+                let mut temp_update = false;
                 // println!("iter loop");
                 while let Some(msg) = bus.pop() {
                     use gstreamer::MessageView;
 
                     println!("{:?}", msg);
-            
+
                     match msg.view() {
                         MessageView::Eos(..) => break,
                         MessageView::Error(err) => {
@@ -275,13 +282,17 @@ impl Streamer {
                            //         .fps(gst::Fraction::new(2, 1))
                                     .build()
                                     .expect("Failed to create video info on demand for source");
+                            println!("video info {:#?}",video_info);
                             appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                            appsrc.set_state(gstreamer::State::Playing).expect("Could not set appsrc to playing");
+                            videoconvert.set_state(gstreamer::State::Playing).expect("Could not set videoconvert to playing");
+                            sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
                             println!("Adjusted caps for resolution {:?}", res);
                         },
                     };
                 }
-                if should_update.load(std::sync::atomic::Ordering::Relaxed) {
-                    update_frame_func(&appsrc);
+                if temp_update || should_update.load(std::sync::atomic::Ordering::Relaxed) {
+                    update_frame_func(&appsrc, &video_info);
                 }
             }
 
@@ -309,7 +320,6 @@ impl Streamer {
         let streaming_cmd_queue = self.streaming_command_queue.clone();
         let frame = self.frame.clone();
         
-
         std::thread::spawn(move || {
 
             let inner_run = || -> Result<()> {
@@ -340,7 +350,7 @@ impl Streamer {
                                     match stellar_protocol::deserialize_safe(&data) {
                                         Some(message) => {
                                             if !matches!(message, StellarMessage::NewFrame) {
-                                                println!("{:?} message", message);
+                                                // println!("{:?} message", message);
                                             }
                                             match message {
                                                 StellarMessage::HandshakeResponse(handshake) => {
