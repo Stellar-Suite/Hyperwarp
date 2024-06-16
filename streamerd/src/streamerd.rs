@@ -258,8 +258,10 @@ impl Streamer {
                 // println!("iter loop");
                 while let Some(msg) = bus.pop() {
                     use gstreamer::MessageView;
-
-                    println!("{:?}", msg);
+                    // qos is spammy
+                    if !matches!(msg.view(), MessageView::Qos(..)) {
+                        println!("{:?}", msg);
+                    }
 
                     match msg.view() {
                         MessageView::Eos(..) => break,
