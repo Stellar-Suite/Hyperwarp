@@ -32,6 +32,10 @@ rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
 opt-level = 0  # Controls the --opt-level the compiler builds with
 debug = true   # Controls whether the compiler passes `-g`
 
+[profile.release]
+opt-level = 3
+debug = false
+
 [patch.crates-io]
 mio = { git = "https://github.com/javaarchive/mio.git", branch = "messageio-patches" }
 
