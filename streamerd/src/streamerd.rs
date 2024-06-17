@@ -142,8 +142,8 @@ impl Streamer {
         .build();
 
         // link
-        pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &sink]).expect("adding els failed");
-        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &sink]).expect("linking failed");
+        pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &sink]).expect("adding els failed");
+        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &videoflip, &sink]).expect("linking failed");
 
         println!("pipeline linked");
 
@@ -332,9 +332,6 @@ impl Streamer {
                                 .expect("Failed to create video info on demand for source");
                         println!("video info {:#?}",video_info);
                         appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
-                        appsrc.set_state(gstreamer::State::Playing).expect("Could not set appsrc to playing");
-                        videoconvert.set_state(gstreamer::State::Playing).expect("Could not set videoconvert to playing");
-                        sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
                         println!("Adjusted caps for resolution {:?}", res);
                     },
                     InternalMessage::SetShouldUpdate(new_should_update) => {
@@ -349,10 +346,17 @@ impl Streamer {
                                 .expect("Failed to create video info on demand for source");
                             println!("video info {:#?}",video_info);
                             appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
-                            appsrc.set_state(gstreamer::State::Playing).expect("Could not set appsrc to playing");
-                            videoconvert.set_state(gstreamer::State::Playing).expect("Could not set videoconvert to playing");
-                            sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
                             println!("Adjusted caps for resolution {:?}", res);
+                        }
+
+                        if let Some(graphics_api) = sync_details.graphics_api {
+                            println!("setting graphics api to {:?}", graphics_api);
+                            let flip = stellar_protocol::protocol::should_flip_buffers_for_graphics_api(graphics_api);
+                            if flip {
+                                videoflip.set_property("method", "vertical-flip");
+                            } else {
+                                videoflip.set_property("method", "none");
+                            }
                         }
                     },
                     
