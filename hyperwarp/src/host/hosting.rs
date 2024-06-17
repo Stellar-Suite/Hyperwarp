@@ -3,7 +3,7 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
-use stellar_protocol::protocol::{get_all_channels, Handshake, StellarChannel, StellarMessage};
+use stellar_protocol::protocol::{get_all_channels, Handshake, StellarChannel, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
 
@@ -160,7 +160,17 @@ impl ApplicationHost {
     }
 
     pub fn sync(&self){
-        
+        if let Some(handler) = &self.messaging_handler {
+            let handler = handler.lock().unwrap();
+            let sync_details = self.get_sync(); // this is here so it is more up to date
+            handler.signals().send(InternalSignals::SendToChannelSignal(StellarChannel::Synchornizations, StellarMessage::SynchronizationEvent(sync_details)));
+        }
+    }
+
+    pub fn get_sync(&self) -> Synchornization {
+        Synchornization {
+            resolution: self.get_behavior().get_fb_size(),
+        }
     }
 
     pub fn start_server(&mut self) {
@@ -331,7 +341,18 @@ impl ApplicationHost {
                                         .network()
                                         .send(subscriber.clone(), &stellar_protocol::serialize(&StellarMessage::NewFrame));
                                 }
-                            }
+                            },
+                            InternalSignals::SendToChannelSignal(channel, message) => {
+                                if let Some(subscribers) = pubsub.get_mut(&channel) {
+                                    for subscriber in subscribers {
+                                        handler_wrapper
+                                            .lock()
+                                            .unwrap()
+                                            .network()
+                                            .send(subscriber.clone(), &stellar_protocol::serialize(&message));
+                                    }
+                                }
+                            },
                             _ => {
                                 // log unhandled signal
                                 if config.debug_mode {

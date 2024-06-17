@@ -7,7 +7,8 @@ use strum_macros::{EnumString, Display, EnumIter, VariantArray};
 #[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq)]
 pub enum StellarChannel {
     Frame,
-    WindowChanges,
+    Synchornizations,
+    WindowChanges, // synchronizations is more reliable for now
     Signaling
 }
 
