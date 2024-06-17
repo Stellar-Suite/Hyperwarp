@@ -9,6 +9,7 @@ use crossbeam_queue::SegQueue;
 
 use std::any::Any;
 use std::path::PathBuf;
+use std::sync::RwLock;
 use std::{
     collections::HashMap,
     fs::File,
@@ -39,6 +40,10 @@ pub enum MainTickMessage {
     RequestHandshake(Endpoint),
 }
 
+pub struct LastSentState {
+    pub resolution: (u32, u32),
+}
+
 pub struct ApplicationHost {
     pub config: Arc<Config>,
     pub features: Mutex<FeatureFlags>,
@@ -47,6 +52,7 @@ pub struct ApplicationHost {
     pub capture_helper: Option<CaptureHelper>,
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<InternalSignals>>>>,
     pub command_queue: Arc<SegQueue<MainTickMessage>>,
+    pub last_sent_state: Arc<RwLock<LastSentState>>, // TODO: remove this arc rwlock if perf is hit hard enough here, may be able to unsafe it
 }
 
 #[derive(Debug)]
@@ -75,6 +81,7 @@ impl ApplicationHost {
             capture_helper: None,
             messaging_handler: None,
             command_queue: Arc::new(SegQueue::new()),
+            last_sent_state: Arc::new(RwLock::new(LastSentState { resolution: (0, 0) })),
         };
         return host;
     }
@@ -102,6 +109,24 @@ impl ApplicationHost {
         if self.config.tracing_mode {
             println!("tick()");
         }
+
+        // compute changes in state
+        let mut state_changed = false;
+        {
+            let mut last_sent_state = self.last_sent_state.write().unwrap();
+            if last_sent_state.resolution != self.get_behavior().get_fb_size().unwrap() {
+                state_changed = true;
+                last_sent_state.resolution = self.get_behavior().get_fb_size().unwrap();
+            }
+
+
+        }
+
+        if state_changed {
+            // send a sync message
+            self.sync();
+        }
+
         match self.command_queue.pop() {
             Some(command) => match command {
                 MainTickMessage::RequestResolutionBroadcast(endpoint) => {
