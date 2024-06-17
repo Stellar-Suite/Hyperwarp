@@ -1,5 +1,5 @@
 use core::prelude::rust_2015;
-use std::{io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, RwLock}, thread::JoinHandle};
+use std::{cmp, io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, RwLock}, thread::JoinHandle};
 
 use clap::{Parser, ValueEnum, command};
 
@@ -14,6 +14,8 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use stellar_protocol::protocol::{StellarChannel, StellarMessage};
 
+use std::time::Instant;
+
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
@@ -26,6 +28,8 @@ pub enum InternalMessage {
     HandshakeRecieved(stellar_protocol::protocol::Handshake),
     SetShouldUpdate(bool),
 }
+
+
 
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
@@ -153,9 +157,11 @@ impl Streamer {
         let mut should_update = false;
 
         let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
-            let caps = appsrc.caps().unwrap();
+            
+            // benchmark thing
+            // let starting = Instant::now();
+            
             let mut buffer = gstreamer::Buffer::with_size(video_info.size()).unwrap();
-
             
             // set pts to current time
             {
@@ -210,7 +216,7 @@ impl Streamer {
                     y += 1;*/
 
                     // new version:
-                    for i in 0..(width * height) {
+                    /*for i in 0..(width * height) {
                         let offset = i * 4;
                         if offset + 3 < frame_reader.len() {
                             // RGBA color format
@@ -225,6 +231,15 @@ impl Streamer {
                             line[offset + 2] = 0;
                             line[offset + 3] = 0;
                         }
+                    }*/
+
+                    // faster version:
+                    let bound = cmp::min(stride * height, frame_reader.len());
+                    // ok I hope this works
+                    // filling makes it 30x slower, in fact this is like I think an extra 20ms to30ms
+                    // line.fill(0);
+                    if bound > 0 {
+                        line[0..bound].copy_from_slice(&frame_reader[0..bound]);
                     }
                 }
                 // println!("cped {}x{}", width, height)
@@ -237,6 +252,10 @@ impl Streamer {
                     println!("Error pushing buffer: {:?}", err);
                 },
             }
+
+            // benchmark thing
+            // let elapsed = starting.elapsed();
+            // println!("elapsed {:?}", elapsed);
         };
 
         appsrc.set_callbacks(
@@ -314,8 +333,8 @@ impl Streamer {
                         sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
                         println!("Adjusted caps for resolution {:?}", res);
                     },
-                    InternalMessage::SetShouldUpdate(should_update) => {
-                        temp_update = should_update;
+                    InternalMessage::SetShouldUpdate(new_should_update) => {
+                        should_update = new_should_update;
                     },
                 };
             }
