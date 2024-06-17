@@ -3,7 +3,7 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
-use stellar_protocol::protocol::{get_all_channels, GraphicsAPI, Handshake, StellarChannel, StellarMessage, Synchornization};
+use stellar_protocol::protocol::{get_all_channels, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
 
@@ -42,6 +42,7 @@ pub enum MainTickMessage {
 
 pub struct LastSentState {
     pub resolution: (u32, u32),
+    pub graphics_api: GraphicsAPI,
 }
 
 pub struct ApplicationHost {
@@ -53,6 +54,7 @@ pub struct ApplicationHost {
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<InternalSignals>>>>,
     pub command_queue: Arc<SegQueue<MainTickMessage>>,
     pub last_sent_state: Arc<RwLock<LastSentState>>, // TODO: remove this arc rwlock if perf is hit hard enough here, may be able to unsafe it
+    pub host_info: RwLock<HostInfo>,
 }
 
 #[derive(Debug)]
@@ -73,6 +75,7 @@ impl ApplicationHost {
         if config.debug_mode {
             println!("Default behavior thread handle: {:?}", handle);
         }
+        let host_info = HostInfo::default();
         let host = ApplicationHost {
             config: Arc::new(config),
             features: Mutex::new(FeatureFlags::new()),
@@ -81,7 +84,8 @@ impl ApplicationHost {
             capture_helper: None,
             messaging_handler: None,
             command_queue: Arc::new(SegQueue::new()),
-            last_sent_state: Arc::new(RwLock::new(LastSentState { resolution: (0, 0) })),
+            last_sent_state: Arc::new(RwLock::new(LastSentState { resolution: (0, 0), graphics_api: host_info.graphics_api })),
+            host_info: RwLock::new(host_info),
         };
         return host;
     }
@@ -98,13 +102,23 @@ impl ApplicationHost {
         let handshake = Handshake {
             resolution: resolution,
             shimg_path: shimg_path,
-            graphics_api: self.get_behavior().get_graphics_api(),
+            graphics_api: self.host_info.read().unwrap().graphics_api,
         };
         handshake
     }
 
+    pub fn has_graphics_api_already(&self) -> bool {
+        self.host_info.read().unwrap().graphics_api != GraphicsAPI::Unknown
+    }
+
     pub fn suggest_graphics_api(&self, api: GraphicsAPI) {
-        self.get_behavior().suggest_graphics_api(api);
+        if !self.has_graphics_api_already() { // this makes the thing read heavy
+            self.set_graphics_api(api);
+        }
+    }
+
+    pub fn set_graphics_api(&self, api: GraphicsAPI) {
+        self.host_info.write().unwrap().graphics_api = api;
     }
 
     pub fn tick(&self) {
@@ -119,9 +133,15 @@ impl ApplicationHost {
         let mut state_changed = false;
         {
             let mut last_sent_state = self.last_sent_state.write().unwrap();
+            let host_info = self.host_info.read().unwrap();
             if last_sent_state.resolution != self.get_behavior().get_fb_size().unwrap() {
                 state_changed = true;
                 last_sent_state.resolution = self.get_behavior().get_fb_size().unwrap();
+            }
+
+            if last_sent_state.graphics_api != host_info.graphics_api {
+                state_changed = true;
+                last_sent_state.graphics_api = host_info.graphics_api;
             }
         }
 
@@ -172,8 +192,10 @@ impl ApplicationHost {
     }
 
     pub fn get_sync(&self) -> Synchornization {
+        let host_info = self.host_info.read().unwrap();
         Synchornization {
             resolution: self.get_behavior().get_fb_size(),
+            graphics_api: Some(host_info.graphics_api),
         }
     }
 

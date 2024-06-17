@@ -8,7 +8,6 @@ use std::{
 };
 
 use gl::{RGBA, UNSIGNED_BYTE};
-use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::{
     bind::{
@@ -61,14 +60,6 @@ pub trait HostBehavior: Send {
         let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
         file_loc
     }
-
-    fn get_graphics_api(&self) -> GraphicsAPI {
-        GraphicsAPI::Unknown
-    }
-
-    fn suggest_graphics_api(&mut self, new_api: GraphicsAPI) {
-        
-    }
 }
 
 #[derive(Debug)]
@@ -80,7 +71,6 @@ pub struct DefaultHostBehavior {
     pub fb: Vec<u8>,
     pub tx: Option<mpsc::Sender<FrameWriterThreadMessage>>,
     pub windows: Vec<Window>,
-    pub detcted_graphics_api: GraphicsAPI,
 }
 
 impl DefaultHostBehavior {
@@ -187,12 +177,6 @@ impl HostBehavior for DefaultHostBehavior {
         }
         None
     }
-
-    fn suggest_graphics_api(&mut self, new_api: GraphicsAPI) {
-        // if self.detcted_graphics_api == GraphicsAPI::Unknown {
-            self.detcted_graphics_api = new_api;
-        // }
-    }
 }
 
 impl DefaultHostBehavior {}
@@ -210,8 +194,7 @@ impl DefaultHostBehavior {
             fb_enabled: false,
             fb: Vec::new(),
             tx: None,
-            windows: Vec::new(),
-            detcted_graphics_api: GraphicsAPI::Unknown,
+            windows: Vec::new()
         }
     }
 

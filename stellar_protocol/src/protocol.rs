@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use strum_macros::{EnumString, Display, EnumIter, VariantArray};
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
 pub enum StellarChannel {
     Frame,
     Synchornizations,
@@ -12,7 +12,7 @@ pub enum StellarChannel {
     Signaling
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
 pub enum GraphicsAPI {
     Unknown,
     OpenGL,
@@ -23,16 +23,35 @@ pub enum GraphicsAPI {
 
 use strum::IntoEnumIterator;
 use strum::VariantArray;
+
+use crate::util;
 pub fn get_all_channels() -> Vec<StellarChannel> {
     let vec: Vec<StellarChannel> = StellarChannel::iter().collect();
     vec
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Handshake {
     pub resolution: (u32, u32),
     pub shimg_path: PathBuf,
     pub graphics_api: GraphicsAPI,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+pub struct HostInfo {
+    pub name: String,
+    pub pid: u32,
+    pub graphics_api: GraphicsAPI,
+}
+
+impl Default for HostInfo {
+    fn default() -> Self {
+        HostInfo {
+            name: util::prog().unwrap_or_else(|| "unknown".to_string()),
+            pid: std::process::id(),
+            graphics_api: GraphicsAPI::Unknown,
+        }
+    }
 }
 
 
@@ -40,6 +59,7 @@ pub struct Handshake {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Synchornization {
     pub resolution: Option<(u32, u32)>,
+    pub graphics_api: Option<GraphicsAPI>,
 }
 
 

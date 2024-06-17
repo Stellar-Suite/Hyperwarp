@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use bincode;
 use crate::protocol::StellarMessage;
 
+pub mod util;
 pub mod protocol;
 
 // for eventual bincode 2 migration
