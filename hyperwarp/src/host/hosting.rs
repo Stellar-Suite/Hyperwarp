@@ -124,6 +124,7 @@ impl ApplicationHost {
 
         if state_changed {
             // send a sync message
+            println!("changes detected, doing sync signal");
             self.sync();
         }
 

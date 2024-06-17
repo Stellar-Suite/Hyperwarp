@@ -389,11 +389,14 @@ impl Streamer {
                                     if ready {
                                         // say hello
                                         println!("sending hello");
-                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::Hello));
+                                        let handler = handler_wrapper.lock().unwrap();
+                                        let network = handler.network();
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::Hello));
                                         println!("sending initial handshake request");
-                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HandshakeRequest));
-                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
-                                        handler_wrapper.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::SubscribeChannel(StellarChannel::Frame)));
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HandshakeRequest));
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::HelloName("Testing protocol".to_string())));
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::SubscribeChannel(StellarChannel::Frame)));
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::SubscribeChannel(StellarChannel::Synchornizations)));
                                     } else {
                                         println!("One client did not successfully ready. {}", endpoint.addr());
                                     }
