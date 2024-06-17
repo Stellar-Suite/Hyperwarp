@@ -25,7 +25,7 @@ enum OperationMode {
 }
 
 pub enum InternalMessage {
-    HandshakeRecieved(stellar_protocol::protocol::Handshake),
+    HandshakeReceived(stellar_protocol::protocol::Handshake),
     SetShouldUpdate(bool),
     SynchornizationReceived(stellar_protocol::protocol::Synchornization),
 }
@@ -334,7 +334,7 @@ impl Streamer {
             // main_loop.context().iteration(true);
             if let Some(imsg) = streaming_cmd_queue_2.pop() {
                 match imsg {
-                    InternalMessage::HandshakeRecieved(handshake) => {
+                    InternalMessage::HandshakeReceived(handshake) => {
                         let res=  handshake.resolution;
                         println!("updating to {:?}", res);
                         update_resolution_func(&appsrc, res);
@@ -424,7 +424,7 @@ impl Streamer {
                                                         shm_file = Some(std::fs::File::open(&handshake.shimg_path).expect("Failed to open shm file"));
                                                         println!("opened shm file for frame buffer");
                                                     }
-                                                    streaming_cmd_queue.push(InternalMessage::HandshakeRecieved(handshake));
+                                                    streaming_cmd_queue.push(InternalMessage::HandshakeReceived(handshake));
                                                 },
                                                 StellarMessage::NewFrame => {
                                                     if let Some(shm_file) = &mut shm_file {
@@ -437,6 +437,7 @@ impl Streamer {
                                                     }
                                                 },
                                                 StellarMessage::SynchronizationEvent(sync_details) => {
+                                                    println!("recieving sync event on hyperwarp conn thread");
                                                     streaming_cmd_queue.push(InternalMessage::SynchornizationReceived(sync_details));
                                                 },
                                                 _ => {
