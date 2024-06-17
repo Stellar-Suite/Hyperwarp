@@ -320,6 +320,7 @@ impl Streamer {
             // main_loop.context().iteration(true);
             if let Some(imsg) = streaming_cmd_queue_2.pop() {
                 match imsg {
+                    // TODO: deduplicate code between handshake and sync, but closure does not currently work because it needs to mutate video_info
                     InternalMessage::HandshakeReceived(handshake) => {
                         let res=  handshake.resolution;
                         println!("updating to {:?}", res);
@@ -359,6 +360,7 @@ impl Streamer {
             if temp_update || should_update {
                 update_frame_func(&appsrc, &video_info);
             }
+            // TOOD: make this loop not thrash cpu by waiting for events
         }
 
         println!("streamer thread exited cleanly.");
