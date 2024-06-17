@@ -98,6 +98,7 @@ impl ApplicationHost {
         let handshake = Handshake {
             resolution: resolution,
             shimg_path: shimg_path,
+            graphics_api: self.get_behavior().get_graphics_api(),
         };
         handshake
     }
