@@ -3,7 +3,7 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
-use stellar_protocol::protocol::{get_all_channels, Handshake, StellarChannel, StellarMessage, Synchornization};
+use stellar_protocol::protocol::{get_all_channels, GraphicsAPI, Handshake, StellarChannel, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
 
@@ -103,6 +103,10 @@ impl ApplicationHost {
         handshake
     }
 
+    pub fn suggest_graphics_api(&self, api: GraphicsAPI) {
+        self.get_behavior().suggest_graphics_api(api);
+    }
+
     pub fn tick(&self) {
         self.get_behavior().tick();
 
@@ -119,8 +123,6 @@ impl ApplicationHost {
                 state_changed = true;
                 last_sent_state.resolution = self.get_behavior().get_fb_size().unwrap();
             }
-
-
         }
 
         if state_changed {

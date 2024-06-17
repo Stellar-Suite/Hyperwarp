@@ -1,4 +1,5 @@
 use libc::{c_char, c_int, c_void};
+use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::constants::sdl2::SDL_FALSE;
 
@@ -82,6 +83,7 @@ redhook::hook! {
             println!("SDL_GL_SwapBuffers called");
         }
         if HOST.config.enable_sdl2 {
+            HOST.suggest_graphics_api(GraphicsAPI::OpenGL);
             HOST.onFrameSwapBegin();
             let result = redhook::real!(SDL_GL_SwapBuffers_hw_direct)();
             HOST.onFrameSwapEnd();
@@ -105,6 +107,7 @@ redhook::hook! {
         }
         if HOST.config.enable_sdl2 {
             HOST.onFrameSwapBegin();
+            HOST.suggest_graphics_api(GraphicsAPI::OpenGL);
             redhook::real!(SDL_GL_SwapWindow_hw_direct)(display);
             HOST.onFrameSwapEnd();
         }

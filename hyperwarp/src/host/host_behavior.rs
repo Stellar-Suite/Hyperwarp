@@ -26,6 +26,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 // for now we only handle a single window
+// TODO: make casing consistent
 pub trait HostBehavior: Send {
     fn onStart(&mut self) {}
 
@@ -64,6 +65,10 @@ pub trait HostBehavior: Send {
     fn get_graphics_api(&self) -> GraphicsAPI {
         GraphicsAPI::Unknown
     }
+
+    fn suggest_graphics_api(&mut self, new_api: GraphicsAPI) {
+        
+    }
 }
 
 #[derive(Debug)]
@@ -75,6 +80,7 @@ pub struct DefaultHostBehavior {
     pub fb: Vec<u8>,
     pub tx: Option<mpsc::Sender<FrameWriterThreadMessage>>,
     pub windows: Vec<Window>,
+    pub detcted_graphics_api: GraphicsAPI,
 }
 
 impl DefaultHostBehavior {
@@ -181,6 +187,12 @@ impl HostBehavior for DefaultHostBehavior {
         }
         None
     }
+
+    fn suggest_graphics_api(&mut self, new_api: GraphicsAPI) {
+        // if self.detcted_graphics_api == GraphicsAPI::Unknown {
+            self.detcted_graphics_api = new_api;
+        // }
+    }
 }
 
 impl DefaultHostBehavior {}
@@ -199,6 +211,7 @@ impl DefaultHostBehavior {
             fb: Vec::new(),
             tx: None,
             windows: Vec::new(),
+            detcted_graphics_api: GraphicsAPI::Unknown,
         }
     }
 
