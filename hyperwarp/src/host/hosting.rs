@@ -134,6 +134,10 @@ impl ApplicationHost {
         }
     }
 
+    pub fn sync(&self){
+        
+    }
+
     pub fn start_server(&mut self) {
         let (handler, listener) = node::split::<InternalSignals>();
 

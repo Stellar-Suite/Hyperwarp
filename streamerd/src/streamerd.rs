@@ -215,7 +215,7 @@ impl Streamer {
                     }
                     y += 1;*/
 
-                    // new version:
+                    // new version: (still slow)
                     /*for i in 0..(width * height) {
                         let offset = i * 4;
                         if offset + 3 < frame_reader.len() {
