@@ -32,6 +32,7 @@ pub fn get_all_channels() -> Vec<StellarChannel> {
 pub struct Handshake {
     pub resolution: (u32, u32),
     pub shimg_path: PathBuf,
+    pub graphics_api: GraphicsAPI,
 }
 
 

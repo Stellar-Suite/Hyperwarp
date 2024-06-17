@@ -8,6 +8,7 @@ use std::{
 };
 
 use gl::{RGBA, UNSIGNED_BYTE};
+use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::{
     bind::{
@@ -58,6 +59,10 @@ pub trait HostBehavior: Send {
         let base_loc = Path::new("/dev/shm");
         let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
         file_loc
+    }
+
+    fn get_graphics_api(&self) -> GraphicsAPI {
+        GraphicsAPI::Unknown
     }
 }
 

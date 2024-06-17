@@ -117,6 +117,7 @@ impl Streamer {
         println!("pipeline initalizing");
 
         let videoconvert = gstreamer::ElementFactory::make("videoconvert").build().expect("could not create video processor");
+        let videoflip = gstreamer::ElementFactory::make("videoflip").build().expect("could not create optional video flipper");
         let sink = gstreamer::ElementFactory::make("autovideosink").build().expect("could not create output");
         
         let mut running = true;
