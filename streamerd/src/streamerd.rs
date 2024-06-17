@@ -172,16 +172,15 @@ impl Streamer {
                     let frame_reader = self_frame.read().unwrap();
 
                     // println!("producing frame of {}x{}", width, height);
-
                     // Iterate over each of the height many lines of length stride
                     for line in vframe
                         .plane_data_mut(0)
                         .unwrap()
-                        .chunks_exact_mut(stride)
-                        .take(height)
+                        .chunks_exact_mut(stride * height)
+                        .take(1)
                     {
                         // Iterate over each pixel of 4 bytes in that line
-                        let chunk = line[..(4 * width)].chunks_exact_mut(4);
+                        /*let chunk = line[..(4 * width)].chunks_exact_mut(4);
                         let mut x = 0;
                         for pixel in chunk {
                             if let Some(offset) = calc_offset(width, height, x, y) {
@@ -207,7 +206,25 @@ impl Streamer {
                             }
                             x += 1;
                         }
-                        y += 1;
+                        y += 1;*/
+
+                        // new version:
+                        for i in 0..(width * height) {
+                            let offset = i * 4;
+                            if offset + 3 < frame_reader.len() {
+                                // RGBA color format
+                                line[offset] = frame_reader[offset];
+                                line[offset + 1] = frame_reader[offset + 1];
+                                line[offset + 2] = frame_reader[offset + 2];
+                                line[offset + 3] = frame_reader[offset + 3];
+                            } else {
+                                // mismatch
+                                line[offset] = 255;
+                                line[offset + 1] = 0;
+                                line[offset + 2] = 0;
+                                line[offset + 3] = 0;
+                            }
+                        }
                     }
                     // println!("cped {}x{}", width, height)
                 }
