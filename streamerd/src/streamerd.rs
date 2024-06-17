@@ -23,7 +23,8 @@ enum OperationMode {
 }
 
 pub enum InternalMessage {
-    HandshakeRecieved(stellar_protocol::protocol::Handshake)
+    HandshakeRecieved(stellar_protocol::protocol::Handshake),
+    SetShouldUpdate(bool),
 }
 
 #[derive(Parser, Debug)]
@@ -115,6 +116,8 @@ impl Streamer {
         
         let mut running = true;
         let streaming_cmd_queue_2 = self.streaming_command_queue.clone();
+        let streaming_cmd_queue_for_cb_1 = self.streaming_command_queue.clone();
+        let streaming_cmd_queue_for_cb_2 = self.streaming_command_queue.clone();
         let self_frame = self.frame.clone();
 
         let mut video_info =
@@ -147,7 +150,7 @@ impl Streamer {
 
         println!("begin event ingest");
 
-        let should_update = Arc::new(AtomicBool::new(false));
+        let mut should_update = false;
 
         let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
             let caps = appsrc.caps().unwrap();
@@ -167,7 +170,6 @@ impl Streamer {
                 // Each line of the first plane has this many bytes
                 let stride = vframe.plane_stride()[0] as usize;
                 // let buf_mut = vframe.planes_data_mut();
-                let mut y = 0;
                 let frame_reader = self_frame.read().unwrap();
 
                 // println!("producing frame of {}x{}", width, height);
@@ -227,20 +229,24 @@ impl Streamer {
                 }
                 // println!("cped {}x{}", width, height)
             }
-            let _ = appsrc.push_buffer(buffer);
+            match appsrc.push_buffer(buffer) {
+                Ok(_) => {
+                    
+                },
+                Err(err) => {
+                    println!("Error pushing buffer: {:?}", err);
+                },
+            }
         };
-
-        // TODO: why is borrow checker a bit annoying here
-        let should_update_2 = should_update.clone();
-        let should_update_3 = should_update.clone();
 
         appsrc.set_callbacks(
             gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
                 // println!("want data");
-                should_update_2.store(true, std::sync::atomic::Ordering::Relaxed);
+                streaming_cmd_queue_for_cb_1.push(InternalMessage::SetShouldUpdate(true));
+
             }).enough_data(move |appsrc| {
                 // println!("enough data");
-                should_update_3.store(false, std::sync::atomic::Ordering::Relaxed);
+                streaming_cmd_queue_for_cb_2.push(InternalMessage::SetShouldUpdate(false));
             }).build()
         );
 
@@ -308,9 +314,12 @@ impl Streamer {
                         sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
                         println!("Adjusted caps for resolution {:?}", res);
                     },
+                    InternalMessage::SetShouldUpdate(should_update) => {
+                        temp_update = should_update;
+                    },
                 };
             }
-            if temp_update || should_update.load(std::sync::atomic::Ordering::Relaxed) {
+            if temp_update || should_update {
                 update_frame_func(&appsrc, &video_info);
             }
         }
