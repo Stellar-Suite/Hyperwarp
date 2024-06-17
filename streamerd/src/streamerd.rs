@@ -27,6 +27,7 @@ enum OperationMode {
 pub enum InternalMessage {
     HandshakeRecieved(stellar_protocol::protocol::Handshake),
     SetShouldUpdate(bool),
+    SynchornizationReceived(stellar_protocol::protocol::Synchornization),
 }
 
 
@@ -294,6 +295,21 @@ impl Streamer {
             
         }*/
         println!("entering run loop");
+
+        let update_resolution_func = |appsrc: &AppSrc, res: (u32, u32)| {
+            let video_info =
+                gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
+                //         .fps(gst::Fraction::new(2, 1))
+                    .build()
+                    .expect("Failed to create video info on demand for source");
+            println!("video info {:#?}",video_info);
+            appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+            appsrc.set_state(gstreamer::State::Playing).expect("Could not set appsrc to playing");
+            videoconvert.set_state(gstreamer::State::Playing).expect("Could not set videoconvert to playing");
+            sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
+            println!("Adjusted caps for resolution {:?}", res);
+        };
+
         while running {
             let mut temp_update = false;
             // println!("iter loop");
@@ -321,21 +337,17 @@ impl Streamer {
                     InternalMessage::HandshakeRecieved(handshake) => {
                         let res=  handshake.resolution;
                         println!("updating to {:?}", res);
-                        video_info =
-                            gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
-                        //         .fps(gst::Fraction::new(2, 1))
-                                .build()
-                                .expect("Failed to create video info on demand for source");
-                        println!("video info {:#?}",video_info);
-                        appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
-                        appsrc.set_state(gstreamer::State::Playing).expect("Could not set appsrc to playing");
-                        videoconvert.set_state(gstreamer::State::Playing).expect("Could not set videoconvert to playing");
-                        sink.set_state(gstreamer::State::Playing).expect("Could not set sink to playing");
-                        println!("Adjusted caps for resolution {:?}", res);
+                        update_resolution_func(&appsrc, res);
                     },
                     InternalMessage::SetShouldUpdate(new_should_update) => {
                         should_update = new_should_update;
                     },
+                    InternalMessage::SynchornizationReceived(sync_details) => {
+                        if let Some(res) = sync_details.resolution {
+                            update_resolution_func(&appsrc, res);
+                        }
+                    },
+                    
                 };
             }
             if temp_update || should_update {
@@ -420,6 +432,9 @@ impl Streamer {
                                                     } else {
                                                         println!("shm file not setup yet, can't acquire frame");
                                                     }
+                                                },
+                                                StellarMessage::SynchronizationEvent(sync_details) => {
+                                                    streaming_cmd_queue.push(InternalMessage::SynchornizationReceived(sync_details));
                                                 },
                                                 _ => {
 
