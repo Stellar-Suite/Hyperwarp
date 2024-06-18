@@ -30,7 +30,9 @@ pub enum InternalMessage {
     SynchornizationReceived(stellar_protocol::protocol::Synchornization),
 }
 
+pub struct SystemHints {
 
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
@@ -39,7 +41,7 @@ pub struct StreamerConfig {
     mode: OperationMode,
     #[arg(short, long, help = "Socket to connect to for Hyperwarp")]
     socket: Option<PathBuf>,
-    #[arg(short, long, help = "Test mode", default_value_t = true)]
+    #[arg(short, long, help = "Test mode", default_value_t = false)]
     test_mode: bool,
     #[arg(short, long, default_value_t = GraphicsAPI::Unknown, help = "Graphics api to assume. Will autodetect if not specified.")]
     graphics_api: GraphicsAPI,

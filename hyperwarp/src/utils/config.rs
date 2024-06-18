@@ -27,6 +27,7 @@ pub struct Config {
     pub bind_addr: Option<SocketAddr>, 
     pub bind_type: Option<String>,
     pub disable_control: bool,
+    pub retitle_windows: bool,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -100,6 +101,7 @@ impl Config {
             capture_mode: booleanify("CAPTURE_MODE", false),
             bind_addr: try_get::<SocketAddr>("SOCKET_ADDR"),
             bind_type: try_get::<String>("SOCKET_TYPE"),
+            retitle_windows: booleanify("RETITLE_WINDOWS", false),
         }
     }
 }
@@ -129,6 +131,7 @@ impl Default for Config {
             bind_addr: None,
             bind_type: None,
             disable_control: false,
+            retitle_windows: false,
         }
     }
 }

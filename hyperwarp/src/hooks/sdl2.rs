@@ -8,6 +8,8 @@ use crate::utils::manual_types::sdl2::{SDL_Window, Uint32, SDL_Renderer};
 
 use crate::host::hosting::HOST;
 
+// Many of these hooks
+
 redhook::hook! {
     unsafe fn SDL_Init(flags: Uint32) -> c_int => sdl_init_first {
         if HOST.config.debug_mode {
