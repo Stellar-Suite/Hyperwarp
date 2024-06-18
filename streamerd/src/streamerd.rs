@@ -407,7 +407,11 @@ impl Streamer {
                     },
                     InternalMessage::SocketAuthenticated => {
                         let socket =  self.get_socket();
-                        socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state)));  
+                        if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
+                            println!("Error setting session state on remote Stargate server: {:?}", err);
+                        }else{
+                            println!("Request to set session state on remote Stargate server.");
+                        }
                     },
                     _ => {
                         // TODO: print more descriptive
@@ -440,7 +444,7 @@ impl Streamer {
                 println!("Initial privlige elevation failed: {:?}, may retry on reconnect", err);
             }
         }).on("upgraded", move |payload, client| {
-            println!("Privlige upgraded accepted.");
+            println!("Privlige upgrade accepted.");
             main_thread_cmd_queue_2.push(InternalMessage::SocketAuthenticated);
         });
 
