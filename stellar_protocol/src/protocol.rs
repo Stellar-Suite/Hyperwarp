@@ -43,7 +43,7 @@ pub struct Handshake {
 #[repr(u8)]
 enum SessionState {
     Initalizing = 0,
-    Handshaking = 3,
+    Handshaking = 1,
     Ready = 2,
     Disconnecting = 9,
 }
