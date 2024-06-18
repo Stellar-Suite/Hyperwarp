@@ -45,6 +45,8 @@ pub struct StreamerConfig {
     test_mode: bool,
     #[arg(short, long, default_value_t = GraphicsAPI::Unknown, help = "Graphics api to assume. Will autodetect if not specified.")]
     graphics_api: GraphicsAPI,
+    #[arg(short, long, default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
+    stargate_addr: String,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -98,6 +100,7 @@ impl Streamer {
             self.handles.push(hyperwarp_thread_handle);
         }
         self.started = true;
+        self.start_stargate_client_thread();
         self.run_gstreamer();
     }
 
@@ -387,6 +390,11 @@ impl Streamer {
         }
 
         println!("streamer thread exited cleanly.");
+    }
+
+    pub fn start_stargate_client_thread(&mut self) {
+        // TODO: do I need to explictly make thread since rust-socketio does this for me?
+
     }
 
     pub fn start_hyperwarp_client_thread(&mut self) -> JoinHandle<()> {
