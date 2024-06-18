@@ -39,13 +39,38 @@ pub struct Handshake {
     pub graphics_api: GraphicsAPI,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Copy, Clone)]
 #[repr(u8)]
-enum SessionState {
+pub enum SessionState {
     Initalizing = 0,
     Handshaking = 1,
     Ready = 2,
     Disconnecting = 9,
+}
+
+pub fn session_state_to_u8(state: SessionState) -> u8 {
+    match state {
+        SessionState::Initalizing => 0,
+        SessionState::Handshaking => 1,
+        SessionState::Ready => 2,
+        SessionState::Disconnecting => 9,
+    }
+}
+
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Copy, Clone)]
+#[repr(u8)]
+pub enum StreamerState {
+    Initalizing = 0,
+    Handshaking = 1,
+    Running = 2,
+}
+
+pub fn streamer_state_to_u8(state: StreamerState) -> u8 {
+    match state {
+        StreamerState::Initalizing => 0,
+        StreamerState::Handshaking => 1,
+        StreamerState::Running => 2,
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]

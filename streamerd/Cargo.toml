@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
-clap = { version = "4.5.4", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive", "env"] }
 crossbeam-channel = "0.5.13"
 crossbeam-queue = "0.3.11"
 gio = "0.19.5"

@@ -1,5 +1,5 @@
 use core::prelude::rust_2015;
-use std::{cmp, io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, RwLock}, thread::JoinHandle};
+use std::{any::Any, cmp, io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, MutexGuard, RwLock}, thread::JoinHandle};
 
 use clap::{Parser, ValueEnum, command};
 
@@ -12,7 +12,8 @@ use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoInfo};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
-use stellar_protocol::protocol::{GraphicsAPI, StellarChannel, StellarMessage};
+use rust_socketio::{client::Client, ClientBuilder};
+use stellar_protocol::protocol::{streamer_state_to_u8, GraphicsAPI, StellarChannel, StellarMessage, StreamerState};
 
 use std::time::Instant;
 
@@ -28,6 +29,8 @@ pub enum InternalMessage {
     HandshakeReceived(stellar_protocol::protocol::Handshake),
     SetShouldUpdate(bool),
     SynchornizationReceived(stellar_protocol::protocol::Synchornization),
+    SocketConnected,
+    SocketAuthenticated,
 }
 
 pub struct SystemHints {
@@ -47,6 +50,8 @@ pub struct StreamerConfig {
     graphics_api: GraphicsAPI,
     #[arg(short = 'u', long = "url", default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
     stargate_addr: String,
+    #[arg(short = 'e', long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
+    secret: String,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -70,6 +75,7 @@ pub struct Streamer {
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<StreamerSignal>>>>,
     pub streaming_command_queue: Arc<SegQueue<InternalMessage>>,
     pub frame: Arc<RwLock<Vec<u8>>>,
+    pub socketio_client: Option<Arc<Mutex<Client>>>,
 }
 
 pub fn calc_offset(width: usize, height: usize, x: usize, y: usize) -> Option<usize> {
@@ -89,6 +95,7 @@ impl Streamer {
             messaging_handler: None,
             streaming_command_queue: Arc::new(SegQueue::new()),
             frame: Arc::new(RwLock::new(vec![])),
+            socketio_client: None,
         }
     }
 
@@ -102,6 +109,10 @@ impl Streamer {
         self.started = true;
         self.start_stargate_client_thread();
         self.run_gstreamer();
+    }
+
+    pub fn get_socket(&self) -> MutexGuard<Client> {
+        self.socketio_client.as_ref().unwrap().lock().unwrap()
     }
 
     pub fn run_gstreamer(&mut self) {
@@ -164,7 +175,9 @@ impl Streamer {
         println!("begin event ingest");
 
         let mut should_update = false;
+        let mut socket_connected = false;
         let mut graphics_api = config.graphics_api;
+        let mut streamer_state = StreamerState::Initalizing;
 
         let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
             
@@ -351,6 +364,7 @@ impl Streamer {
                         } else {
                             videoflip.set_property("method", "none");
                         }
+                        streamer_state = StreamerState::Running;
                     },
                     InternalMessage::SetShouldUpdate(new_should_update) => {
                         should_update = new_should_update;
@@ -380,7 +394,24 @@ impl Streamer {
                             }
                         }
                     },
-                    
+                    InternalMessage::SocketConnected => {
+                        if !socket_connected {
+                            println!("Stargate socket connected for the first time.");
+                            socket_connected = true;
+                            // first connect logic
+                            let socket =  self.get_socket();
+                        } else {
+                            println!("Stargate socket reconnected.");
+                        }
+                    },
+                    InternalMessage::SocketAuthenticated => {
+                        let socket =  self.get_socket();
+                        socket.emit("set_session_state", streamer_state_to_u8(streamer_state));  
+                    },
+                    _ => {
+                        // TODO: print more descriptive
+                        println!("Unimplemented message {:#?}", imsg.type_id());
+                    }
                 };
             }
             if temp_update || should_update {
@@ -392,9 +423,35 @@ impl Streamer {
         println!("streamer thread exited cleanly.");
     }
 
-    pub fn start_stargate_client_thread(&mut self) {
+    pub fn start_stargate_client_thread(&mut self) -> anyhow::Result<()>{
         // TODO: do I need to explictly make thread since rust-socketio does this for me?
+        let main_thread_cmd_queue_1 = self.streaming_command_queue.clone();
+        let main_thread_cmd_queue_2 = self.streaming_command_queue.clone();
 
+        let mut socket_builder = ClientBuilder::new(self.config.stargate_addr.clone());
+
+        let config = self.config.clone();
+        
+        socket_builder = socket_builder.on("hello", move |payload, client| {
+            main_thread_cmd_queue_1.push(InternalMessage::SocketConnected);
+            // now we need to elevate privs
+            if let Err(err) = client.emit("upgrade_privs", config.secret.clone()) {
+                println!("Initial privlige elevation failed: {:?}, may retry on reconnect", err);
+            }
+        }).on("upgraded", move |payload, client| {
+            println!("Privlige upgraded accepted.");
+            main_thread_cmd_queue_2.push(InternalMessage::SocketAuthenticated);
+        });
+
+        let socket = socket_builder.connect()?;
+
+        let arc = Arc::new(Mutex::new(socket));
+        
+        let socket_arc = arc.clone();
+
+        self.socketio_client = Some(arc);
+
+        Ok(())
     }
 
     pub fn start_hyperwarp_client_thread(&mut self) -> JoinHandle<()> {
