@@ -41,6 +41,8 @@ pub struct StreamerConfig {
     socket: Option<PathBuf>,
     #[arg(short, long, help = "Test mode", default_value_t = true)]
     test_mode: bool,
+    #[arg(short, long, default_value_t = GraphicsAPI::Unknown, help = "Graphics api to assume. Will autodetect if not specified.")]
+    graphics_api: GraphicsAPI,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -157,7 +159,7 @@ impl Streamer {
         println!("begin event ingest");
 
         let mut should_update = false;
-        let mut graphics_api = GraphicsAPI::Unknown;
+        let mut graphics_api = config.graphics_api;
 
         let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
             
