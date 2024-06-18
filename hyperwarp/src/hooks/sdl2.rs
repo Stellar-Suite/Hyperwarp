@@ -4,6 +4,7 @@ use stellar_protocol::protocol::GraphicsAPI;
 use crate::constants::sdl2::SDL_FALSE;
 
 use crate::host::window::Window;
+use crate::utils;
 use crate::utils::manual_types::sdl2::{SDL_Window, Uint32, SDL_Renderer};
 
 use crate::host::hosting::HOST;
@@ -50,8 +51,10 @@ redhook::hook! {
             final_h = new_h as c_int;
         }
 
+        let final_title = utils::format_window_title_prefix_cstr(title);
+
         let mut result = if HOST.config.enable_sdl2 {
-            redhook::real!(SDL_CreateWindow_hw_direct)(title, final_x, final_y, final_w, final_h, flags)
+            redhook::real!(SDL_CreateWindow_hw_direct)(final_title, final_x, final_y, final_w, final_h, flags)
         } else {
             std::ptr::null()
         };
