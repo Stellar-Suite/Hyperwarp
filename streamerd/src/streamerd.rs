@@ -41,11 +41,11 @@ pub struct StreamerConfig {
     mode: OperationMode,
     #[arg(short, long, help = "Socket to connect to for Hyperwarp")]
     socket: Option<PathBuf>,
-    #[arg(short, long, help = "Test mode", default_value_t = false)]
+    #[arg(short = 't', long = "test", help = "Test mode", default_value_t = false)]
     test_mode: bool,
     #[arg(short, long, default_value_t = GraphicsAPI::Unknown, help = "Graphics api to assume. Will autodetect if not specified.")]
     graphics_api: GraphicsAPI,
-    #[arg(short, long, default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
+    #[arg(short = 'u', long = "url", default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
     stargate_addr: String,
 }
 
