@@ -23,7 +23,7 @@ pub fn format_window_title_prefix_cstr(c_string: *const c_char) -> *const c_char
     
     let c_str = unsafe { CStr::from_ptr(c_string) };
     let rust_str = c_str.to_str().expect("Bad C String");
-    println!("orig cstring {}", rust_str);
+    // println!("orig cstring {}", rust_str);
     let formatted = format!("{} ({})", rust_str, LIBRARY_NAME); // TODO: put crate version here
     // let c_str = CString::new(c_string).unwrap();
     let formatted_c_str = CString::new(formatted).unwrap();
