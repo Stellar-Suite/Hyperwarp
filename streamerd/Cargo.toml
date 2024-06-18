@@ -20,6 +20,7 @@ gstreamer-video = "0.22.5"
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 # stellar_core = { path = "../stellar_core" }
 stellar_protocol = { path = "../stellar_protocol" }
+rust_socketio = "*"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"
