@@ -12,7 +12,7 @@ use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoInfo};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
-use stellar_protocol::protocol::{StellarChannel, StellarMessage};
+use stellar_protocol::protocol::{GraphicsAPI, StellarChannel, StellarMessage};
 
 use std::time::Instant;
 
@@ -157,6 +157,7 @@ impl Streamer {
         println!("begin event ingest");
 
         let mut should_update = false;
+        let mut graphics_api = GraphicsAPI::Unknown;
 
         let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
             
@@ -323,6 +324,7 @@ impl Streamer {
                 match imsg {
                     // TODO: deduplicate code between handshake and sync, but closure does not currently work because it needs to mutate video_info
                     InternalMessage::HandshakeReceived(handshake) => {
+                        println!("handshake details {:#?}", handshake);
                         let res=  handshake.resolution;
                         println!("updating to {:?}", res);
                         video_info =
@@ -333,11 +335,21 @@ impl Streamer {
                         println!("video info {:#?}",video_info);
                         appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
                         println!("Adjusted caps for resolution {:?}", res);
+                        graphics_api = handshake.graphics_api;
+                        println!("setting graphics api to {:?}", graphics_api);
+                        let flip = stellar_protocol::protocol::should_flip_buffers_for_graphics_api(graphics_api);
+                        if flip {
+                            // wow gstreamer needs to make like constants for these
+                            videoflip.set_property_from_str("method", "vertical-flip");
+                        } else {
+                            videoflip.set_property("method", "none");
+                        }
                     },
                     InternalMessage::SetShouldUpdate(new_should_update) => {
                         should_update = new_should_update;
                     },
                     InternalMessage::SynchornizationReceived(sync_details) => {
+                        println!("syncing {:#?}", sync_details);
                         if let Some(res) = sync_details.resolution {
                             video_info =
                             gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
@@ -349,11 +361,13 @@ impl Streamer {
                             println!("Adjusted caps for resolution {:?}", res);
                         }
 
-                        if let Some(graphics_api) = sync_details.graphics_api {
-                            println!("setting graphics api to {:?}", graphics_api);
+                        if let Some(new_graphics_api) = sync_details.graphics_api {
+                            println!("setting graphics api to {:?}", new_graphics_api);
+                            graphics_api = new_graphics_api;
                             let flip = stellar_protocol::protocol::should_flip_buffers_for_graphics_api(graphics_api);
                             if flip {
-                                videoflip.set_property("method", "vertical-flip");
+                                // wow gstreamer needs to make like constants for these
+                                videoflip.set_property_from_str("method", "vertical-flip");
                             } else {
                                 videoflip.set_property("method", "none");
                             }
