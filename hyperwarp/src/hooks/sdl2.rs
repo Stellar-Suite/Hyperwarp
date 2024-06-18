@@ -4,7 +4,7 @@ use stellar_protocol::protocol::GraphicsAPI;
 use crate::constants::sdl2::SDL_FALSE;
 
 use crate::host::window::Window;
-use crate::utils;
+use crate::utils::{self, format_window_title_prefix_cstr};
 use crate::utils::manual_types::sdl2::{SDL_Window, Uint32, SDL_Renderer};
 
 use crate::host::hosting::HOST;
@@ -132,5 +132,23 @@ redhook::hook! {
         } else {
             std::ptr::null()
         }
+    }
+}
+redhook::hook! {
+    unsafe fn SDL_SetWindowTitle(display: *mut SDL_Window, title: *const c_char) => sdl_setwindowtitle_first {
+        if HOST.config.debug_mode {
+            println!("SDL_SetWindowTitle called");
+        }
+
+        if HOST.config.enable_sdl2 {
+            let result = redhook::real!(SDL_SetWindowTitle_hw_direct)(display, format_window_title_prefix_cstr(title));
+            result
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_SetWindowTitle_hw_direct(display: *mut SDL_Window, title: *const c_char) => sdl_setwindowtitle_hw_direct {
+        // shim so I can run redhook::real on it   
     }
 }
