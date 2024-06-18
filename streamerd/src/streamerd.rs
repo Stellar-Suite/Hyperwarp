@@ -514,6 +514,7 @@ impl Streamer {
                                                         let mut writable_frame = frame.write().unwrap();
                                                         writable_frame.clear();
                                                         let resolution = handshake.resolution;
+                                                        // this doesn't actually need to happen because it's cleared and appended anyways
                                                         writable_frame.resize((4 * resolution.0 * resolution.1) as usize, 0);
                                                         println!("init streamer frame buffer {} bytes", (4 * resolution.0 * resolution.1));
                                                     }
@@ -534,6 +535,7 @@ impl Streamer {
                                                     }
                                                 },
                                                 StellarMessage::SynchronizationEvent(sync_details) => {
+                                                    // this doesn't happen enough I think to be spammy?
                                                     println!("recieving sync event on hyperwarp conn thread");
                                                     streaming_cmd_queue.push(InternalMessage::SynchornizationReceived(sync_details));
                                                 },
