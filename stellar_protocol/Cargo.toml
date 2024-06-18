@@ -9,3 +9,4 @@ lazy_static = "1.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
 strum = "0.26.2"
 strum_macros = "0.26.3"
+serde_repr = "0.1"

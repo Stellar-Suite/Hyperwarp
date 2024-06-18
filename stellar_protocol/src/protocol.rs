@@ -2,6 +2,8 @@
 use std::path::PathBuf;
 
 use serde::{Serialize, Deserialize};
+use serde_repr::Deserialize_repr;
+use serde_repr::Serialize_repr;
 use strum_macros::{EnumString, Display, EnumIter, VariantArray};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
@@ -35,6 +37,15 @@ pub struct Handshake {
     pub resolution: (u32, u32),
     pub shimg_path: PathBuf,
     pub graphics_api: GraphicsAPI,
+}
+
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
+#[repr(u8)]
+enum SessionState {
+    Initalizing = 0,
+    Handshaking = 3,
+    Ready = 2,
+    Disconnecting = 9,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
