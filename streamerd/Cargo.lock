@@ -1824,6 +1824,7 @@ dependencies = [
  "gstreamer-video",
  "message-io",
  "rust_socketio",
+ "serde_json",
  "stellar_protocol",
 ]
 

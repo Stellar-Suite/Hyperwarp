@@ -13,6 +13,7 @@ use gstreamer_video::{prelude::*, VideoInfo};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
 use rust_socketio::{client::Client, ClientBuilder};
+use serde_json::json;
 use stellar_protocol::protocol::{streamer_state_to_u8, GraphicsAPI, StellarChannel, StellarMessage, StreamerState};
 
 use std::time::Instant;
@@ -406,7 +407,7 @@ impl Streamer {
                     },
                     InternalMessage::SocketAuthenticated => {
                         let socket =  self.get_socket();
-                        socket.emit("set_session_state", streamer_state_to_u8(streamer_state));  
+                        socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state)));  
                     },
                     _ => {
                         // TODO: print more descriptive
@@ -435,7 +436,7 @@ impl Streamer {
         socket_builder = socket_builder.on("hello", move |payload, client| {
             main_thread_cmd_queue_1.push(InternalMessage::SocketConnected);
             // now we need to elevate privs
-            if let Err(err) = client.emit("upgrade_privs", config.secret.clone()) {
+            if let Err(err) = client.emit("upgrade_privs", json!(config.secret.clone())) {
                 println!("Initial privlige elevation failed: {:?}, may retry on reconnect", err);
             }
         }).on("upgraded", move |payload, client| {
