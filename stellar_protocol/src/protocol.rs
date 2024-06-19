@@ -98,6 +98,10 @@ pub struct Synchornization {
     pub graphics_api: Option<GraphicsAPI>,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct DebugInfo {
+    pub message: String,
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum StellarMessage {
@@ -118,6 +122,8 @@ pub enum StellarMessage {
     SynchronizationEvent(Synchornization),
     SubscribeChannel(StellarChannel),
     UnsubscribeChannel(StellarChannel),
+    DebugInfoRequest,
+    DebugInfoResponse(DebugInfo),
 }
 
 pub fn should_flip_buffers_for_graphics_api(gapi: GraphicsAPI) -> bool {

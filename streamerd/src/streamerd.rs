@@ -53,6 +53,10 @@ pub struct StreamerConfig {
     stargate_addr: String,
     #[arg(short = 'e', long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
     secret: String,
+    #[arg(short = 'p', long = "pid", env = "TARGET_PROCESS_PID", help = "determine socket based off pid instead")]
+    pid: Option<u32>,
+    #[arg(short = 'd', long = "debug", help = "Ask process for debug info as well.")]
+    debug: bool,
 }
 
 impl std::fmt::Display for OperationMode {
