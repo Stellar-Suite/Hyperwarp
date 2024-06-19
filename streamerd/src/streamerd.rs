@@ -178,7 +178,7 @@ impl Streamer {
         let mut should_update = false;
         let mut socket_connected = false;
         let mut graphics_api = config.graphics_api;
-        let mut streamer_state = StreamerState::Initalizing;
+        let mut streamer_state = StreamerState::Handshaking;
 
         let update_frame_func = |appsrc: &AppSrc, video_info: &VideoInfo| {
             
@@ -366,6 +366,16 @@ impl Streamer {
                             videoflip.set_property("method", "none");
                         }
                         streamer_state = StreamerState::Running;
+                        {
+                            // annouce that we are up and running
+                            let socket =  self.get_socket();
+                            // this tells the ui to switch out of the loading screen
+                            if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
+                                println!("Error setting session state on remote Stargate server: {:?}", err);
+                            }else{
+                                println!("Request to set session state on remote Stargate server.");
+                            }
+                        }
                     },
                     InternalMessage::SetShouldUpdate(new_should_update) => {
                         should_update = new_should_update;
@@ -407,6 +417,7 @@ impl Streamer {
                     },
                     InternalMessage::SocketAuthenticated => {
                         let socket =  self.get_socket();
+                        // this tells the ui to switch out of the loading screen
                         if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
                             println!("Error setting session state on remote Stargate server: {:?}", err);
                         }else{
