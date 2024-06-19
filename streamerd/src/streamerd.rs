@@ -90,6 +90,13 @@ pub fn calc_offset(width: usize, height: usize, x: usize, y: usize) -> Option<us
     None
 }
 
+pub fn calc_offset_rgb(width: usize, height: usize, x: usize, y: usize) -> Option<usize> {
+    if x <= width && y <= height {
+        return Some(((y * width + x) * 3));
+    }
+    None
+}
+
 impl Streamer {
     pub fn new(config: StreamerConfig) -> Self {
         Self { 
