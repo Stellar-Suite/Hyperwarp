@@ -28,4 +28,18 @@ impl WebRTCPeer {
     pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
         gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin]).expect("linking elements failed");
     }
+
+    pub fn remove_from_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
+
+        // unlink queue and webrtcbin
+        gstreamer::Element::unlink_many([&tee, &self.queue, &self.webrtcbin]);
+
+        // stop queue and webrtcbin
+        self.queue.set_state(gstreamer::State::Null).expect("could not set queue state to null");
+        self.webrtcbin.set_state(gstreamer::State::Null).expect("could not set webrtcbin state to null");
+
+        // remove queue and webrtcbin from pipeline
+        pipeline.remove(&self.queue).expect("removing queue element failed");
+        pipeline.remove(&self.webrtcbin).expect("removing webrtcbin element failed");
+    }
 }

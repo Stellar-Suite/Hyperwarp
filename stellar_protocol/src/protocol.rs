@@ -155,6 +155,16 @@ pub enum StellarFrontendMessage {
         type_: String,
         sdp: String,
     },
+    ProvisionWebRTC,
+}
+
+pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {
+    match message {
+        StellarFrontendMessage::Ice { candidate, sdp_mline_index } => true,
+        StellarFrontendMessage::Sdp { type_, sdp } => true,
+        StellarFrontendMessage::ProvisionWebRTC => true,
+        _ => false
+    }
 }
 
 pub fn should_flip_buffers_for_graphics_api(gapi: GraphicsAPI) -> bool {

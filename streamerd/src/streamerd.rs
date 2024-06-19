@@ -1,5 +1,5 @@
 use core::prelude::rust_2015;
-use std::{any::Any, cmp, io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, MutexGuard, RwLock}, thread::JoinHandle};
+use std::{any::Any, cmp, collections::HashMap, io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, MutexGuard, RwLock}, thread::JoinHandle};
 
 use clap::{Parser, ValueEnum, command};
 
@@ -14,9 +14,11 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{streamer_state_to_u8, EncodingPreset, GraphicsAPI, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
 
 use std::time::Instant;
+
+use crate::webrtc::{self, WebRTCPeer};
 
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
@@ -32,6 +34,7 @@ pub enum InternalMessage {
     SynchornizationReceived(stellar_protocol::protocol::Synchornization),
     SocketConnected,
     SocketAuthenticated,
+    SocketPeerFrontendMessageWithPipeline(String, stellar_protocol::protocol::StellarFrontendMessage),
 }
 
 pub struct SystemHints {
@@ -160,6 +163,8 @@ impl Streamer {
         let streaming_cmd_queue_for_cb_1 = self.streaming_command_queue.clone();
         let streaming_cmd_queue_for_cb_2 = self.streaming_command_queue.clone();
         let self_frame = self.frame.clone();
+
+        let mut downstream_peers: HashMap<String, WebRTCPeer> = HashMap::new();
 
         let mut video_info =
         // default to 100x100
@@ -440,6 +445,18 @@ impl Streamer {
                             println!("Request to set session state on remote Stargate server.");
                         }
                     },
+                    InternalMessage::SocketPeerFrontendMessageWithPipeline(origin_socketid, frontend_message) => {
+                        match frontend_message {
+                            StellarFrontendMessage::ProvisionWebRTC => {
+                                let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
+                                downstream_peer_el_group.add_to_pipeline(&pipeline);
+                                downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
+                            },
+                            _ => {
+                                println!("Unhandled frontend message {:?}", frontend_message);
+                            }
+                        }
+                    },
                     _ => {
                         // TODO: print more descriptive
                         println!("Unimplemented message {:#?}", imsg.type_id());
@@ -459,6 +476,7 @@ impl Streamer {
         // TODO: do I need to explictly make thread since rust-socketio does this for me?
         let main_thread_cmd_queue_1 = self.streaming_command_queue.clone();
         let main_thread_cmd_queue_2 = self.streaming_command_queue.clone();
+        let main_thread_cmd_queue_3 = self.streaming_command_queue.clone();
 
         let mut socket_builder = ClientBuilder::new(self.config.stargate_addr.clone());
 
@@ -485,7 +503,17 @@ impl Streamer {
                             // rip 0 copy because of to_owend
                             match serde_json::from_value::<StellarFrontendMessage>(values.get(1).unwrap().to_owned()) {
                                 Ok(frontend_message) => {
-                                    
+                                    match frontend_message {
+                                        StellarFrontendMessage::Test { time } => todo!(),
+                                        StellarFrontendMessage::Ping { ping_payload } => todo!(),
+                                        other => {
+                                            if may_mutate_pipeline(&other) {
+                                                main_thread_cmd_queue_3.push(InternalMessage::SocketPeerFrontendMessageWithPipeline(src_socketid.clone(), other));
+                                            } else {
+                                                println!("Unhandled frontend message {:?}", other);
+                                            }
+                                        }
+                                    }
                                 },
                                 Err(err) => println!("malformed frontend message {:?}", err),
                             }
