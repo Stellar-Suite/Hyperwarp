@@ -468,6 +468,18 @@ impl Streamer {
         }).on("upgraded", move |payload, client| {
             println!("Privlige upgrade accepted.");
             main_thread_cmd_queue_2.push(InternalMessage::SocketAuthenticated);
+        }).on("peer_message", move |payload, client| {
+            match payload {
+                rust_socketio::Payload::Binary(bin) => {
+                    // serde in js would never
+                },
+                rust_socketio::Payload::Text(_) => {
+
+                },
+                rust_socketio::Payload::String(_) => {
+                    // deprecated
+                },
+            }
         });
 
         let socket = socket_builder.connect()?;
