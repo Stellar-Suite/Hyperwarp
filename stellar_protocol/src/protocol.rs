@@ -23,6 +23,15 @@ pub enum GraphicsAPI {
     Metal, // idk if i'll ever be able to
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
+pub enum EncodingPreset {
+    H264,
+    H265,
+    VP8,
+    VP9, // bad
+    AV1
+}
+
 use strum::IntoEnumIterator;
 use strum::VariantArray;
 

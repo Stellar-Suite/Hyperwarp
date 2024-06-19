@@ -14,7 +14,7 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{streamer_state_to_u8, GraphicsAPI, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{streamer_state_to_u8, EncodingPreset, GraphicsAPI, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
 
 use std::time::Instant;
 
@@ -59,6 +59,8 @@ pub struct StreamerConfig {
     debug: bool,
     #[arg(long = "stun", default_value_t = { "stun://stun.l.google.com:19302".to_string() }, help = "stun server to use")]
     stun_server: String,
+    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::H264, help = "encoding preset to use, defaults to h264")]
+    encoder: EncodingPreset,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -121,7 +123,7 @@ impl Streamer {
             self.handles.push(hyperwarp_thread_handle);
         }
         self.started = true;
-        self.start_stargate_client_thread();
+        self.start_stargate_client_thread().expect("Stargate connection failed.");
         self.run_gstreamer();
     }
 
@@ -150,6 +152,7 @@ impl Streamer {
 
         let videoconvert = gstreamer::ElementFactory::make("videoconvert").build().expect("could not create video processor");
         let videoflip = gstreamer::ElementFactory::make("videoflip").build().expect("could not create optional video flipper");
+        let debug_tee = gstreamer::ElementFactory::make("tee").name("debug_tee").build().expect("could not create debugtee");
         let sink = gstreamer::ElementFactory::make("autovideosink").build().expect("could not create output");
         
         let mut running = true;
@@ -174,8 +177,8 @@ impl Streamer {
         .build();
 
         // link
-        pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &sink]).expect("adding els failed");
-        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &videoflip, &sink]).expect("linking failed");
+        pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
+        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("linking failed");
 
         println!("pipeline linked");
 
