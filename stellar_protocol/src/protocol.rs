@@ -29,7 +29,16 @@ pub enum EncodingPreset {
     H265,
     VP8,
     VP9, // bad
-    AV1
+    AV1,
+    Unknown, // dangerously passthrough all settings
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
+pub enum PipelineOptimization {
+    None,
+    Intel,
+    NVIDIA,
+    AMD
 }
 
 use strum::IntoEnumIterator;
