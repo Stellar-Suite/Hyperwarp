@@ -126,6 +126,28 @@ pub enum StellarMessage {
     DebugInfoResponse(DebugInfo),
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(untagged)]
+pub enum StellarFrontendMessage {
+    Test {
+        time: u64
+    },
+    Ping {
+        ping_payload: String
+    },
+    // webrtc stuff reference: https://gitlab.freedesktop.org/gstreamer/gst-examples/-/blob/discontinued-for-monorepo/webrtc/sendrecv/gst-rust/src/main.rs?ref_type=heads#L51
+    Ice {
+        candidate: String,
+        #[serde(rename = "sdpMLineIndex")]
+        sdp_mline_index: u32,
+    },
+    Sdp {
+        #[serde(rename = "type")]
+        type_: String,
+        sdp: String,
+    },
+}
+
 pub fn should_flip_buffers_for_graphics_api(gapi: GraphicsAPI) -> bool {
     match gapi {
         GraphicsAPI::OpenGL => true,
@@ -135,3 +157,4 @@ pub fn should_flip_buffers_for_graphics_api(gapi: GraphicsAPI) -> bool {
         GraphicsAPI::Unknown => false,
     }
 }
+

@@ -14,7 +14,7 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{streamer_state_to_u8, GraphicsAPI, StellarChannel, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{streamer_state_to_u8, GraphicsAPI, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
 
 use std::time::Instant;
 
@@ -57,6 +57,8 @@ pub struct StreamerConfig {
     pid: Option<u32>,
     #[arg(short = 'd', long = "debug", help = "Ask process for debug info as well.")]
     debug: bool,
+    #[arg(long = "stun", default_value_t = { "stun://stun.l.google.com:19302".to_string() }, help = "stun server to use")]
+    stun_server: String,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -473,8 +475,22 @@ impl Streamer {
                 rust_socketio::Payload::Binary(bin) => {
                     // serde in js would never
                 },
-                rust_socketio::Payload::Text(_) => {
-
+                rust_socketio::Payload::Text(values) => {
+                    // serde json deserialize time
+                    if values.len() >= 2 {
+                        if let serde_json::Value::String(src_socketid) = values.get(0).unwrap() {
+                            // rip 0 copy because of to_owend
+                            match serde_json::from_value::<StellarFrontendMessage>(values.get(1).unwrap().to_owned()) {
+                                Ok(frontend_message) => {
+                                    
+                                },
+                                Err(err) => println!("malformed frontend message {:?}", err),
+                            }
+                        } else {
+                            println!("very malformed frontend message, missing source socket id string");
+                        }
+                    }
+                    
                 },
                 rust_socketio::Payload::String(_) => {
                     // deprecated
