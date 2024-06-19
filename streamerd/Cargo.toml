@@ -24,6 +24,8 @@ rust_socketio = "*"
 serde_json = "1.0"
 gstreamer-webrtc = "0.22.6"
 gstreamer-sdp = "0.22.6"
+lazy_static = "1.4.0"
+num = "0.4.3"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"
