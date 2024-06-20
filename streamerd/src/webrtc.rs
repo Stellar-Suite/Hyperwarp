@@ -145,7 +145,7 @@ impl WebRTCPreprocessor {
         }
     }
 
-    pub fn attach_to_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
+    pub fn attach_to_pipeline(&self, pipeline: &gstreamer::Pipeline, after_element: &gstreamer::Element) {
         pipeline.add_many([&self.encoder, &self.payloader]).expect("adding elements to pipeline failed");
         // add prefix and suffix elements
         /*for el in &self.extra_prefix_elements {
@@ -154,7 +154,7 @@ impl WebRTCPreprocessor {
         for el in &self.extra_suffix_elements {
             pipeline.add_many([el]).expect("adding elements to pipeline failed");
         }*/
-        gstreamer::Element::link_many([tee, &self.encoder, &self.payloader]).expect("linking elements failed");
+        gstreamer::Element::link_many([after_element, &self.encoder, &self.payloader]).expect("linking elements failed");
     }
 
     pub fn get_last_element(&self) -> &gstreamer::Element {

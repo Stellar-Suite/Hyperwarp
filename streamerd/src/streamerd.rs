@@ -64,7 +64,7 @@ pub struct StreamerConfig {
     debug: bool,
     #[arg(long = "stun", default_value_t = { "stun://stun.l.google.com:19302".to_string() }, help = "stun server to use")]
     stun_server: String,
-    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::H264, help = "encoding preset to use, defaults to h264")]
+    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::VP8, help = "encoding preset to use, defaults to h264")]
     encoder: EncodingPreset,
 }
 
@@ -133,7 +133,7 @@ impl Streamer {
     }
 
     pub fn get_socket(&self) -> MutexGuard<Client> {
-        self.socketio_client.as_ref().unwrap().lock().unwrap()
+        self.socketio_client.as_ref().expect("Socketio client not initialized").lock().unwrap()
     }
 
     pub fn complain_to_socket(&self, socket_id: &str, message: &str) {
@@ -195,10 +195,15 @@ impl Streamer {
         pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
         gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("linking failed");
 
+        println!("create queue before preprocessor");
+        let queue = gstreamer::ElementFactory::make("queue").build().expect("could not create queue element");
+        pipeline.add(&queue).expect("adding elements to pipeline failed");
+        gstreamer::Element::link_many([&debug_tee, &queue]).expect("linking failed");
+
         println!("initing preprocessor");
 
         let preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder);
-        preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
+        preprocessor.attach_to_pipeline(&pipeline, &queue);
 
         println!("setting up second tee element");
 
@@ -371,7 +376,10 @@ impl Streamer {
                 }
 
                 match msg.view() {
-                    MessageView::Eos(..) => break,
+                    MessageView::Eos(..) => {
+                        println!("Exiting at end of stream.");
+                        break;
+                    },
                     MessageView::Error(err) => {
                         pipeline.set_state(gstreamer::State::Null).expect("could not reset pipeline state");
                         running = false;
@@ -411,7 +419,9 @@ impl Streamer {
                             // annouce that we are up and running
                             let socket = self.get_socket();
                             // this tells the ui to switch out of the loading screen
-                            if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
+                            let state_num = streamer_state_to_u8(streamer_state);
+                            println!("syncing state to ui: {:?}", state_num);
+                            if let Err(err) = socket.emit("set_session_state", json!(state_num)) {
                                 println!("Error setting session state on remote Stargate server: {:?}", err);
                             }else{
                                 println!("Requested to set session state on remote Stargate server.");
@@ -575,6 +585,7 @@ impl Streamer {
             println!("Privlige upgrade accepted.");
             main_thread_cmd_queue_2.push(InternalMessage::SocketAuthenticated);
         }).on("peer_message", move |payload, client| {
+            println!("peer_message {:#?}", payload);
             match payload {
                 rust_socketio::Payload::Binary(bin) => {
                     // serde in js would never
@@ -612,7 +623,11 @@ impl Streamer {
             }
         });
 
+        println!("Connecting to Stargate server");
+
         let socket = socket_builder.connect()?;
+
+        println!("Connected to Stargate server");
 
         let arc = Arc::new(Mutex::new(socket));
         
