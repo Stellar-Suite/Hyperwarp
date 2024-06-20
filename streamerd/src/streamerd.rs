@@ -48,7 +48,7 @@ pub struct SystemHints {
 pub struct StreamerConfig {
     #[arg(short, long, default_value_t = OperationMode::Hyperwarp, help = "Operation mode to use. Can be used to run without Hyperwarp injected application (in the future).")]
     mode: OperationMode,
-    #[arg(long, help = "Socket to connect to for Hyperwarp")]
+    #[arg(short, long, help = "Socket to connect to for Hyperwarp")]
     socket: Option<PathBuf>,
     #[arg(short = 't', long = "test", help = "Test mode", default_value_t = false)]
     test_mode: bool,
@@ -56,7 +56,7 @@ pub struct StreamerConfig {
     graphics_api: GraphicsAPI,
     #[arg(short = 'u', long = "url", default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
     stargate_addr: String,
-    #[arg(short = 's', long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
+    #[arg(long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
     secret: String,
     #[arg(short = 'p', long = "pid", env = "TARGET_PROCESS_PID", help = "determine socket based off pid instead")]
     pid: Option<u32>,
@@ -414,7 +414,7 @@ impl Streamer {
                             if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
                                 println!("Error setting session state on remote Stargate server: {:?}", err);
                             }else{
-                                println!("Request to set session state on remote Stargate server.");
+                                println!("Requested to set session state on remote Stargate server.");
                             }
                         }
                     },
