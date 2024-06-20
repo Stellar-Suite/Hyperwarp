@@ -493,6 +493,17 @@ impl Streamer {
                                         streaming_cmd_queue_for_negotiation.push(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone()));
                                     }));
 
+                                    let socket_arc = self.socketio_client.clone().unwrap();
+                                    let origin_socketid_for_ice_sending = origin_socketid.clone();
+
+                                    downstream_peer_el_group.webrtcbin.connect_closure("on-ice-candidate", false, glib::closure!(move |_webrtcbin: &gstreamer::Element, mlineindex: u32, candidate: &str| {
+                                        println!("element got an ice candidate");
+                                        let socket = socket_arc.lock().unwrap();
+                                        if let Err(err) = socket.emit("send_to", json!([origin_socketid_for_ice_sending, StellarFrontendMessage::Ice { candidate: candidate.to_string(), sdp_mline_index: mlineindex }])) {
+                                            println!("Error sending ice candidate to socket id {:?}: {:?}", origin_socketid_for_ice_sending, err);
+                                        }
+                                    }));
+
                                     downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
                                     println!("Added downstream peer to pipeline");
 

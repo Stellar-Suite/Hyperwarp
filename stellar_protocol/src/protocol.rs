@@ -190,6 +190,7 @@ pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {
         StellarFrontendMessage::Sdp { type_, sdp } => true,
         StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => true,
         StellarFrontendMessage::DebugInfoRequest { debug_info_request } => true,
+        StellarFrontendMessage::OfferRequest { offer_request_source } => true,
         _ => false
     }
 }
