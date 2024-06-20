@@ -46,9 +46,9 @@ pub struct SystemHints {
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
 pub struct StreamerConfig {
-    #[arg(short, long, default_value_t = OperationMode::Hyperwarp, help = "Operation mode to use. Can be used to run without Hyperwarp injected application.")]
+    #[arg(short, long, default_value_t = OperationMode::Hyperwarp, help = "Operation mode to use. Can be used to run without Hyperwarp injected application (in the future).")]
     mode: OperationMode,
-    #[arg(short, long, help = "Socket to connect to for Hyperwarp")]
+    #[arg(long, help = "Socket to connect to for Hyperwarp")]
     socket: Option<PathBuf>,
     #[arg(short = 't', long = "test", help = "Test mode", default_value_t = false)]
     test_mode: bool,
@@ -56,7 +56,7 @@ pub struct StreamerConfig {
     graphics_api: GraphicsAPI,
     #[arg(short = 'u', long = "url", default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
     stargate_addr: String,
-    #[arg(short = 'e', long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
+    #[arg(short = 's', long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
     secret: String,
     #[arg(short = 'p', long = "pid", env = "TARGET_PROCESS_PID", help = "determine socket based off pid instead")]
     pid: Option<u32>,
@@ -474,10 +474,18 @@ impl Streamer {
                                 if let Ok(_) = downstream_peer_el_group.play() {
                                     downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
                                     println!("Added downstream peer to pipeline");
+
+                                    let socket = self.get_socket();
+                                    if let Err(err) = socket.emit("send_to", json!([origin_socketid, StellarFrontendMessage::ProvisionWebRTCReply { provision_ok: true }])) {
+                                        println!("Error sending provision reply to socket id {:?}: {:?}", origin_socketid, err);
+                                    }
+
                                 } else {
                                     println!("Failed to play downstream peer");
                                     downstream_peer_el_group.remove_from_pipeline(&pipeline, &video_tee);
                                 }
+                                
+
                             },
                             StellarFrontendMessage::Ice { candidate, sdp_mline_index } => {
                                 if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
@@ -487,6 +495,7 @@ impl Streamer {
                             StellarFrontendMessage::Sdp { type_, sdp } => {
                                 if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
                                     if type_ == "answer" {
+                                        println!("processing sdp answer");
                                         if let Err(err) = webrtc_peer.process_sdp_answer(&sdp) {
                                             self.complain_to_socket(&origin_socketid, &format!("Error processing sdp answer from socket id {:?}", err));
                                             println!("Error processing sdp answer from socket id {:?}: {:?}", origin_socketid, err);
@@ -494,7 +503,9 @@ impl Streamer {
                                     }else if type_ == "offer" {
                                         let streaming_cmd_queue_for_reply = self.streaming_command_queue.clone();
                                         let source_id = origin_socketid.clone();
+                                        println!("processing sdp offer");
                                         if let Err(err) = webrtc_peer.process_sdp_offer(&sdp, Box::new(move |reply| {
+                                            println!("answering sdp offer");
                                             streaming_cmd_queue_for_reply.push(InternalMessage::SocketSdpAnswer(source_id.clone(), reply));
                                         })) {
                                             self.complain_to_socket(&origin_socketid, &format!("Error processing sdp offer from socket id {:?}", err));

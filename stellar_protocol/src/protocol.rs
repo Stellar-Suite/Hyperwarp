@@ -167,6 +167,9 @@ pub enum StellarFrontendMessage {
     ProvisionWebRTC {
         rtc_provision_start: u64,
     },
+    ProvisionWebRTCReply {
+        provision_ok: bool
+    },
     Error {
         error: String
     },
