@@ -9,6 +9,7 @@ use stellar_protocol::protocol::EncodingPreset;
 
 use lazy_static::lazy_static;
 
+// https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L305
 pub struct WebRTCPeer {
     pub id: String,
     pub queue: gstreamer::Element,

@@ -11,19 +11,19 @@ clap = { version = "4.5.4", features = ["derive", "env"] }
 crossbeam-channel = "0.5.13"
 crossbeam-queue = "0.3.11"
 gio = "0.19.5"
-gstreamer = "0.22.0"
-gstreamer-app = "0.22.0"
-gstreamer-base = "0.22.0"
-gstreamer-gl = "0.22.0"
-gstreamer-rtp = "0.22.5"
-gstreamer-video = "0.22.5"
+gstreamer = "0.22.6"
+gstreamer-app = "0.22.6"
+gstreamer-base = "0.22.6"
+gstreamer-gl = "0.22.6"
+gstreamer-rtp = "0.22.6"
+gstreamer-video = "0.22.6"
+gstreamer-webrtc = "0.22.6"
+gstreamer-sdp = "0.22.6"
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 # stellar_core = { path = "../stellar_core" }
 stellar_protocol = { path = "../stellar_protocol" }
 rust_socketio = "*"
 serde_json = "1.0"
-gstreamer-webrtc = "0.22.6"
-gstreamer-sdp = "0.22.6"
 lazy_static = "1.4.0"
 num = "0.4.3"
 
