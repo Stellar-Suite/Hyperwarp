@@ -64,7 +64,7 @@ pub struct StreamerConfig {
     debug: bool,
     #[arg(long = "stun", default_value_t = { "stun://stun.l.google.com:19302".to_string() }, help = "stun server to use")]
     stun_server: String,
-    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::VP8, help = "encoding preset to use, defaults to h264")]
+    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::VP8, help = "encoding preset to use, defaults to vp8")]
     encoder: EncodingPreset,
 }
 
