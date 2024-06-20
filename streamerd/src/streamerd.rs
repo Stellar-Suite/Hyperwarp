@@ -18,7 +18,7 @@ use stellar_protocol::protocol::{may_mutate_pipeline, streamer_state_to_u8, Enco
 
 use std::time::Instant;
 
-use crate::webrtc::{self, WebRTCPeer};
+use crate::webrtc::{self, WebRTCPeer, WebRTCPreprocessor};
 
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
@@ -185,11 +185,21 @@ impl Streamer {
         pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
         gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("linking failed");
 
-        println!("pipeline linked");
+        println!("initing preprocessor");
 
-        // pipeline.set_state(gstreamer::State::Playing)?;
+        let preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder);
+        preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
 
-        // println!("pipeline started");
+        println!("setting up second tee element");
+
+        let video_tee = gstreamer::ElementFactory::make("tee").name("video_tee").build().expect("could not create video tee");
+        // connect video tee to preprocessor\
+        pipeline.add(&video_tee).expect("adding video tee to pipeline failed");
+        gstreamer::Element::link_many([preprocessor.get_last_element(), &video_tee]).expect("linking video tee to preprocessor failed");
+
+        println!("pipeline shared section linked");
+
+        println!("getting bus and clock");
 
         let bus = pipeline.bus().expect("Bus not found?");
         let sys_clock = gstreamer::SystemClock::obtain();
@@ -449,8 +459,32 @@ impl Streamer {
                         match frontend_message {
                             StellarFrontendMessage::ProvisionWebRTC => {
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
-                                downstream_peer_el_group.add_to_pipeline(&pipeline);
-                                downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
+                                downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
+                                if let Ok(_) = downstream_peer_el_group.play() {
+                                    downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
+                                    println!("Added downstream peer to pipeline");
+                                } else {
+                                    println!("Failed to play downstream peer");
+                                    downstream_peer_el_group.remove_from_pipeline(&pipeline, &video_tee);
+                                }
+                            },
+                            StellarFrontendMessage::Ice { candidate, sdp_mline_index } => {
+                                if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
+                                    webrtc_peer.webrtcbin.emit_by_name::<()>("add-ice-candidate", &[&sdp_mline_index, &candidate]);
+                                }
+                            },
+                            StellarFrontendMessage::Sdp { type_, sdp } => {
+                                if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
+                                    if type_ == "offer" {
+                                        if let Err(err) = webrtc_peer.process_sdp_offer(&sdp) {
+                                            println!("Error processing sdp offer from socket id {:?}: {:?}", origin_socketid, err);
+                                        }
+                                    }else if type_ == "answer" {
+    
+                                    }else{
+                                        println!("Unhandled sdp type {:?} from socket id {:?}", type_, origin_socketid);
+                                    }
+                                }
                             },
                             _ => {
                                 println!("Unhandled frontend message {:?}", frontend_message);

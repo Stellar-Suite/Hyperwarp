@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+// tips: https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
+
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_video::{prelude::*, VideoInfo};
 use stellar_protocol::protocol::EncodingPreset;
@@ -14,11 +16,24 @@ pub struct WebRTCPeer {
 
 impl WebRTCPeer {
     pub fn new(id: String) -> Self {
+        let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
+        webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
+        webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
         Self {
             id,
             queue: gstreamer::ElementFactory::make("queue").build().expect("could not create queue element"),
-            webrtcbin: gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element"),
+            webrtcbin,
         }
+    }
+
+    pub fn play(&self) -> anyhow::Result<()> {
+        self.queue.set_state(gstreamer::State::Playing)?;
+        self.webrtcbin.set_state(gstreamer::State::Playing)?;
+        Ok(())
+    }
+
+    pub fn set_stun_server(&self, stun_server: &str) {
+        self.webrtcbin.set_property_from_str("stun-server", &stun_server);
     }
 
     pub fn setup_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
@@ -46,6 +61,13 @@ impl WebRTCPeer {
         // remove queue and webrtcbin from pipeline
         pipeline.remove(&self.queue).expect("removing queue element failed");
         pipeline.remove(&self.webrtcbin).expect("removing webrtcbin element failed");
+    }
+
+    pub fn process_sdp_offer(&self, sdp: &str) -> anyhow::Result<()> {
+        let sdp_message = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())?;
+        let answer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Answer, sdp_message);
+        self.webrtcbin.emit_by_name::<()>("set-remote-description", &[&answer, &None::<gstreamer::Promise>]);
+        Ok(())
     }
 }
 
@@ -77,6 +99,31 @@ impl WebRTCPreprocessor {
         }
     }
 
+    pub fn attach_to_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
+        pipeline.add_many([&self.encoder, &self.payloader]).expect("adding elements to pipeline failed");
+        // add prefix and suffix elements
+        /*for el in &self.extra_prefix_elements {
+            pipeline.add_many([el]).expect("adding elements to pipeline failed");
+        }
+        for el in &self.extra_suffix_elements {
+            pipeline.add_many([el]).expect("adding elements to pipeline failed");
+        }*/
+        gstreamer::Element::link_many([tee, &self.encoder, &self.payloader]).expect("linking elements failed");
+    }
+
+    pub fn get_last_element(&self) -> &gstreamer::Element {
+        if self.extra_suffix_elements.len() > 0 {
+            return &self.extra_suffix_elements[self.extra_suffix_elements.len() - 1];
+        }
+        &self.payloader
+    }
+
+    pub fn play(&self) -> anyhow::Result<()> {
+        self.encoder.set_state(gstreamer::State::Playing)?;
+        self.payloader.set_state(gstreamer::State::Playing)?;
+        Ok(())
+    }
+
     // maybe a better name for this is encodertype not preset
     pub fn new_preset(preset: EncodingPreset) -> Self {
         let prefix: Vec<gstreamer::Element> = vec![];
@@ -94,6 +141,8 @@ impl WebRTCPreprocessor {
             extra_suffix_elements: suffix,
         }
     }
+
+    // TODO: support audio
 
     pub fn get_encoder_element_type(preset: EncodingPreset) -> String {
         match preset {
