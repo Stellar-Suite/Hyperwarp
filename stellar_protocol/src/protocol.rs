@@ -169,6 +169,12 @@ pub enum StellarFrontendMessage {
     },
     Error {
         error: String
+    },
+    DebugInfoRequest {
+        debug_info_request: u64
+    },
+    DebugResponse {
+        debug: String
     }
 }
 
@@ -177,6 +183,7 @@ pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {
         StellarFrontendMessage::Ice { candidate, sdp_mline_index } => true,
         StellarFrontendMessage::Sdp { type_, sdp } => true,
         StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => true,
+        StellarFrontendMessage::DebugInfoRequest { debug_info_request } => true,
         _ => false
     }
 }

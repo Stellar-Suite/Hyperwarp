@@ -505,6 +505,12 @@ impl Streamer {
                                     }
                                 }
                             },
+                            StellarFrontendMessage::DebugInfoRequest { debug_info_request } => {
+                                let response = format!("DEBUG: There are {} peers connected.", downstream_peers.len());
+                                if let Err(err) = self.get_socket().emit("send_to", json!([origin_socketid, StellarFrontendMessage::DebugResponse { debug: response }])) {
+                                    println!("Error sending debug info request to socket id {:?}: {:?}", origin_socketid, err);
+                                }
+                            }
                             _ => {
                                 println!("Unhandled frontend message {:?}", frontend_message);
                             }
