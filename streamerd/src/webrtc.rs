@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-// tips: https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
+// tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_video::{prelude::*, VideoInfo};
+use gstreamer_webrtc::WebRTCSessionDescription;
 use stellar_protocol::protocol::EncodingPreset;
 
 use lazy_static::lazy_static;
@@ -63,10 +64,55 @@ impl WebRTCPeer {
         pipeline.remove(&self.webrtcbin).expect("removing webrtcbin element failed");
     }
 
-    pub fn process_sdp_offer(&self, sdp: &str) -> anyhow::Result<()> {
+    pub fn set_local_description(&self, desc_ref: &WebRTCSessionDescription) {
+        self.webrtcbin.emit_by_name::<()>("set-local-description", &[desc_ref, &None::<gstreamer::Promise>]);
+    }
+
+    pub fn set_remote_description(&self, desc_ref: &WebRTCSessionDescription) {
+        self.webrtcbin.emit_by_name::<()>("set-remote-description", &[desc_ref, &None::<gstreamer::Promise>]);
+    }
+
+    pub fn process_sdp_answer(&self, sdp: &str) -> anyhow::Result<()> {
         let sdp_message = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())?;
         let answer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Answer, sdp_message);
-        self.webrtcbin.emit_by_name::<()>("set-remote-description", &[&answer, &None::<gstreamer::Promise>]);
+        self.set_remote_description(&answer);
+        Ok(())
+    }
+
+    pub fn process_sdp_offer(&self, sdp: &str, on_answer: Box<dyn FnOnce(WebRTCSessionDescription) + Send>) -> anyhow::Result<()> {
+        let sdp_message = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())?;
+        let answer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Answer, sdp_message);
+        self.set_remote_description(&answer);
+        let promise = gstreamer::Promise::with_change_func(move |reply| {
+            match reply {
+                Ok(answer_option) => {
+                    match answer_option {
+                        Some(struct_ref) => {
+                            let answer_result = struct_ref
+                                .value("answer")
+                                .unwrap()
+                                .get::<gstreamer_webrtc::WebRTCSessionDescription>();
+                            match answer_result {
+                                Ok(answer) => {
+                                    on_answer(answer);
+                                },
+                                Err(err) => {
+                                    println!("failed at getting answer struct: {:?}", err);
+                                }
+                            }
+                        },
+                        None => {
+                            println!("no answer created");
+                        }
+                    }
+                },
+                Err(err) => {
+                    println!("early error creating answer: {:?}", err);
+                }
+            }
+        });
+        self.webrtcbin.emit_by_name::<()>("create-answer", &[&None::<gstreamer::Structure>, &promise]);
+
         Ok(())
     }
 }

@@ -164,14 +164,19 @@ pub enum StellarFrontendMessage {
         type_: String,
         sdp: String,
     },
-    ProvisionWebRTC,
+    ProvisionWebRTC {
+        rtc_provision_start: u64,
+    },
+    Error {
+        error: String
+    }
 }
 
 pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {
     match message {
         StellarFrontendMessage::Ice { candidate, sdp_mline_index } => true,
         StellarFrontendMessage::Sdp { type_, sdp } => true,
-        StellarFrontendMessage::ProvisionWebRTC => true,
+        StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => true,
         _ => false
     }
 }

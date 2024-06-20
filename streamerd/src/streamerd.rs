@@ -10,6 +10,7 @@ use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoInfo};
+use gstreamer_webrtc::WebRTCSessionDescription;
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
 use rust_socketio::{client::Client, ClientBuilder};
@@ -35,6 +36,7 @@ pub enum InternalMessage {
     SocketConnected,
     SocketAuthenticated,
     SocketPeerFrontendMessageWithPipeline(String, stellar_protocol::protocol::StellarFrontendMessage),
+    SocketSdpAnswer(String, WebRTCSessionDescription)
 }
 
 pub struct SystemHints {
@@ -132,6 +134,14 @@ impl Streamer {
 
     pub fn get_socket(&self) -> MutexGuard<Client> {
         self.socketio_client.as_ref().unwrap().lock().unwrap()
+    }
+
+    pub fn complain_to_socket(&self, socket_id: &str, message: &str) {
+        let socket =  self.get_socket();
+        let error_msg = StellarFrontendMessage::Error { error: message.to_string() };
+        if let Err(err) = socket.emit("send_to", json!([socket_id, error_msg])) {
+            println!("Error complaining to socket: {:?}", err);
+        }
     }
 
     pub fn run_gstreamer(&mut self) {
@@ -399,7 +409,7 @@ impl Streamer {
                         streamer_state = StreamerState::Running;
                         {
                             // annouce that we are up and running
-                            let socket =  self.get_socket();
+                            let socket = self.get_socket();
                             // this tells the ui to switch out of the loading screen
                             if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
                                 println!("Error setting session state on remote Stargate server: {:?}", err);
@@ -457,7 +467,8 @@ impl Streamer {
                     },
                     InternalMessage::SocketPeerFrontendMessageWithPipeline(origin_socketid, frontend_message) => {
                         match frontend_message {
-                            StellarFrontendMessage::ProvisionWebRTC => {
+                            StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => {
+                                println!("Provisioning webrtc for socket id {:?} client claim start: {:?}", origin_socketid, rtc_provision_start);
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 if let Ok(_) = downstream_peer_el_group.play() {
@@ -475,12 +486,20 @@ impl Streamer {
                             },
                             StellarFrontendMessage::Sdp { type_, sdp } => {
                                 if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
-                                    if type_ == "offer" {
-                                        if let Err(err) = webrtc_peer.process_sdp_offer(&sdp) {
+                                    if type_ == "answer" {
+                                        if let Err(err) = webrtc_peer.process_sdp_answer(&sdp) {
+                                            self.complain_to_socket(&origin_socketid, &format!("Error processing sdp answer from socket id {:?}", err));
+                                            println!("Error processing sdp answer from socket id {:?}: {:?}", origin_socketid, err);
+                                        }
+                                    }else if type_ == "offer" {
+                                        let streaming_cmd_queue_for_reply = self.streaming_command_queue.clone();
+                                        let source_id = origin_socketid.clone();
+                                        if let Err(err) = webrtc_peer.process_sdp_offer(&sdp, Box::new(move |reply| {
+                                            streaming_cmd_queue_for_reply.push(InternalMessage::SocketSdpAnswer(source_id.clone(), reply));
+                                        })) {
+                                            self.complain_to_socket(&origin_socketid, &format!("Error processing sdp offer from socket id {:?}", err));
                                             println!("Error processing sdp offer from socket id {:?}: {:?}", origin_socketid, err);
                                         }
-                                    }else if type_ == "answer" {
-    
                                     }else{
                                         println!("Unhandled sdp type {:?} from socket id {:?}", type_, origin_socketid);
                                     }
@@ -488,6 +507,19 @@ impl Streamer {
                             },
                             _ => {
                                 println!("Unhandled frontend message {:?}", frontend_message);
+                            }
+                        }
+                    },
+                    InternalMessage::SocketSdpAnswer(origin_socketid, desc) => {
+                        if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
+                            webrtc_peer.set_remote_description(&desc);
+                            let reply = StellarFrontendMessage::Sdp {
+                                type_: "answer".to_string(),
+                                sdp: desc.sdp().as_text().expect("Could not turn the session description into a string").to_string(),
+                            };
+                            let socket = self.get_socket();
+                            if let Err(err) = socket.emit("send_to", json!([origin_socketid, reply])) {
+                                println!("Error sending sdp answer to socket id {:?}: {:?}", origin_socketid, err);
                             }
                         }
                     },
