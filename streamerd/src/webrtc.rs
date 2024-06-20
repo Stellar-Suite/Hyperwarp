@@ -129,6 +129,7 @@ pub struct WebRTCPreprocessor {
 
 lazy_static! {
     pub static ref SUPPORTS_TARGET_BITRATE: Vec<EncodingPreset> = vec![EncodingPreset::H264, EncodingPreset::H265, EncodingPreset::VP8, EncodingPreset::VP9, EncodingPreset::AV1];
+    pub static ref SUPPORTS_DEADLINE: Vec<EncodingPreset> = vec![EncodingPreset::VP8, EncodingPreset::VP9];
 }
 
 // TODO: pass config to this and do hardware accel
@@ -226,6 +227,10 @@ impl WebRTCPreprocessor {
                 // idk
             }
         }
+
+        if SUPPORTS_DEADLINE.contains(&self.preset) {
+            self.set_setting("deadline", serde_json::json!(1));
+        }
     }
 
     pub fn set_setting(&mut self, key: &str, value: serde_json::Value) {
@@ -243,6 +248,16 @@ impl WebRTCPreprocessor {
                             let mut bitrate: i32 = value_number.as_u64().unwrap_or(1024 * 1024 * 4) as i32;
                             bitrate = num::clamp(bitrate, 1024 * 300, 1024 * 1024 * 100);
                             self.encoder.set_property("target-bitrate", bitrate);
+                        }
+                    }
+                },
+                "deadline" => {
+                    if SUPPORTS_DEADLINE.contains(&self.preset) {
+                        if let serde_json::Value::Number(value_number) = value {
+                            // makes a uint in gstreamer strictness
+                            let mut deadline: i64 = value_number.as_i64().unwrap_or(0);
+                            deadline = num::clamp(deadline, 0,1000);
+                            self.encoder.set_property("deadline", deadline);
                         }
                     }
                 },
