@@ -178,6 +178,9 @@ pub enum StellarFrontendMessage {
     },
     DebugResponse {
         debug: String
+    },
+    OfferRequest {
+        offer_request_source: String
     }
 }
 

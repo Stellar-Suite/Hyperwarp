@@ -36,7 +36,9 @@ pub enum InternalMessage {
     SocketConnected,
     SocketAuthenticated,
     SocketPeerFrontendMessageWithPipeline(String, stellar_protocol::protocol::StellarFrontendMessage),
-    SocketSdpAnswer(String, WebRTCSessionDescription)
+    SocketSdpAnswer(String, WebRTCSessionDescription),
+    SocketSdpOffer(String, WebRTCSessionDescription),
+    SocketOfferGeneration(String),
 }
 
 pub struct SystemHints {
@@ -482,6 +484,15 @@ impl Streamer {
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 if let Ok(_) = downstream_peer_el_group.play() {
+
+                                    let streaming_cmd_queue_for_negotiation = self.streaming_command_queue.clone();
+                                    let origin_socketid_for_negotiation = origin_socketid.clone();
+
+                                    downstream_peer_el_group.webrtcbin.connect_closure("on-negotiation-needed", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
+                                        println!("element prompted negotiation");
+                                        streaming_cmd_queue_for_negotiation.push(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone()));
+                                    }));
+
                                     downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
                                     println!("Added downstream peer to pipeline");
 
@@ -531,6 +542,11 @@ impl Streamer {
                                 if let Err(err) = self.get_socket().emit("send_to", json!([origin_socketid, StellarFrontendMessage::DebugResponse { debug: response }])) {
                                     println!("Error sending debug info request to socket id {:?}: {:?}", origin_socketid, err);
                                 }
+                            },
+                            StellarFrontendMessage::OfferRequest { offer_request_source } => {
+                                if offer_request_source == "client" {
+                                    self.streaming_command_queue.push(InternalMessage::SocketOfferGeneration(origin_socketid.clone()));
+                                }
                             }
                             _ => {
                                 println!("Unhandled frontend message {:?}", frontend_message);
@@ -549,6 +565,51 @@ impl Streamer {
                                 println!("Error sending sdp answer to socket id {:?}: {:?}", origin_socketid, err);
                             }
                         }
+                    },
+                    InternalMessage::SocketSdpOffer(origin_socketid, desc) => {
+                        if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
+                            webrtc_peer.set_local_description(&desc);
+                            let reply = StellarFrontendMessage::Sdp {
+                                type_: "offer".to_string(),
+                                sdp: desc.sdp().as_text().expect("Could not turn the session description into a string").to_string(),
+                            };
+                            let socket = self.get_socket();
+                            if let Err(err) = socket.emit("send_to", json!([origin_socketid, reply])) {
+                                println!("Error sending sdp answer to socket id {:?}: {:?}", origin_socketid, err);
+                            }
+                        }
+                    },
+                    InternalMessage::SocketOfferGeneration(origin_socketid) => {
+
+                        if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
+
+                            let streaming_cmd_queue_for_reply = self.streaming_command_queue.clone();
+
+                            let promise = gstreamer::Promise::with_change_func(move |reply| {
+                                
+                                if let Ok(Some(offer_structref)) = reply {
+                                    let offer = offer_structref
+                                        .value("offer")
+                                        .unwrap()
+                                        .get::<gstreamer_webrtc::WebRTCSessionDescription>()
+                                        .expect("Invalid argument");
+                                    streaming_cmd_queue_for_reply.push(InternalMessage::SocketSdpOffer(origin_socketid.clone(), offer));
+                                }else if let Err(err) = reply {
+                                    println!("Error generating offer: {:?}", err);
+                                }else{
+                                    println!("offer generation failed");
+                                }
+
+                               
+                                
+
+                            });
+
+                            webrtc_peer.webrtcbin.emit_by_name::<()>("create-offer", &[&None::<gstreamer::Structure>, &promise]);
+                        }
+
+                        
+
                     },
                     _ => {
                         // TODO: print more descriptive
