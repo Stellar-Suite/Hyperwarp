@@ -204,7 +204,8 @@ impl Streamer {
 
         println!("initing preprocessor");
 
-        let preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder);
+        let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder);
+        preprocessor.set_default_settings();
         preprocessor.attach_to_pipeline(&pipeline, &queue);
 
         println!("setting up second tee element");

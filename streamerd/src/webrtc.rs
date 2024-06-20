@@ -215,6 +215,19 @@ impl WebRTCPreprocessor {
         }
     }
 
+    pub fn set_default_settings(&mut self){
+        match self.preset {
+            EncodingPreset::H264 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 6)),
+            EncodingPreset::H265 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
+            EncodingPreset::VP8 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 6)),
+            EncodingPreset::VP9 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
+            EncodingPreset::AV1 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
+            _ => {
+                // idk
+            }
+        }
+    }
+
     pub fn set_setting(&mut self, key: &str, value: serde_json::Value) {
 
         // match with preset
@@ -226,7 +239,8 @@ impl WebRTCPreprocessor {
                 "target-bitrate" => {
                     if SUPPORTS_TARGET_BITRATE.contains(&self.preset) {
                         if let serde_json::Value::Number(value_number) = value {
-                            let mut bitrate = value_number.as_u64().unwrap_or(1024 * 1024 * 4);
+                            // makes a uint in gstreamer strictness
+                            let mut bitrate: i32 = value_number.as_u64().unwrap_or(1024 * 1024 * 4) as i32;
                             bitrate = num::clamp(bitrate, 1024 * 300, 1024 * 1024 * 100);
                             self.encoder.set_property("target-bitrate", bitrate);
                         }
