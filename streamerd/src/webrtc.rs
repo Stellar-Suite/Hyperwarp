@@ -1,13 +1,15 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 // tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_video::{prelude::*, VideoInfo};
 use gstreamer_webrtc::WebRTCSessionDescription;
-use stellar_protocol::protocol::EncodingPreset;
+use stellar_protocol::protocol::{EncodingPreset, PipelineOptimization};
 
 use lazy_static::lazy_static;
+
+use crate::streamerd::StreamerConfig;
 
 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L305
 pub struct WebRTCPeer {
@@ -125,10 +127,12 @@ pub struct WebRTCPreprocessor {
     pub extra_suffix_elements: Vec<gstreamer::Element>,
     pub preset: EncodingPreset,
     settings: HashMap<String, serde_json::Value>, // this allows us to set the settings for the encoder and payloader regardless of format easily
+    pub config: Option<Arc<StreamerConfig>>,
 }
 
 lazy_static! {
-    pub static ref SUPPORTS_TARGET_BITRATE: Vec<EncodingPreset> = vec![EncodingPreset::H264, EncodingPreset::H265, EncodingPreset::VP8, EncodingPreset::VP9, EncodingPreset::AV1];
+    pub static ref SUPPORTS_TARGET_BITRATE: Vec<EncodingPreset> = vec![EncodingPreset::H264, EncodingPreset::H265, EncodingPreset::VP8, EncodingPreset::VP9];
+    pub static ref SUPPORTS_BITRATE: Vec<EncodingPreset> = vec![EncodingPreset::H264, EncodingPreset::H265, EncodingPreset::VP8, EncodingPreset::VP9, EncodingPreset::AV1];
     pub static ref SUPPORTS_DEADLINE: Vec<EncodingPreset> = vec![EncodingPreset::VP8, EncodingPreset::VP9];
 }
 
@@ -144,19 +148,32 @@ impl WebRTCPreprocessor {
             settings: HashMap::new(),
             extra_prefix_elements: Vec::new(),
             extra_suffix_elements: Vec::new(),
+            config: None,
         }
     }
 
     pub fn attach_to_pipeline(&self, pipeline: &gstreamer::Pipeline, after_element: &gstreamer::Element) {
         pipeline.add_many([&self.encoder, &self.payloader]).expect("adding elements to pipeline failed");
         // add prefix and suffix elements
-        /*for el in &self.extra_prefix_elements {
-            pipeline.add_many([el]).expect("adding elements to pipeline failed");
+        // I might just be able to add them directly with add_many but I'll check later
+        for el in &self.extra_prefix_elements {
+            pipeline.add_many([el]).expect("adding prefix elements to pipeline failed");
         }
         for el in &self.extra_suffix_elements {
-            pipeline.add_many([el]).expect("adding elements to pipeline failed");
-        }*/
-        gstreamer::Element::link_many([after_element, &self.encoder, &self.payloader]).expect("linking elements failed");
+            pipeline.add_many([el]).expect("adding suffix elements to pipeline failed");
+        }
+
+        let mut linkage = vec![after_element];
+        for el in &self.extra_prefix_elements {
+            linkage.push(el);
+        }
+        linkage.push(&self.encoder);
+        linkage.push(&self.payloader);
+        for el in &self.extra_suffix_elements {
+            linkage.push(el);
+        }
+
+        gstreamer::Element::link_many(linkage).expect("linking elements failed");
     }
 
     pub fn get_last_element(&self) -> &gstreamer::Element {
@@ -173,13 +190,33 @@ impl WebRTCPreprocessor {
     }
 
     // maybe a better name for this is encodertype not preset
-    pub fn new_preset(preset: EncodingPreset) -> Self {
-        let prefix: Vec<gstreamer::Element> = vec![];
-        let suffix: Vec<gstreamer::Element> = vec![];
+    pub fn new_preset(preset: EncodingPreset, optimizations: PipelineOptimization) -> Self {
+        let mut prefix: Vec<gstreamer::Element> = vec![];
+        let mut suffix: Vec<gstreamer::Element> = vec![];
 
         // TODO: support unknown
-        let encoder_el_type = WebRTCPreprocessor::get_encoder_element_type(preset);
-        let payloader_el_type = WebRTCPreprocessor::get_payloader_element_type(preset);
+        let encoder_el_type = WebRTCPreprocessor::get_encoder_element_type(preset, optimizations);
+        let payloader_el_type = WebRTCPreprocessor::get_payloader_element_type(preset, optimizations);
+
+        match optimizations {
+            PipelineOptimization::NVIDIA => {
+                match preset {
+                    EncodingPreset::H264 => {
+                        suffix.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
+                    },
+                    EncodingPreset::H265 => {
+                        suffix.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
+                    },
+                    _ => {
+
+                    }
+                }
+            },
+            _ => {
+
+            }
+        }
+
         Self {
             encoder: gstreamer::ElementFactory::make(&encoder_el_type).name("encoder").build().expect("could not create encoder element"),
             payloader: gstreamer::ElementFactory::make(&payloader_el_type).name("pauloader").build().expect("could not create payloader element"),
@@ -187,16 +224,44 @@ impl WebRTCPreprocessor {
             settings: HashMap::new(),
             extra_prefix_elements: prefix,
             extra_suffix_elements: suffix,
+            config: None,
+        }
+    }
+
+    pub fn set_config(&mut self, config: Option<Arc<StreamerConfig>>) {
+        self.config = config;
+    }
+
+    pub fn get_optimizations(&self) -> PipelineOptimization {
+        match &self.config {
+            Some(config) => {
+                config.optimizations
+            },
+            None => PipelineOptimization::None,
         }
     }
 
     // TODO: support audio
 
-    pub fn get_encoder_element_type(preset: EncodingPreset) -> String {
+    pub fn get_encoder_element_type_simple(preset: EncodingPreset) -> String {
+        Self::get_encoder_element_type(preset, PipelineOptimization::None)
+    }
+
+    pub fn get_encoder_element_type(preset: EncodingPreset, optimizations: PipelineOptimization) -> String {
         match preset {
             // wow supermaven so smart???
-            EncodingPreset::H264 => "x264enc".to_string(),
-            EncodingPreset::H265 => "x265enc".to_string(),
+            EncodingPreset::H264 => {
+                match optimizations {
+                    PipelineOptimization::NVIDIA => "nvh264enc".to_string(),
+                    _ => "x264enc".to_string(),
+                }
+            },
+            EncodingPreset::H265 => {
+                match optimizations {
+                    PipelineOptimization::NVIDIA => "nvh265enc".to_string(),
+                    _ => "x265enc".to_string(),
+                }
+            },
             EncodingPreset::VP8 => "vp8enc".to_string(),
             EncodingPreset::VP9 => "vp9enc".to_string(),
             EncodingPreset::AV1 => "rav1enc".to_string(),
@@ -204,7 +269,11 @@ impl WebRTCPreprocessor {
         }
     }
 
-    pub fn get_payloader_element_type(preset: EncodingPreset) -> String {
+    pub fn get_payloader_element_type_simple(preset: EncodingPreset) -> String {
+        Self::get_payloader_element_type(preset, PipelineOptimization::None)
+    }
+
+    pub fn get_payloader_element_type(preset: EncodingPreset, optimizations: PipelineOptimization) -> String {
         match preset {
             // wow supermaven so smart???
             EncodingPreset::H264 => "rtph264pay".to_string(),
@@ -218,8 +287,9 @@ impl WebRTCPreprocessor {
 
     pub fn set_default_settings(&mut self){
         match self.preset {
-            EncodingPreset::H264 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 6)),
-            EncodingPreset::H265 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
+            // TODO: fix this, but it defaults to 0 which is based off resolution
+            // EncodingPreset::H264 => self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 6)),
+            // EncodingPreset::H265 => self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4)),
             EncodingPreset::VP8 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 6)),
             EncodingPreset::VP9 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
             EncodingPreset::AV1 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
@@ -247,7 +317,17 @@ impl WebRTCPreprocessor {
                             // makes a uint in gstreamer strictness
                             let mut bitrate: i32 = value_number.as_u64().unwrap_or(1024 * 1024 * 4) as i32;
                             bitrate = num::clamp(bitrate, 1024 * 300, 1024 * 1024 * 100);
-                            self.encoder.set_property("target-bitrate", bitrate);
+                            self.encoder.set_property("target-bitrate", bitrate); // gint
+                        }
+                    }
+                },
+                "bitrate" => {
+                    if SUPPORTS_BITRATE.contains(&self.preset) {
+                        if let serde_json::Value::Number(value_number) = value {
+                            // makes a uint in gstreamer strictness
+                            let mut bitrate: u32 = value_number.as_u64().unwrap_or(1024 * 1024 * 4) as u32;
+                            bitrate = num::clamp(bitrate, 1024 * 300, 1024 * 1024 * 100);
+                            self.encoder.set_property("bitrate", bitrate); //guint
                         }
                     }
                 },
@@ -257,7 +337,7 @@ impl WebRTCPreprocessor {
                             // makes a uint in gstreamer strictness
                             let mut deadline: i64 = value_number.as_i64().unwrap_or(0);
                             deadline = num::clamp(deadline, 0,1000);
-                            self.encoder.set_property("deadline", deadline);
+                            self.encoder.set_property("deadline", deadline); 
                         }
                     }
                 },

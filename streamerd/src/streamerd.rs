@@ -16,7 +16,7 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, PipelineOptimization, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
 
 use std::time::Instant;
 
@@ -50,13 +50,13 @@ pub struct SystemHints {
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
 pub struct StreamerConfig {
     #[arg(short, long, default_value_t = OperationMode::Hyperwarp, help = "Operation mode to use. Can be used to run without Hyperwarp injected application (in the future).")]
-    mode: OperationMode,
+    pub mode: OperationMode,
     #[arg(short, long, help = "Socket to connect to for Hyperwarp")]
     socket: Option<PathBuf>,
     #[arg(short = 't', long = "test", help = "Test mode", default_value_t = false)]
     test_mode: bool,
     #[arg(short, long, default_value_t = GraphicsAPI::Unknown, help = "Graphics api to assume. Will autodetect if not specified.")]
-    graphics_api: GraphicsAPI,
+    pub graphics_api: GraphicsAPI,
     #[arg(short = 'u', long = "url", default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
     stargate_addr: String,
     #[arg(long = "secret", env = "STARGATE_SECRET", help = "Session secret to authenticate and elevate when connecting to Stargate server.")]
@@ -67,8 +67,10 @@ pub struct StreamerConfig {
     debug: bool,
     #[arg(long = "stun", default_value_t = { "stun://stun.l.google.com:19302".to_string() }, help = "stun server to use")]
     stun_server: String,
-    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::VP8, help = "encoding preset to use, defaults to vp8")]
-    encoder: EncodingPreset,
+    #[arg(short = 'e', long = "encoder", default_value_t = EncodingPreset::H264, help = "encoding preset to use, defaults to vp8")]
+    pub encoder: EncodingPreset,
+    #[arg(short = 'O', long = "optimizations", default_value_t = PipelineOptimization::None, help = "extra pipeline optimizations to apply")]
+    pub optimizations: PipelineOptimization,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -210,7 +212,7 @@ impl Streamer {
 
         println!("initing preprocessor");
 
-        let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder);
+        let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations);
         preprocessor.set_default_settings();
         preprocessor.attach_to_pipeline(&pipeline, &queue);
 
