@@ -5,6 +5,7 @@ use clap::{Parser, ValueEnum, command};
 
 use anyhow::{bail, Result};
 
+use crossbeam_channel::{Receiver, Sender};
 use crossbeam_queue::SegQueue;
 use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
@@ -89,7 +90,8 @@ pub struct Streamer {
     pub started: bool,
     pub handles: Vec<JoinHandle<()>>,
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<StreamerSignal>>>>,
-    pub streaming_command_queue: Arc<SegQueue<InternalMessage>>,
+    pub streaming_command_queue: Sender<InternalMessage>,
+    pub streaming_command_recv: Receiver<InternalMessage>,
     pub frame: Arc<RwLock<Vec<u8>>>,
     pub socketio_client: Option<Arc<Mutex<Client>>>,
 }
@@ -110,13 +112,17 @@ pub fn calc_offset_rgb(width: usize, height: usize, x: usize, y: usize) -> Optio
 
 impl Streamer {
     pub fn new(config: StreamerConfig) -> Self {
+
+        let (sender, receiver) = crossbeam_channel::unbounded::<InternalMessage>();
+
         Self { 
             config: Arc::new(config),
             stop: Arc::new(AtomicBool::new(false)),
             started: false,
             handles: vec![],
             messaging_handler: None,
-            streaming_command_queue: Arc::new(SegQueue::new()),
+            streaming_command_queue: sender,
+            streaming_command_recv: receiver,
             frame: Arc::new(RwLock::new(vec![])),
             socketio_client: None,
         }
@@ -146,7 +152,7 @@ impl Streamer {
         }
     }
 
-    pub fn run_gstreamer(&mut self) {
+    pub fn run_gstreamer(&mut self) -> anyhow::Result<()> {
         let config = self.config.clone();
         let stopper = self.stop.clone();
         
@@ -334,11 +340,11 @@ impl Streamer {
         appsrc.set_callbacks(
             gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
                 // println!("want data");
-                streaming_cmd_queue_for_cb_1.push(InternalMessage::SetShouldUpdate(true));
+                streaming_cmd_queue_for_cb_1.send(InternalMessage::SetShouldUpdate(true));
 
             }).enough_data(move |appsrc| {
                 // println!("enough data");
-                streaming_cmd_queue_for_cb_2.push(InternalMessage::SetShouldUpdate(false));
+                streaming_cmd_queue_for_cb_2.send(InternalMessage::SetShouldUpdate(false));
             }).build()
         );
 
@@ -387,13 +393,15 @@ impl Streamer {
                         pipeline.set_state(gstreamer::State::Null).expect("could not reset pipeline state");
                         running = false;
                         println!("Error: {} {:?}", err.error(), err.debug());
-                        return;
+                        return Ok(());
                     }
                     _ => (),
                 }
             }
             // main_loop.context().iteration(true);
-            if let Some(imsg) = streaming_cmd_queue_2.pop() {
+
+            let imsg = self.streaming_command_recv.recv()?;
+            { // this block here is remenant of the old if statement
                 match imsg {
                     // TODO: deduplicate code between handshake and sync, but closure does not currently work because it needs to mutate video_info
                     InternalMessage::HandshakeReceived(handshake) => {
@@ -491,7 +499,7 @@ impl Streamer {
 
                                     downstream_peer_el_group.webrtcbin.connect_closure("on-negotiation-needed", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
                                         println!("element prompted negotiation");
-                                        streaming_cmd_queue_for_negotiation.push(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone()));
+                                        streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone()));
                                     }));
 
                                     let socket_arc = self.socketio_client.clone().unwrap();
@@ -539,7 +547,7 @@ impl Streamer {
                                         println!("processing sdp offer");
                                         if let Err(err) = webrtc_peer.process_sdp_offer(&sdp, Box::new(move |reply| {
                                             println!("answering sdp offer");
-                                            streaming_cmd_queue_for_reply.push(InternalMessage::SocketSdpAnswer(source_id.clone(), reply));
+                                            streaming_cmd_queue_for_reply.send(InternalMessage::SocketSdpAnswer(source_id.clone(), reply));
                                         })) {
                                             self.complain_to_socket(&origin_socketid, &format!("Error processing sdp offer from socket id {:?}", err));
                                             println!("Error processing sdp offer from socket id {:?}: {:?}", origin_socketid, err);
@@ -557,7 +565,7 @@ impl Streamer {
                             },
                             StellarFrontendMessage::OfferRequest { offer_request_source } => {
                                 if offer_request_source == "client" {
-                                    self.streaming_command_queue.push(InternalMessage::SocketOfferGeneration(origin_socketid.clone()));
+                                    self.streaming_command_queue.send(InternalMessage::SocketOfferGeneration(origin_socketid.clone()));
                                 }
                             }
                             _ => {
@@ -605,7 +613,7 @@ impl Streamer {
                                         .unwrap()
                                         .get::<gstreamer_webrtc::WebRTCSessionDescription>()
                                         .expect("Invalid argument");
-                                    streaming_cmd_queue_for_reply.push(InternalMessage::SocketSdpOffer(origin_socketid.clone(), offer));
+                                    streaming_cmd_queue_for_reply.send(InternalMessage::SocketSdpOffer(origin_socketid.clone(), offer));
                                 }else if let Err(err) = reply {
                                     println!("Error generating offer: {:?}", err);
                                 }else{
@@ -636,6 +644,7 @@ impl Streamer {
         }
 
         println!("streamer thread exited cleanly.");
+        Ok(())
     }
 
     pub fn start_stargate_client_thread(&mut self) -> anyhow::Result<()>{
@@ -649,14 +658,14 @@ impl Streamer {
         let config = self.config.clone();
         
         socket_builder = socket_builder.on("hello", move |payload, client| {
-            main_thread_cmd_queue_1.push(InternalMessage::SocketConnected);
+            main_thread_cmd_queue_1.send(InternalMessage::SocketConnected);
             // now we need to elevate privs
             if let Err(err) = client.emit("upgrade_privs", json!(config.secret.clone())) {
                 println!("Initial privlige elevation failed: {:?}, may retry on reconnect", err);
             }
         }).on("upgraded", move |payload, client| {
             println!("Privlige upgrade accepted.");
-            main_thread_cmd_queue_2.push(InternalMessage::SocketAuthenticated);
+            main_thread_cmd_queue_2.send(InternalMessage::SocketAuthenticated);
         }).on("peer_message", move |payload, client| {
             println!("peer_message {:#?}", payload);
             match payload {
@@ -675,7 +684,7 @@ impl Streamer {
                                         StellarFrontendMessage::Ping { ping_payload } => todo!(),
                                         other => {
                                             if may_mutate_pipeline(&other) {
-                                                main_thread_cmd_queue_3.push(InternalMessage::SocketPeerFrontendMessageWithPipeline(src_socketid.clone(), other));
+                                                main_thread_cmd_queue_3.send(InternalMessage::SocketPeerFrontendMessageWithPipeline(src_socketid.clone(), other));
                                             } else {
                                                 println!("Unhandled frontend message {:?}", other);
                                             }
@@ -778,7 +787,7 @@ impl Streamer {
                                                         shm_file = Some(std::fs::File::open(&handshake.shimg_path).expect("Failed to open shm file"));
                                                         println!("opened shm file for frame buffer");
                                                     }
-                                                    streaming_cmd_queue.push(InternalMessage::HandshakeReceived(handshake));
+                                                    streaming_cmd_queue.send(InternalMessage::HandshakeReceived(handshake));
                                                 },
                                                 StellarMessage::NewFrame => {
                                                     if let Some(shm_file) = &mut shm_file {
@@ -793,7 +802,7 @@ impl Streamer {
                                                 StellarMessage::SynchronizationEvent(sync_details) => {
                                                     // this doesn't happen enough I think to be spammy?
                                                     println!("recieving sync event on hyperwarp conn thread");
-                                                    streaming_cmd_queue.push(InternalMessage::SynchornizationReceived(sync_details));
+                                                    streaming_cmd_queue.send(InternalMessage::SynchornizationReceived(sync_details));
                                                 },
                                                 _ => {
 
