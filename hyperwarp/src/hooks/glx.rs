@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use libc::{c_char, c_void, c_long, c_int};
+use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::{host::hosting::HOST, utils::pointer::Pointer};
 
@@ -21,6 +22,7 @@ pub fn modify_pointers(name: &str, pointer: Pointer) -> Pointer{
             println!("overrode glxswapbuffers");
             let mut features = HOST.features.lock().unwrap();
             features.enable_glx();
+            HOST.suggest_graphics_api(GraphicsAPI::OpenGL);
             // memorize the real glxSwapBuffers pointer and return our shim instead
             HOST.func_pointers.lock().unwrap().insert(name.to_string(), pointer);
             let func: c_func = unsafe { std::mem::transmute(glXSwapBuffersShim as *const c_void) };
@@ -91,6 +93,7 @@ pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
     let func = func_pointers.get("glXSwapBuffers").unwrap();
     match func {
         Pointer(func_ref) => {
+
             let func: extern "C" fn(name: Display, drawble: GLXDrawable) = unsafe { std::mem::transmute(*func_ref) };
             
             HOST.onFrameSwapBegin();
@@ -107,6 +110,8 @@ pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
 fn glxGetProcAddrShim(name: String, origPointer: Pointer) -> Pointer{
     match name.as_ref() {
         "glXSwapBuffers" => {
+            HOST.suggest_graphics_api(GraphicsAPI::OpenGL);
+
             if HOST.config.debug_mode {
                 println!("overrode glxswapbuffers");
             }
