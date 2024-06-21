@@ -330,8 +330,8 @@ impl WebRTCPreprocessor {
                         
                     },
                     PipelineOptimization::NVIDIA => {
-
-                        self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
+                        self.encoder.set_property("zerolatency", true);
+                        // self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
                     }
                     _ => {}
                 }

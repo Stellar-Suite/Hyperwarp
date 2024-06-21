@@ -10,7 +10,7 @@ use crossbeam_queue::SegQueue;
 use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_app::AppSrc;
-use gstreamer_video::{prelude::*, VideoInfo};
+use gstreamer_video::{prelude::*, VideoFlags, VideoInfo};
 use gstreamer_webrtc::WebRTCSessionDescription;
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
@@ -173,6 +173,7 @@ impl Streamer {
 
         println!("pipeline initalizing");
 
+        // let videoupload = gstreamer::ElementFactory::make("cudaupload").build().expect("could not create video processor");
         let videoconvert = gstreamer::ElementFactory::make("videoconvert").build().expect("could not create video processor");
         let videoflip = gstreamer::ElementFactory::make("videoflip").build().expect("could not create optional video flipper");
         let debug_tee = gstreamer::ElementFactory::make("tee").name("debug_tee").build().expect("could not create debugtee");
@@ -190,6 +191,7 @@ impl Streamer {
         // default to 100x100
         gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, 100, 100)
     //         .fps(gst::Fraction::new(2, 1))
+           // .flags(VideoFlags::VARIABLE_FPS)
             .build()
             .expect("Failed to create video info on demand for source");
 
@@ -197,13 +199,26 @@ impl Streamer {
         .caps(&video_info.to_caps().expect("Cap generation failed"))
         // .is_live(true)
         .block(false)
+        .is_live(true)
         .do_timestamp(true)
         .format(gstreamer::Format::Time)
         .build();
 
+        let mut intiial_link = vec![appsrc.upcast_ref::<Element>()];
+        // intiial_link.push(&videoupload);
+        intiial_link.push(&videoconvert);
+        intiial_link.push(&videoflip);
+        intiial_link.push(&debug_tee);
+        if config.debug || true {
+            intiial_link.push(&sink);
+        }
+
         // link
+        // pipeline.add(&videoupload).expect("adding upload element to pipeline failed");
         pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
-        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("linking failed");
+        gstreamer::Element::link_many(intiial_link).expect("linking failed");
+
+        
 
         println!("create queue before preprocessor");
         let queue = gstreamer::ElementFactory::make("queue").build().expect("could not create queue element");
