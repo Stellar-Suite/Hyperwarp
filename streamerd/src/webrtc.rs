@@ -124,6 +124,7 @@ pub struct WebRTCPreprocessor {
     pub encoder: gstreamer::Element,
     pub payloader: gstreamer::Element,
     pub extra_prefix_elements: Vec<gstreamer::Element>,
+    pub extra_middle_elements: Vec<gstreamer::Element>,
     pub extra_suffix_elements: Vec<gstreamer::Element>,
     pub preset: EncodingPreset,
     settings: HashMap<String, serde_json::Value>, // this allows us to set the settings for the encoder and payloader regardless of format easily
@@ -147,6 +148,7 @@ impl WebRTCPreprocessor {
             preset: EncodingPreset::Unknown,
             settings: HashMap::new(),
             extra_prefix_elements: Vec::new(),
+            extra_middle_elements: Vec::new(),
             extra_suffix_elements: Vec::new(),
             config: None,
         }
@@ -159,6 +161,9 @@ impl WebRTCPreprocessor {
         for el in &self.extra_prefix_elements {
             pipeline.add_many([el]).expect("adding prefix elements to pipeline failed");
         }
+        for el in &self.extra_middle_elements {
+            pipeline.add_many([el]).expect("adding middle elements to pipeline failed");
+        }
         for el in &self.extra_suffix_elements {
             pipeline.add_many([el]).expect("adding suffix elements to pipeline failed");
         }
@@ -168,6 +173,9 @@ impl WebRTCPreprocessor {
             linkage.push(el);
         }
         linkage.push(&self.encoder);
+        for el in &self.extra_middle_elements {
+            linkage.push(el);
+        }
         linkage.push(&self.payloader);
         for el in &self.extra_suffix_elements {
             linkage.push(el);
@@ -192,20 +200,24 @@ impl WebRTCPreprocessor {
     // maybe a better name for this is encodertype not preset
     pub fn new_preset(preset: EncodingPreset, optimizations: PipelineOptimization) -> Self {
         let mut prefix: Vec<gstreamer::Element> = vec![];
+        let mut middle: Vec<gstreamer::Element> = vec![];
         let mut suffix: Vec<gstreamer::Element> = vec![];
 
         // TODO: support unknown
         let encoder_el_type = WebRTCPreprocessor::get_encoder_element_type(preset, optimizations);
         let payloader_el_type = WebRTCPreprocessor::get_payloader_element_type(preset, optimizations);
 
+        println!("encoder type: {:?}", encoder_el_type);
+        println!("payloader type: {:?}", payloader_el_type);
+
         match optimizations {
             PipelineOptimization::NVIDIA => {
                 match preset {
                     EncodingPreset::H264 => {
-                        suffix.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
+                        middle.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
                     },
                     EncodingPreset::H265 => {
-                        suffix.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
+                        middle.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
                     },
                     _ => {
 
@@ -219,17 +231,18 @@ impl WebRTCPreprocessor {
 
         Self {
             encoder: gstreamer::ElementFactory::make(&encoder_el_type).name("encoder").build().expect("could not create encoder element"),
-            payloader: gstreamer::ElementFactory::make(&payloader_el_type).name("pauloader").build().expect("could not create payloader element"),
+            payloader: gstreamer::ElementFactory::make(&payloader_el_type).name("payloader").build().expect("could not create payloader element"),
             preset,
             settings: HashMap::new(),
             extra_prefix_elements: prefix,
+            extra_middle_elements: middle,
             extra_suffix_elements: suffix,
             config: None,
         }
     }
 
-    pub fn set_config(&mut self, config: Option<Arc<StreamerConfig>>) {
-        self.config = config;
+    pub fn set_config(&mut self, config: Arc<StreamerConfig>) {
+        self.config = Some(config);
     }
 
     pub fn get_optimizations(&self) -> PipelineOptimization {
@@ -253,7 +266,7 @@ impl WebRTCPreprocessor {
             EncodingPreset::H264 => {
                 match optimizations {
                     PipelineOptimization::NVIDIA => "nvh264enc".to_string(),
-                    _ => "x264enc".to_string(),
+                    _ => "openh264enc".to_string(),
                 }
             },
             EncodingPreset::H265 => {
@@ -288,8 +301,16 @@ impl WebRTCPreprocessor {
     pub fn set_default_settings(&mut self){
         match self.preset {
             // TODO: fix this, but it defaults to 0 which is based off resolution
-            // EncodingPreset::H264 => self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 6)),
-            // EncodingPreset::H265 => self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4)),
+            EncodingPreset::H264 => {
+                match self.get_optimizations() {
+                    PipelineOptimization::None => {
+                        self.encoder.set_property_from_str("rate-control", "1");
+                        self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 6));
+                    },
+                    _ => {}
+                }
+            },
+            EncodingPreset::H265 => self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4)),
             EncodingPreset::VP8 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 6)),
             EncodingPreset::VP9 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
             EncodingPreset::AV1 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),

@@ -213,6 +213,7 @@ impl Streamer {
         println!("initing preprocessor");
 
         let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations);
+        preprocessor.set_config(config.clone());
         preprocessor.set_default_settings();
         preprocessor.attach_to_pipeline(&pipeline, &queue);
 
