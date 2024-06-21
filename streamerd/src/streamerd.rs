@@ -493,6 +493,9 @@ impl Streamer {
                         match frontend_message {
                             StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => {
                                 println!("Provisioning webrtc for socket id {:?} client claim start: {:?}", origin_socketid, rtc_provision_start);
+                                if let Err(err) = preprocessor.play() {
+                                    println!("Error forceplaying preprocessor: {:?}", err);
+                                }
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 if let Ok(_) = downstream_peer_el_group.play() {
@@ -561,7 +564,21 @@ impl Streamer {
                                 }
                             },
                             StellarFrontendMessage::DebugInfoRequest { debug_info_request } => {
-                                let response = format!("DEBUG: There are {} peers connected.", downstream_peers.len());
+                                let mut response = format!("DEBUG: There are {} peers connected.\n", downstream_peers.len());
+                                let pipeline_base = [&videoconvert, &videoflip, &debug_tee, &queue];
+                                for element in pipeline_base {
+                                    response.push_str(&format!("{}: {:?}\n", element.name(), element.current_state()));
+                                }
+                                preprocessor.for_each_element(|el| {
+                                    response.push_str(&format!("{}: {:?}\n", el.name(), el.current_state()));
+                                });
+                                
+                                // pairwise
+                                for (peer_id, peer) in downstream_peers.iter() {
+                                    response.push_str(&format!("Peer's queue {}: {:?}\n", peer_id, peer.queue.current_state()));
+                                    response.push_str(&format!("Peer's webrtcbin {}: {:?}\n", peer_id, peer.webrtcbin.current_state()));
+                                }
+
                                 if let Err(err) = self.get_socket().emit("send_to", json!([origin_socketid, StellarFrontendMessage::DebugResponse { debug: response }])) {
                                     println!("Error sending debug info request to socket id {:?}: {:?}", origin_socketid, err);
                                 }
@@ -622,10 +639,6 @@ impl Streamer {
                                 }else{
                                     println!("offer generation failed");
                                 }
-
-                               
-                                
-
                             });
 
                             webrtc_peer.webrtcbin.emit_by_name::<()>("create-offer", &[&None::<gstreamer::Structure>, &promise]);

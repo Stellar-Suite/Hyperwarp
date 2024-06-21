@@ -33,6 +33,7 @@ impl WebRTCPeer {
     pub fn play(&self) -> anyhow::Result<()> {
         self.queue.set_state(gstreamer::State::Playing)?;
         self.webrtcbin.set_state(gstreamer::State::Playing)?;
+
         Ok(())
     }
 
@@ -154,19 +155,30 @@ impl WebRTCPreprocessor {
         }
     }
 
+    pub fn for_each_element<F>(&self, mut f: F)
+    where
+        F: FnMut(&gstreamer::Element),
+    {
+        for el in &self.extra_prefix_elements {
+            f(el);
+        }
+        f(&self.encoder);
+        for el in &self.extra_middle_elements {
+            f(el);
+        }
+        f(&self.payloader);
+        for el in &self.extra_suffix_elements {
+            f(el);
+        }
+    }
+
     pub fn attach_to_pipeline(&self, pipeline: &gstreamer::Pipeline, after_element: &gstreamer::Element) {
         pipeline.add_many([&self.encoder, &self.payloader]).expect("adding elements to pipeline failed");
         // add prefix and suffix elements
         // I might just be able to add them directly with add_many but I'll check later
-        for el in &self.extra_prefix_elements {
-            pipeline.add_many([el]).expect("adding prefix elements to pipeline failed");
-        }
-        for el in &self.extra_middle_elements {
-            pipeline.add_many([el]).expect("adding middle elements to pipeline failed");
-        }
-        for el in &self.extra_suffix_elements {
-            pipeline.add_many([el]).expect("adding suffix elements to pipeline failed");
-        }
+        pipeline.add_many(&self.extra_prefix_elements).expect("adding prefix elements to pipeline failed");
+        pipeline.add_many(&self.extra_middle_elements).expect("adding middle elements to pipeline failed");
+        pipeline.add_many(&self.extra_suffix_elements).expect("adding suffix elements to pipeline failed");
 
         let mut linkage = vec![after_element];
         for el in &self.extra_prefix_elements {
@@ -192,8 +204,17 @@ impl WebRTCPreprocessor {
     }
 
     pub fn play(&self) -> anyhow::Result<()> {
+        for el in &self.extra_prefix_elements {
+            el.set_state(gstreamer::State::Playing)?;
+        }
         self.encoder.set_state(gstreamer::State::Playing)?;
+        for el in &self.extra_middle_elements {
+            el.set_state(gstreamer::State::Playing)?;
+        }
         self.payloader.set_state(gstreamer::State::Playing)?;
+        for el in &self.extra_suffix_elements {
+            el.set_state(gstreamer::State::Playing)?;
+        }
         Ok(())
     }
 
@@ -306,7 +327,12 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::None => {
                         self.encoder.set_property_from_str("rate-control", "1");
                         self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 6));
+                        
                     },
+                    PipelineOptimization::NVIDIA => {
+
+                        self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
+                    }
                     _ => {}
                 }
             },
