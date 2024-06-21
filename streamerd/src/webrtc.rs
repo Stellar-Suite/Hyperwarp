@@ -229,7 +229,7 @@ impl WebRTCPreprocessor {
         }
 
         if SUPPORTS_DEADLINE.contains(&self.preset) {
-            self.set_setting("deadline", serde_json::json!(1));
+            self.set_setting("deadline", serde_json::json!(0));
         }
     }
 

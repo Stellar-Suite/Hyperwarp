@@ -415,7 +415,7 @@ impl Streamer {
                             // wow gstreamer needs to make like constants for these
                             videoflip.set_property_from_str("method", "vertical-flip");
                         } else {
-                            videoflip.set_property("method", "none");
+                            videoflip.set_property_from_str("method", "none");
                         }
                         streamer_state = StreamerState::Running;
                         {
