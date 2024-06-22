@@ -241,10 +241,11 @@ impl WebRTCPreprocessor {
                         middle.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
                         // great reference: https://github.com/m1k1o/neko/blob/21a4b2b797bb91947ed3702b8d26a99fef4ca157/server/internal/capture/pipelines.go#L158C40-L158C283
                         // video/x-h264,stream-format=byte-stream,profile=constrained-baseline
-                        // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
+                        middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                     },
                     EncodingPreset::H265 => {
                         middle.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
+                        middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main-444").build()).expect("could not create special capsfilter"));
                     },
                     _ => {
 
@@ -255,9 +256,13 @@ impl WebRTCPreprocessor {
                 match preset {
                     EncodingPreset::H264 => {
                         middle.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
+                        println!("pushing capsfilter for h264");
+                        middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                     },
                     EncodingPreset::H265 => {
                         middle.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
+                        println!("pushing capsfilter for h265");
+                        middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main-444").build()).expect("could not create special capsfilter"));
                     },
                     _ => {
 

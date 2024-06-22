@@ -46,7 +46,7 @@ pub struct SystemHints {
 
 }
 
-pub const INTERNAL_DEBUG: bool = false;
+pub const INTERNAL_DEBUG: bool = true;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
@@ -118,7 +118,6 @@ pub fn calc_offset_rgb(width: usize, height: usize, x: usize, y: usize) -> Optio
 
 pub fn build_capsfilter(caps: gstreamer::Caps) -> anyhow::Result<gstreamer::Element> {
     let capsfilter = gstreamer::ElementFactory::make("capsfilter")
-        .name("capsfilter")
         .build()?;
     capsfilter.set_property("caps", &caps);
     Ok(capsfilter)
@@ -441,6 +440,7 @@ impl Streamer {
                         break;
                     },
                     MessageView::Error(err) => {
+                        pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("errordump.dot"));
                         pipeline.set_state(gstreamer::State::Null).expect("could not reset pipeline state");
                         running = false;
                         println!("Error: {} {:?}", err.error(), err.debug());
@@ -636,7 +636,7 @@ impl Streamer {
                                     println!("Error sending debug info request to socket id {:?}: {:?}", origin_socketid, err);
                                 }
 
-                                pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("/tmp/debug.dot"));
+                                // pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("/tmp/debug.dot"));
                                 pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("pipeline.dump.dot"));
                                 println!("sent pipeline dump");
                             },
