@@ -332,6 +332,16 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::NVIDIA => {
                         self.encoder.set_property("zerolatency", true);
                         // self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
+                        // https://github.com/m1k1o/neko/blob/master/server/internal/capture/pipelines.go
+                        // preset=2 gop-size=25 spatial-aq=true temporal-aq=true bitrate=%d vbv-buffer-size=%d rc-mode=6
+                        self.encoder.set_property_from_str("rc-mode", "3");
+                        self.encoder.set_property_from_str("preset", "2");
+                        self.encoder.set_property_from_str("gop-size", "25");
+                        self.encoder.set_property_from_str("spatial-aq", "true");
+                        self.encoder.set_property_from_str("temporal-aq", "true");
+                        self.encoder.set_property_from_str("bitrate", "1024000");
+                        self.encoder.set_property_from_str("vbv-buffer-size", "1024000");
+                        
                     }
                     _ => {}
                 }
