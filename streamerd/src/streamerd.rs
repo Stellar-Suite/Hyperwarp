@@ -10,7 +10,7 @@ use crossbeam_queue::SegQueue;
 use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_app::AppSrc;
-use gstreamer_video::{prelude::*, VideoFlags, VideoInfo};
+use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
 use gstreamer_webrtc::WebRTCSessionDescription;
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
@@ -112,6 +112,14 @@ pub fn calc_offset_rgb(width: usize, height: usize, x: usize, y: usize) -> Optio
     None
 }
 
+pub fn build_capsfilter(caps: gstreamer::Caps) -> anyhow::Result<gstreamer::Element> {
+    let capsfilter = gstreamer::ElementFactory::make("capsfilter")
+        .name("capsfilter")
+        .build()?;
+    capsfilter.set_property("caps", &caps);
+    Ok(capsfilter)
+}
+
 impl Streamer {
     pub fn new(config: StreamerConfig) -> Self {
 
@@ -179,6 +187,8 @@ impl Streamer {
         let debug_tee = gstreamer::ElementFactory::make("tee").name("debug_tee").build().expect("could not create debugtee");
         let sink = gstreamer::ElementFactory::make("autovideosink").build().expect("could not create output");
         
+        // let caps_filter_1 = build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create capsfilter");
+
         let mut running = true;
         let streaming_cmd_queue_2 = self.streaming_command_queue.clone();
         let streaming_cmd_queue_for_cb_1 = self.streaming_command_queue.clone();
@@ -215,6 +225,7 @@ impl Streamer {
 
         // link
         // pipeline.add(&videoupload).expect("adding upload element to pipeline failed");
+        // pipeline.add(&caps_filter_1).expect("adding capsfilter to pipeline failed");
         pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
         gstreamer::Element::link_many(intiial_link).expect("linking failed");
 
