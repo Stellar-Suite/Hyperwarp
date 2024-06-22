@@ -16,7 +16,8 @@ int main (int argc, char *argv []) {
     rust_launch_real = dlsym(RTLD_NEXT, "_internal_rust_launch");
     if(rust_launch_real == NULL){
         printf("You are meant to call this with Hyperwarp loaded into the process. (2)\n");
-        return;
+        return 0;
     }
-    return rust_launch_real();    
+    rust_launch_real();    
+    return 0;
 }
