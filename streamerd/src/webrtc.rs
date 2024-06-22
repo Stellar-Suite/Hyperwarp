@@ -251,6 +251,19 @@ impl WebRTCPreprocessor {
                     }
                 }
             },
+            PipelineOptimization::AMD => {
+                match preset {
+                    EncodingPreset::H264 => {
+                        middle.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
+                    },
+                    EncodingPreset::H265 => {
+                        middle.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
+                    },
+                    _ => {
+
+                    }
+                }
+            }
             _ => {
 
             }
@@ -293,12 +306,16 @@ impl WebRTCPreprocessor {
             EncodingPreset::H264 => {
                 match optimizations {
                     PipelineOptimization::NVIDIA => "nvh264enc".to_string(),
+                    PipelineOptimization::Intel => "vah264enc".to_string(),
+                    PipelineOptimization::AMD => "vah264enc".to_string(),
                     _ => "openh264enc".to_string(),
                 }
             },
             EncodingPreset::H265 => {
                 match optimizations {
                     PipelineOptimization::NVIDIA => "nvh265enc".to_string(),
+                    PipelineOptimization::Intel => "vah265enc".to_string(),
+                    PipelineOptimization::AMD => "vah265enc".to_string(),
                     _ => "x265enc".to_string(),
                 }
             },

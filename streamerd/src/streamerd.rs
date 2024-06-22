@@ -46,7 +46,7 @@ pub struct SystemHints {
 
 }
 
-pub const INTERNAL_DEBUG: bool = true;
+pub const INTERNAL_DEBUG: bool = false;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
@@ -462,6 +462,7 @@ impl Streamer {
                         video_info =
                             gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
                             //         .fps(gst::Fraction::new(2, 1))
+                            .fps(gstreamer::Fraction::new(self.config.fps.unwrap_or(60) as i32, 1))
                                 .build()
                                 .expect("Failed to create video info on demand for source");
                         println!("video info {:#?}",video_info);
