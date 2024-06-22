@@ -352,7 +352,15 @@ impl WebRTCPreprocessor {
                     _ => {}
                 }
             },
-            EncodingPreset::H265 => self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4)),
+            EncodingPreset::H265 => {
+                match self.get_optimizations() {
+                    PipelineOptimization::None => {
+                        self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4));
+                    },
+                    _ => {}
+                }
+                // self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4))
+            },
             EncodingPreset::VP8 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 6)),
             EncodingPreset::VP9 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),
             EncodingPreset::AV1 => self.set_setting("target-bitrate", serde_json::json!(1024 * 1024 * 4)),

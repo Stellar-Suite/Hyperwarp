@@ -71,6 +71,8 @@ pub struct StreamerConfig {
     pub encoder: EncodingPreset,
     #[arg(short = 'O', long = "optimizations", default_value_t = PipelineOptimization::None, help = "extra pipeline optimizations to apply")]
     pub optimizations: PipelineOptimization,
+    #[arg(short, long = "fps", default_value = "60", help = "fps to use in streaming pipeline")]
+    fps: Option<u32>,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -193,6 +195,8 @@ impl Streamer {
         let streaming_cmd_queue_for_cb_2 = self.streaming_command_queue.clone();
         let self_frame = self.frame.clone();
 
+        videoconvert.set_property_from_str("qos", "true");
+
         let mut downstream_peers: HashMap<String, WebRTCPeer> = HashMap::new();
 
         let mut video_info =
@@ -200,6 +204,7 @@ impl Streamer {
         gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, 100, 100)
     //         .fps(gst::Fraction::new(2, 1))
            // .flags(VideoFlags::VARIABLE_FPS)
+           .fps(gstreamer::Fraction::new(self.config.fps.unwrap_or(60) as i32, 1))
             .build()
             .expect("Failed to create video info on demand for source");
 
