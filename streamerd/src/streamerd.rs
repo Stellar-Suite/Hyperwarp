@@ -167,10 +167,8 @@ impl Streamer {
         let stopper = self.stop.clone();
         
 
-        gstreamer::init().expect("bruh gstreamer didn't load");
-
-        println!("grabbing a main loop");
-        let main_loop = glib::MainLoop::new(None, false);
+        // println!("grabbing a main loop");
+        // let main_loop = glib::MainLoop::new(None, false);
 
         println!("initalizing streaming");
         gstreamer::init().expect("library load failed");
