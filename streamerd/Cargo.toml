@@ -12,13 +12,13 @@ crossbeam-channel = "0.5.13"
 crossbeam-queue = "0.3.11"
 gio = "0.19.5"
 gstreamer = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-app = "0.22.6"
-gstreamer-base = "0.22.6"
-gstreamer-gl = "0.22.6"
-gstreamer-rtp = "0.22.6"
-gstreamer-video = "0.22.6"
-gstreamer-webrtc = "0.22.6"
-gstreamer-sdp = "0.22.6"
+gstreamer-app = { version ="0.22.6", features = ["v1_24"] }
+gstreamer-base = { version ="0.22.6", features = ["v1_24"] }
+gstreamer-gl = { version ="0.22.6", features = ["v1_24"] }
+gstreamer-rtp = { version ="0.22.6", features = ["v1_24"] }
+gstreamer-video = { version ="0.22.6", features = ["v1_24"] }
+gstreamer-webrtc = { version ="0.22.6", features = ["v1_24"] }
+gstreamer-sdp = { version ="0.22.6", features = ["v1_24"] }
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 # stellar_core = { path = "../stellar_core" }
 stellar_protocol = { path = "../stellar_protocol" }
