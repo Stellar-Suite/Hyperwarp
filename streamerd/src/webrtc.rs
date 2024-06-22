@@ -255,14 +255,14 @@ impl WebRTCPreprocessor {
             PipelineOptimization::AMD => {
                 match preset {
                     EncodingPreset::H264 => {
-                        middle.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
                         println!("pushing capsfilter for h264");
                         middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
+                        middle.push(gstreamer::ElementFactory::make("h264parse").build().expect("could not create h264parse element"));
                     },
                     EncodingPreset::H265 => {
-                        middle.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
                         println!("pushing capsfilter for h265");
                         middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main-444").build()).expect("could not create special capsfilter"));
+                        middle.push(gstreamer::ElementFactory::make("h265parse").build().expect("could not create h265parse element"));
                     },
                     _ => {
 

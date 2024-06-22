@@ -46,7 +46,7 @@ pub struct SystemHints {
 
 }
 
-pub const INTERNAL_DEBUG: bool = true;
+pub const INTERNAL_DEBUG: bool = false;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
@@ -546,10 +546,12 @@ impl Streamer {
                         match frontend_message {
                             StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => {
                                 println!("Provisioning webrtc for socket id {:?} client claim start: {:?}", origin_socketid, rtc_provision_start);
-                                if let Err(err) = preprocessor.play() {
+                                /*if let Err(err) = preprocessor.play() {
                                     println!("Error forceplaying preprocessor: {:?}", err);
-                                }
+                                }*/
+                                pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
+                                pipeline.set_state(gstreamer::State::Playing).expect("play failure");
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 if let Ok(_) = downstream_peer_el_group.play() {
 
