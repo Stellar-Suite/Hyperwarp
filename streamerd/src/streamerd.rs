@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use crossbeam_channel::{Receiver, Sender};
 use crossbeam_queue::SegQueue;
 use gio::glib::{self, bitflags::Flags};
-use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
+use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, ErrorMessage};
 use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
 use gstreamer_webrtc::WebRTCSessionDescription;
@@ -25,7 +25,7 @@ use crate::webrtc::{self, WebRTCPeer, WebRTCPreprocessor};
 // https://docs.rs/clap/latest/clap/_derive/_cookbook/git_derive/index.html
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
-enum OperationMode {
+pub enum OperationMode {
     Hyperwarp,
     Ingest
 }
@@ -45,6 +45,8 @@ pub enum InternalMessage {
 pub struct SystemHints {
 
 }
+
+pub const INTERNAL_DEBUG: bool = true;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "rust streaming daemon using gstreamer", long_about = None)]
@@ -149,7 +151,7 @@ impl Streamer {
         }
         self.started = true;
         self.start_stargate_client_thread().expect("Stargate connection failed.");
-        self.run_gstreamer();
+        self.run_gstreamer().expect("Streamer thread panicked");
     }
 
     pub fn get_socket(&self) -> MutexGuard<Client> {
@@ -181,12 +183,18 @@ impl Streamer {
 
         println!("pipeline initalizing");
 
+        // requires --gst-enable-gst-debug at build time for gstreamer
+        pipeline.debug_to_dot_data(DebugGraphDetails::all());
+
         // let videoupload = gstreamer::ElementFactory::make("cudaupload").build().expect("could not create video processor");
+        let ximagesrc = gstreamer::ElementFactory::make("ximagesrc").name("ximagesrc").build().expect("could not create ximagesrc element");
         let videoconvert = gstreamer::ElementFactory::make("videoconvert").build().expect("could not create video processor");
         let videoflip = gstreamer::ElementFactory::make("videoflip").build().expect("could not create optional video flipper");
         let debug_tee = gstreamer::ElementFactory::make("tee").name("debug_tee").build().expect("could not create debugtee");
         let sink = gstreamer::ElementFactory::make("autovideosink").build().expect("could not create output");
         
+        pipeline.add(&ximagesrc).expect("adding debug ximagesrc to pipeline failed");
+
         // let caps_filter_1 = build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create capsfilter");
 
         let mut running = true;
@@ -217,7 +225,10 @@ impl Streamer {
         .format(gstreamer::Format::Time)
         .build();
 
-        let mut intiial_link = vec![appsrc.upcast_ref::<Element>()];
+        let mut intiial_link = match INTERNAL_DEBUG {
+            true => vec![&ximagesrc], //vec![appsrc.upcast_ref::<Element>()];
+            false => vec![appsrc.upcast_ref::<Element>()],
+        };
         // intiial_link.push(&videoupload);
         intiial_link.push(&videoconvert);
         intiial_link.push(&videoflip);
@@ -229,7 +240,10 @@ impl Streamer {
         // link
         // pipeline.add(&videoupload).expect("adding upload element to pipeline failed");
         // pipeline.add(&caps_filter_1).expect("adding capsfilter to pipeline failed");
-        pipeline.add_many([appsrc.upcast_ref::<Element>(), &videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
+        if !INTERNAL_DEBUG {
+            pipeline.add(appsrc.upcast_ref::<Element>()).expect("adding frames source element to pipeline failed");
+        }
+        pipeline.add_many([&videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
         gstreamer::Element::link_many(intiial_link).expect("linking failed");
 
         
@@ -369,17 +383,18 @@ impl Streamer {
             // println!("elapsed {:?}", elapsed);
         };
 
-        appsrc.set_callbacks(
-            gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
-                // println!("want data");
-                streaming_cmd_queue_for_cb_1.send(InternalMessage::SetShouldUpdate(true));
+        if !INTERNAL_DEBUG {
+            appsrc.set_callbacks(
+                gstreamer_app::AppSrcCallbacks::builder().need_data(move |appsrc, _| {
+                    // println!("want data");
+                    streaming_cmd_queue_for_cb_1.send(InternalMessage::SetShouldUpdate(true));
 
-            }).enough_data(move |appsrc| {
-                // println!("enough data");
-                streaming_cmd_queue_for_cb_2.send(InternalMessage::SetShouldUpdate(false));
-            }).build()
-        );
-
+                }).enough_data(move |appsrc| {
+                    // println!("enough data");
+                    streaming_cmd_queue_for_cb_2.send(InternalMessage::SetShouldUpdate(false));
+                }).build()
+            );
+        }
     
 
         // glib::idle_add(move );
@@ -416,6 +431,10 @@ impl Streamer {
                     println!("{:?}", msg);
                 // }
 
+                if INTERNAL_DEBUG {
+                    // pipeline.debug_to_dot_file(DebugGraphDetails::all(), PathBuf::from("pipeline.dump.dot"));
+                }
+
                 match msg.view() {
                     MessageView::Eos(..) => {
                         println!("Exiting at end of stream.");
@@ -446,7 +465,9 @@ impl Streamer {
                                 .build()
                                 .expect("Failed to create video info on demand for source");
                         println!("video info {:#?}",video_info);
-                        appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                        if !INTERNAL_DEBUG {
+                            appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                        }
                         println!("Adjusted caps for resolution {:?}", res);
                         graphics_api = handshake.graphics_api;
                         println!("setting graphics api to {:?}", graphics_api);
@@ -483,7 +504,9 @@ impl Streamer {
                                 .build()
                                 .expect("Failed to create video info on demand for source");
                             println!("video info {:#?}",video_info);
-                            appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                            if !INTERNAL_DEBUG {
+                                appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                            }
                             println!("Adjusted caps for resolution {:?}", res);
                         }
 
@@ -611,6 +634,10 @@ impl Streamer {
                                 if let Err(err) = self.get_socket().emit("send_to", json!([origin_socketid, StellarFrontendMessage::DebugResponse { debug: response }])) {
                                     println!("Error sending debug info request to socket id {:?}: {:?}", origin_socketid, err);
                                 }
+
+                                pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("/tmp/debug.dot"));
+                                pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("pipeline.dump.dot"));
+                                println!("sent pipeline dump");
                             },
                             StellarFrontendMessage::OfferRequest { offer_request_source } => {
                                 if offer_request_source == "client" {
