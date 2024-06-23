@@ -192,7 +192,9 @@ impl Streamer {
         let debug_tee = gstreamer::ElementFactory::make("tee").name("debug_tee").build().expect("could not create debugtee");
         let sink = gstreamer::ElementFactory::make("autovideosink").build().expect("could not create output");
         
-        pipeline.add(&ximagesrc).expect("adding debug ximagesrc to pipeline failed");
+        if INTERNAL_DEBUG {
+            pipeline.add(&ximagesrc).expect("adding debug ximagesrc to pipeline failed");
+        }
 
         // let caps_filter_1 = build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create capsfilter");
 
@@ -423,6 +425,7 @@ impl Streamer {
         while running {
             let mut temp_update = false;
             // println!("iter loop");
+            let mut iter_count = 0;
             while let Some(msg) = bus.pop() {
                 use gstreamer::MessageView;
                 // qos is spammy
@@ -447,6 +450,11 @@ impl Streamer {
                         return Ok(());
                     }
                     _ => (),
+                }
+                iter_count += 1;
+                if iter_count > 100 {
+                    // force processing the queue
+                    break;
                 }
             }
             // main_loop.context().iteration(true);
@@ -546,9 +554,9 @@ impl Streamer {
                         match frontend_message {
                             StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => {
                                 println!("Provisioning webrtc for socket id {:?} client claim start: {:?}", origin_socketid, rtc_provision_start);
-                                /*if let Err(err) = preprocessor.play() {
+                                if let Err(err) = preprocessor.play() {
                                     println!("Error forceplaying preprocessor: {:?}", err);
-                                }*/
+                                }
                                 pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 pipeline.set_state(gstreamer::State::Playing).expect("play failure");
