@@ -234,7 +234,7 @@ impl Streamer {
         intiial_link.push(&videoconvert);
         intiial_link.push(&videoflip);
         intiial_link.push(&debug_tee);
-        if config.debug || true {
+        if config.debug {
             intiial_link.push(&sink);
         }
 
