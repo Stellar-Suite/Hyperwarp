@@ -252,6 +252,11 @@ impl WebRTCPreprocessor {
 
         match optimizations {
             PipelineOptimization::NVIDIA => {
+
+                // convert to nvidia format
+                prefix.push(gstreamer::ElementFactory::make("videoconvert").name("nvvideoconverter").build().expect("Could not build nvidia videoconverter"));
+                prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create special capsfilter"));
+
                 match preset {
                     EncodingPreset::H264 => {
                         // prefix.push(gstreamer::ElementFactory::make("cudaupload").build().expect("could not create cudaupload element"));
