@@ -254,14 +254,16 @@ impl WebRTCPreprocessor {
             PipelineOptimization::NVIDIA => {
 
                 // convert to nvidia format
-                prefix.push(gstreamer::ElementFactory::make("videoconvert").name("nvvideoconverter").build().expect("Could not build nvidia videoconverter"));
-                prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create special capsfilter"));
+                // prefix.push(gstreamer::ElementFactory::make("videoconvert").name("nvvideoconverter").build().expect("Could not build nvidia videoconverter"));
+                // prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create special capsfilter"));
 
                 match preset {
                     EncodingPreset::H264 => {
                         // prefix.push(gstreamer::ElementFactory::make("cudaupload").build().expect("could not create cudaupload element"));
                         // prefix.push(gstreamer::ElementFactory::make("cudaconvert").build().expect("could not create cudaconvert element"));
                         // prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").features(["memory:CUDAMemory"]).field("format", "I420").build()).expect("could not create special capsfilter"));
+                        // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
+                        // above is to use constrained baseline for compat
                         middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
                         middle.push(gstreamer::ElementFactory::make("h264parse").name("parser").build().expect("could not create h264parse element"));
                         // great reference: https://github.com/m1k1o/neko/blob/21a4b2b797bb91947ed3702b8d26a99fef4ca157/server/internal/capture/pipelines.go#L158C40-L158C283
@@ -269,6 +271,8 @@ impl WebRTCPreprocessor {
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                     },
                     EncodingPreset::H265 => {
+                        // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
+                        // above is to use constrained baseline for compat
                         middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
                         middle.push(gstreamer::ElementFactory::make("h265parse").name("parser").build().expect("could not create h265parse element"));
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main-444").build()).expect("could not create special capsfilter"));
@@ -401,7 +405,7 @@ impl WebRTCPreprocessor {
                     },
                     PipelineOptimization::NVIDIA => {
                         self.encoder.set_property("zerolatency", true);
-                        // self.encoder.set_property_from_str("preset","low-latency");
+                        self.encoder.set_property_from_str("preset","low-latency-hp");
                         self.extra_middle_elements[1].set_property("config-interval", -1 as i32);
                         // https://github.com/m1k1o/neko/blob/master/server/internal/capture/pipelines.go
                         // preset=2 gop-size=25 spatial-aq=true temporal-aq=true bitrate=%d vbv-buffer-size=%d rc-mode=6

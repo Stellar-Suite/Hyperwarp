@@ -254,17 +254,17 @@ impl Streamer {
 
         
 
-        println!("create queue before preprocessor");
+        /*println!("create queue before preprocessor");
         let queue = gstreamer::ElementFactory::make("queue").build().expect("could not create queue element");
         pipeline.add(&queue).expect("adding elements to pipeline failed");
-        gstreamer::Element::link_many([&debug_tee, &queue]).expect("linking failed");
+        gstreamer::Element::link_many([&debug_tee, &queue]).expect("linking failed");*/
 
         println!("initing preprocessor");
 
         let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations);
         preprocessor.set_config(config.clone());
         preprocessor.set_default_settings();
-        preprocessor.attach_to_pipeline(&pipeline, &queue);
+        preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
 
         println!("setting up second tee element");
 
@@ -402,6 +402,14 @@ impl Streamer {
             );
         }
     
+        /*let dbg_filesink = gstreamer::ElementFactory::make("filesink").property_from_str("location", "/tmp/gst-debug-file").build().expect("could not create filesink element");
+        pipeline.add(&dbg_filesink).expect("adding debug filesink to pipeline failed");
+        video_tee.link(&dbg_filesink).expect("linking tee to filesink failed");*/
+
+        // this forces video flow
+        let video_hacky_sink = gstreamer::ElementFactory::make("fakesink").property_from_str("sync", "false").build().expect("could not create fakesink element");
+        pipeline.add(&video_hacky_sink).expect("adding null fakesink to pipeline failed");
+        video_tee.link(&video_hacky_sink).expect("linking tee to fakesink failed");
 
         // glib::idle_add(move );
         println!("attempting to set play pipeline");
@@ -633,7 +641,7 @@ impl Streamer {
                             },
                             StellarFrontendMessage::DebugInfoRequest { debug_info_request } => {
                                 let mut response = format!("DEBUG: There are {} peers connected.\n", downstream_peers.len());
-                                let pipeline_base = [&videoconvert, &videoflip, &debug_tee, &queue];
+                                let pipeline_base = [&videoconvert, &videoflip, &debug_tee];
                                 for element in pipeline_base {
                                     response.push_str(&format!("{}: {:?}\n", element.name(), element.current_state()));
                                 }
@@ -645,6 +653,9 @@ impl Streamer {
                                 for (peer_id, peer) in downstream_peers.iter() {
                                     response.push_str(&format!("Peer's queue {}: {:?}\n", peer_id, peer.queue.current_state()));
                                     response.push_str(&format!("Peer's webrtcbin {}: {:?}\n", peer_id, peer.webrtcbin.current_state()));
+                                    if let Err(err) = peer.play() {
+                                        println!("Error forceplaying webrtcbin: {:?}", err);
+                                    }
                                 }
 
                                 if let Err(err) = self.get_socket().emit("send_to", json!([origin_socketid, StellarFrontendMessage::DebugResponse { debug: response }])) {
@@ -654,10 +665,13 @@ impl Streamer {
                                 // pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("/tmp/debug.dot"));
                                 pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("pipeline.dump.dot"));
                                 println!("sent pipeline dump");
+                                if let Err(err) = preprocessor.play() {
+                                    println!("Error forceplaying preprocessor: {:?}", err);
+                                }
                             },
                             StellarFrontendMessage::OfferRequest { offer_request_source } => {
                                 if offer_request_source == "client" {
-                                    self.streaming_command_queue.send(InternalMessage::SocketOfferGeneration(origin_socketid.clone()));
+                                    let _ = self.streaming_command_queue.send(InternalMessage::SocketOfferGeneration(origin_socketid.clone()));
                                 }
                             }
                             _ => {
