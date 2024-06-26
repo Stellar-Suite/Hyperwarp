@@ -217,6 +217,8 @@ impl Streamer {
             .build()
             .expect("Failed to create video info on demand for source");
 
+        let preview_sink = true;
+
         let appsrc = gstreamer_app::AppSrc::builder()
         .caps(&video_info.to_caps().expect("Cap generation failed"))
         // .is_live(true)
@@ -234,7 +236,7 @@ impl Streamer {
         intiial_link.push(&videoconvert);
         intiial_link.push(&videoflip);
         intiial_link.push(&debug_tee);
-        if config.debug {
+        if preview_sink {
             intiial_link.push(&sink);
         }
 
@@ -244,7 +246,10 @@ impl Streamer {
         if !INTERNAL_DEBUG {
             pipeline.add(appsrc.upcast_ref::<Element>()).expect("adding frames source element to pipeline failed");
         }
-        pipeline.add_many([&videoconvert, &videoflip, &debug_tee, &sink]).expect("adding els failed");
+        if preview_sink {
+            pipeline.add(&sink).expect("adding preview sink to pipeline failed");
+        }
+        pipeline.add_many([&videoconvert, &videoflip, &debug_tee]).expect("adding els failed");
         gstreamer::Element::link_many(intiial_link).expect("linking failed");
 
         

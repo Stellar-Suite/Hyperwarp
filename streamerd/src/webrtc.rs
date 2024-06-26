@@ -257,14 +257,14 @@ impl WebRTCPreprocessor {
                         // prefix.push(gstreamer::ElementFactory::make("cudaupload").build().expect("could not create cudaupload element"));
                         // prefix.push(gstreamer::ElementFactory::make("cudaconvert").build().expect("could not create cudaconvert element"));
                         // prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").features(["memory:CUDAMemory"]).field("format", "I420").build()).expect("could not create special capsfilter"));
-                        // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
+                        middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
                         middle.push(gstreamer::ElementFactory::make("h264parse").name("parser").build().expect("could not create h264parse element"));
                         // great reference: https://github.com/m1k1o/neko/blob/21a4b2b797bb91947ed3702b8d26a99fef4ca157/server/internal/capture/pipelines.go#L158C40-L158C283
                         // video/x-h264,stream-format=byte-stream,profile=constrained-baseline
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                     },
                     EncodingPreset::H265 => {
-                        // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
+                        middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
                         middle.push(gstreamer::ElementFactory::make("h265parse").name("parser").build().expect("could not create h265parse element"));
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main-444").build()).expect("could not create special capsfilter"));
                     },
@@ -383,6 +383,7 @@ impl WebRTCPreprocessor {
     }
 
     pub fn set_default_settings(&mut self){
+        self.payloader.set_property_from_str("config-interval", "-1");
         self.payloader.set_property_from_str("pt", "96");
         match self.preset {
             // TODO: fix this, but it defaults to 0 which is based off resolution
@@ -400,7 +401,7 @@ impl WebRTCPreprocessor {
                         // https://github.com/m1k1o/neko/blob/master/server/internal/capture/pipelines.go
                         // preset=2 gop-size=25 spatial-aq=true temporal-aq=true bitrate=%d vbv-buffer-size=%d rc-mode=6
                         // self.encoder.set_property_from_str("rc-mode", "3");
-                        self.encoder.set_property_from_str("rc-mode", "cbr");
+                        /*self.encoder.set_property_from_str("rc-mode", "cbr");
                         self.encoder.set_property_from_str("rc-lookahead", "0");
                         self.encoder.set_property("b-adapt", false);
                         self.encoder.set_property("aud", false);
@@ -409,7 +410,7 @@ impl WebRTCPreprocessor {
                         // self.encoder.set_property_from_str("preset", "2");
                         self.encoder.set_property_from_str("gop-size", "60");
                         self.encoder.set_property_from_str("spatial-aq", "true");
-                        self.encoder.set_property_from_str("temporal-aq", "true");
+                        self.encoder.set_property_from_str("temporal-aq", "true");*/
                         // self.encoder.set_property_from_str("bitrate", "1024000");
                         // self.encoder.set_property_from_str("vbv-buffer-size", "1024000");
                         
