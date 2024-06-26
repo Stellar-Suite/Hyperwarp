@@ -1,0 +1,1 @@
+gst-launch-1.0 ximagesrc ! videoconvert ! videoflip ! tee ! queue ! nvh264enc ! rtph264pay config-interval=-1 ! "application/x-rtp,media=video,encoding-name=H264,payload=96" ! tee ! queue ! udpsink host=127.0.0.1 port=4321
