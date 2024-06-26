@@ -1,0 +1,2 @@
+# taken from https://forums.developer.nvidia.com/t/unable-to-use-gstreamer-with-nvh264enc-ecoder-to-stream-8k-images-but-works-great-for-4k-images/260071
+gst-launch-1.0 videotestsrc ! queue ! videoconvert ! video/x-raw, format=BGRx ! videoconvert ! nvh264enc ! video/x-h264, stream-format=byte-stream, alignment=au ! h264parse ! video/x-h264, stream-format=byte-stream ! rtph264pay pt=96 config-interval=1 ! application/x-rtp, media=video, encoding-name=H264 ! udpsink host=127.0.0.1 port=4321 auto-multicast=true

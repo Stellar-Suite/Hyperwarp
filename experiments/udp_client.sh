@@ -1,1 +1,1 @@
-gst-launch-1.0 udpsrc udp://127.0.0.1:4321 ! "application/x-rtp,media=video,encoding-name=H264,payload=96" ! rtph264depay ! video/x-h264 ! queue ! h264parse ! queue ! nvh264dec ! videoconvert ! autovideosink
+GST_DEBUG_DUMP_DOT_DIR=/tmp/gst-debug GST_DEBUG=4 gst-launch-1.0 udpsrc address=127.0.0.1,port=4321 ! "application/x-rtp,media=video,encoding-name=H264,payload=96" ! rtph264depay ! video/x-h264 ! queue ! h264parse config-interval=1 ! video/x-h264,stream-format=byte-stream ! nvh264dec ! videoconvert ! autovideosink
