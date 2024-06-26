@@ -275,7 +275,7 @@ impl WebRTCPreprocessor {
                 prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create special capsfilter"));
             },
             _ => {
-                
+
             }
         }
 
@@ -461,6 +461,9 @@ impl WebRTCPreprocessor {
                 match self.get_optimizations() {
                     PipelineOptimization::None => {
                         self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4));
+                    },
+                    PipelineOptimization::AMD => {
+                        self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
                     },
                     _ => {}
                 }
