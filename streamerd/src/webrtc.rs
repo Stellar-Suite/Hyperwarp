@@ -18,6 +18,8 @@ pub struct WebRTCPeer {
     pub webrtcbin: gstreamer::Element,
 }
 
+pub const DISABLE_QUEUES: bool = false;
+
 impl WebRTCPeer {
     pub fn new(id: String) -> Self {
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
@@ -31,7 +33,9 @@ impl WebRTCPeer {
     }
 
     pub fn play(&self) -> anyhow::Result<()> {
-        self.queue.set_state(gstreamer::State::Playing)?;
+        if !DISABLE_QUEUES {
+            self.queue.set_state(gstreamer::State::Playing)?;
+        }
         self.webrtcbin.set_state(gstreamer::State::Playing)?;
 
         Ok(())
@@ -47,24 +51,38 @@ impl WebRTCPeer {
     }
 
     pub fn add_to_pipeline(&self, pipeline: &gstreamer::Pipeline) {
-        pipeline.add_many([&self.queue, &self.webrtcbin]).expect("adding elements to pipeline failed");
+        // pipeline.add_many([&self.queue, &self.webrtcbin]).expect("adding elements to pipeline failed");
+        pipeline.add(&self.queue).expect("adding elements to pipeline failed");
+        pipeline.add(&self.webrtcbin).expect("adding elements to pipeline failed");
     }
 
     pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
-        gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin]).expect("linking elements failed");
+        if DISABLE_QUEUES {
+            gstreamer::Element::link_many([tee, &self.webrtcbin]).expect("linking elements failed");
+        }else {
+            gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin]).expect("linking elements failed");
+        }
     }
 
     pub fn remove_from_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
 
         // unlink queue and webrtcbin
-        gstreamer::Element::unlink_many([&tee, &self.queue, &self.webrtcbin]);
+        if DISABLE_QUEUES {
+            gstreamer::Element::unlink_many([&tee, &self.webrtcbin]);
+        }else {
+            gstreamer::Element::unlink_many([&tee, &self.queue, &self.webrtcbin]);
+        }
 
         // stop queue and webrtcbin
-        self.queue.set_state(gstreamer::State::Null).expect("could not set queue state to null");
+        if !DISABLE_QUEUES {
+            self.queue.set_state(gstreamer::State::Null).expect("could not set queue state to null");
+        }
         self.webrtcbin.set_state(gstreamer::State::Null).expect("could not set webrtcbin state to null");
 
         // remove queue and webrtcbin from pipeline
-        pipeline.remove(&self.queue).expect("removing queue element failed");
+        if !DISABLE_QUEUES {
+            pipeline.remove(&self.queue).expect("removing queue element failed");
+        }
         pipeline.remove(&self.webrtcbin).expect("removing webrtcbin element failed");
     }
 
@@ -423,7 +441,10 @@ impl WebRTCPreprocessor {
                         // self.encoder.set_property_from_str("bitrate", "1024000");
                         // self.encoder.set_property_from_str("vbv-buffer-size", "1024000");
                         
-                    }
+                    },
+                    PipelineOptimization::AMD => {
+                        self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
+                    },
                     _ => {}
                 }
             },
