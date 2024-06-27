@@ -25,7 +25,7 @@ impl WebRTCPeer {
     pub fn new(id: String) -> Self {
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
         webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
-        webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
+        webrtcbin.set_property_from_str("bundle-policy", "max-compat");
         Self {
             id,
             queue: gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element"),
@@ -67,6 +67,10 @@ impl WebRTCPeer {
     }
 
     pub fn remove_from_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
+
+        // prepare for unlinking
+
+        
 
         // unlink queue and webrtcbin
         if DISABLE_QUEUES {
