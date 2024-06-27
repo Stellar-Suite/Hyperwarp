@@ -28,7 +28,7 @@ impl WebRTCPeer {
         webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
         Self {
             id,
-            queue: gstreamer::ElementFactory::make("queue").build().expect("could not create queue element"),
+            queue: gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element"),
             webrtcbin,
             may_offer: true,
         }

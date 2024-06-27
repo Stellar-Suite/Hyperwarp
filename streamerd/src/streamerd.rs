@@ -576,13 +576,13 @@ impl Streamer {
                                 if let Err(err) = preprocessor.play() {
                                     println!("Error forceplaying preprocessor: {:?}", err);
                                 }
-                                if downstream_peers.is_empty() {
+                                // if downstream_peers.is_empty() {
                                     pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
-                                }
+                                // }
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
-                                if downstream_peers.is_empty() {
+                                // if downstream_peers.is_empty() {
                                     pipeline.set_state(gstreamer::State::Playing).expect("play failure");
-                                }
+                                // }
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 if let Ok(_) = downstream_peer_el_group.play() {
 
@@ -602,7 +602,7 @@ impl Streamer {
                                     let origin_socketid_for_ice_sending = origin_socketid.clone();
 
                                     downstream_peer_el_group.webrtcbin.connect_closure("on-ice-candidate", false, glib::closure!(move |_webrtcbin: &gstreamer::Element, mlineindex: u32, candidate: &str| {
-                                        println!("element got an ice candidate {} {}", mlineindex, candidate);
+                                        println!("element got (produced) an ice candidate {} {}", mlineindex, candidate);
                                         let socket = socket_arc.lock().unwrap();
                                         if let Err(err) = socket.emit("send_to", json!([origin_socketid_for_ice_sending, StellarFrontendMessage::Ice { candidate: candidate.to_string(), sdp_mline_index: mlineindex }])) {
                                             println!("Error sending ice candidate to socket id {:?}: {:?}", origin_socketid_for_ice_sending, err);
