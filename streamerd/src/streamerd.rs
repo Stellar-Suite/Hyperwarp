@@ -570,9 +570,13 @@ impl Streamer {
                                 if let Err(err) = preprocessor.play() {
                                     println!("Error forceplaying preprocessor: {:?}", err);
                                 }
-                                pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
+                                if downstream_peers.is_empty() {
+                                    pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
+                                }
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
-                                pipeline.set_state(gstreamer::State::Playing).expect("play failure");
+                                if downstream_peers.is_empty() {
+                                    pipeline.set_state(gstreamer::State::Playing).expect("play failure");
+                                }
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 if let Ok(_) = downstream_peer_el_group.play() {
 
@@ -582,6 +586,10 @@ impl Streamer {
                                     downstream_peer_el_group.webrtcbin.connect_closure("on-negotiation-needed", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
                                         println!("element prompted negotiation");
                                         streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone()));
+                                    }));
+
+                                    downstream_peer_el_group.webrtcbin.connect_closure("on-new-transceiver", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
+                                        println!("on-new-transceiver called");
                                     }));
 
                                     let socket_arc = self.socketio_client.clone().unwrap();
