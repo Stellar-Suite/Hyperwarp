@@ -16,6 +16,7 @@ pub struct WebRTCPeer {
     pub id: String,
     pub queue: gstreamer::Element,
     pub webrtcbin: gstreamer::Element,
+    pub may_offer: bool,
 }
 
 pub const DISABLE_QUEUES: bool = false;
@@ -29,6 +30,7 @@ impl WebRTCPeer {
             id,
             queue: gstreamer::ElementFactory::make("queue").build().expect("could not create queue element"),
             webrtcbin,
+            may_offer: true,
         }
     }
 
