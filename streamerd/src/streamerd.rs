@@ -46,7 +46,8 @@ pub enum InternalMessage {
     SocketSdpAnswer(String, WebRTCSessionDescription),
     SocketSdpOffer(String, WebRTCSessionDescription),
     SocketOfferGeneration(String, OfferGenerationOriginType),
-    PeerStateChange(String, WebRTCPeerConnectionState)
+    PeerStateChange(String, WebRTCPeerConnectionState),
+    SocketRtcReady(String),
 }
 
 pub struct SystemHints {
@@ -414,7 +415,7 @@ impl Streamer {
         video_tee.link(&dbg_filesink).expect("linking tee to filesink failed");*/
 
         // this forces video flow
-        let video_hacky_sink = gstreamer::ElementFactory::make("fakesink").property_from_str("async", "false").build().expect("could not create fakesink element");
+        let video_hacky_sink = gstreamer::ElementFactory::make("fakesink").property_from_str("async", "false").property_from_str("sync", "true").build().expect("could not create fakesink element");
         pipeline.add(&video_hacky_sink).expect("adding null fakesink to pipeline failed");
         video_tee.link(&video_hacky_sink).expect("linking tee to fakesink failed");
 
@@ -584,59 +585,90 @@ impl Streamer {
                                 // if downstream_peers.is_empty() {
                                     // pipeline.set_state(gstreamer::State::Playing).expect("play failure");
                                 // }
-                                downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
-                                // downstream_peer_el_group.add_to_pipeline(&pipeline);
+                                // downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
+                                downstream_peer_el_group.add_to_pipeline(&pipeline);
                                 // let streaming_cmd_queue_for_setup = self.streaming_command_queue.clone();
                                 // let queue_sink_pad = downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad");
                                 // let video_tee_dynamic_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from tee");
-                                if let Ok(_) = downstream_peer_el_group.play() {
-                                    let streaming_cmd_queue_for_negotiation = self.streaming_command_queue.clone();
-                                    let origin_socketid_for_negotiation = origin_socketid.clone();
+                                // if let Ok(_) = downstream_peer_el_group.play() {
+                                let streaming_cmd_queue_for_negotiation = self.streaming_command_queue.clone();
+                                let origin_socketid_for_negotiation = origin_socketid.clone();
 
-                                    downstream_peer_el_group.webrtcbin.connect_closure("on-negotiation-needed", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
-                                        println!("element prompted negotiation");
-                                        // this was causing some headaches by being spammed
-                                        // hopefully it stops doing this
-                                        // streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone(), OfferGenerationOriginType::Element));
-                                    }));
+                                downstream_peer_el_group.webrtcbin.connect_closure("on-negotiation-needed", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
+                                    println!("element prompted negotiation");
+                                    // this was causing some headaches by being spammed
+                                    // hopefully it stops doing this
+                                    // streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone(), OfferGenerationOriginType::Element));
+                                }));
 
-                                    downstream_peer_el_group.webrtcbin.connect_closure("on-new-transceiver", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
-                                        println!("on-new-transceiver called");
-                                    }));
+                                downstream_peer_el_group.webrtcbin.connect_closure("on-new-transceiver", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
+                                    println!("on-new-transceiver called");
+                                }));
 
-                                    let socket_arc = self.socketio_client.clone().unwrap();
-                                    let origin_socketid_for_ice_sending = origin_socketid.clone();
+                                let socket_arc = self.socketio_client.clone().unwrap();
+                                let origin_socketid_for_ice_sending = origin_socketid.clone();
 
-                                    downstream_peer_el_group.webrtcbin.connect_closure("on-ice-candidate", false, glib::closure!(move |_webrtcbin: &gstreamer::Element, mlineindex: u32, candidate: &str| {
-                                        println!("element got (produced) an ice candidate {} {}", mlineindex, candidate);
-                                        let socket = socket_arc.lock().unwrap();
-                                        if let Err(err) = socket.emit("send_to", json!([origin_socketid_for_ice_sending, StellarFrontendMessage::Ice { candidate: candidate.to_string(), sdp_mline_index: mlineindex }])) {
-                                            println!("Error sending ice candidate to socket id {:?}: {:?}", origin_socketid_for_ice_sending, err);
-                                        }
-                                    }));
+                                downstream_peer_el_group.webrtcbin.connect_closure("on-ice-candidate", false, glib::closure!(move |_webrtcbin: &gstreamer::Element, mlineindex: u32, candidate: &str| {
+                                    println!("element got (produced) an ice candidate {} {}", mlineindex, candidate);
+                                    let socket = socket_arc.lock().unwrap();
+                                    if let Err(err) = socket.emit("send_to", json!([origin_socketid_for_ice_sending, StellarFrontendMessage::Ice { candidate: candidate.to_string(), sdp_mline_index: mlineindex }])) {
+                                        println!("Error sending ice candidate to socket id {:?}: {:?}", origin_socketid_for_ice_sending, err);
+                                    }
+                                }));
 
-                                    let origin_socketid_for_state_change = origin_socketid.clone();
-                                    let streaming_cmd_queue_for_state_change = self.streaming_command_queue.clone();
+                                let origin_socketid_for_state_change = origin_socketid.clone();
+                                let streaming_cmd_queue_for_state_change = self.streaming_command_queue.clone();
 
-                                    // https://github.com/centricular/webrtcsink/blob/main/plugins/src/webrtcsink/imp.rs
-                                    downstream_peer_el_group.webrtcbin.connect_notify(Some("connection-state"),  move |webrtcbin, _pspec| {
-                                        let state = webrtcbin.property::<WebRTCPeerConnectionState>("connection-state");
-                                        println!("{}'s connection state is {:?}", origin_socketid_for_state_change, state);
-                                        streaming_cmd_queue_for_state_change.send(InternalMessage::PeerStateChange(origin_socketid_for_state_change.clone(), state));
-                                    });
+                                // https://github.com/centricular/webrtcsink/blob/main/plugins/src/webrtcsink/imp.rs
+                                downstream_peer_el_group.webrtcbin.connect_notify(Some("connection-state"),  move |webrtcbin, _pspec| {
+                                    let state = webrtcbin.property::<WebRTCPeerConnectionState>("connection-state");
+                                    println!("{}'s connection state is {:?}", origin_socketid_for_state_change, state);
+                                    streaming_cmd_queue_for_state_change.send(InternalMessage::PeerStateChange(origin_socketid_for_state_change.clone(), state));
+                                });
 
-                                    downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
-                                    println!("Added downstream peer to pipeline");
+                                // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L464
 
-                                    let socket = self.get_socket();
-                                    if let Err(err) = socket.emit("send_to", json!([origin_socketid, StellarFrontendMessage::ProvisionWebRTCReply { provision_ok: true }])) {
-                                        println!("Error sending provision reply to socket id {:?}: {:?}", origin_socketid, err);
+                                let video_sink_pad = downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad");
+
+                                let video_src_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from video tee");
+                                let video_block = video_src_pad
+                                    .add_probe(gstreamer::PadProbeType::BLOCK_DOWNSTREAM, |_pad, _info| {
+                                        gstreamer::PadProbeReturn::Ok
+                                    })
+                                    .unwrap();
+
+                                video_src_pad.link(&video_sink_pad).expect("Linking video src pad to video sink pad failed");
+
+                                let streaming_cmd_queue_for_ready = self.streaming_command_queue.clone();
+
+                                let origin_socketid_for_ready = origin_socketid.clone();
+
+                                downstream_peer_el_group.bin.call_async(move |bin| {
+                                    if let Err(err) = bin.sync_state_with_parent() {
+                                        println!("Error syncing bin state with parent: {:?}", err);
+                                    } else {
+                                        println!("Bin state synced with parent");
                                     }
 
-                                } else {
+                                    video_src_pad.remove_probe(video_block);
+
+                                    // send init thing
+                                    let _ = streaming_cmd_queue_for_ready.send(InternalMessage::SocketRtcReady(origin_socketid_for_ready));
+
+                                });
+
+                                downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
+                                println!("Added downstream peer to pipeline");
+
+                                
+                                /*if let Err(err) = socket.emit("send_to", json!([origin_socketid, StellarFrontendMessage::ProvisionWebRTCReply { provision_ok: true }])) {
+                                    println!("Error sending provision reply to socket id {:?}: {:?}", origin_socketid, err);
+                                }*/
+
+                                /* } else {
                                     println!("Failed to play downstream peer");
                                     downstream_peer_el_group.remove_from_pipeline(&pipeline, &video_tee);
-                                }
+                                } */
                                 
 
                             },
@@ -803,17 +835,32 @@ impl Streamer {
                             }
 
                             if should_disconnect {
-                                webrtc_peer.remove_from_pipeline(&pipeline, &video_tee);
+
+                                webrtc_peer.stop().expect("Error stopping webrtc peer");
+                                webrtc_peer.remove_from_pipeline(&pipeline).expect("Error removing webrtc peer from pipeline");
                                 downstream_peers.remove(&origin_socketid); // drop bye bye
-                                if let Err(err) = pipeline.set_state(gstreamer::State::Playing) {
+                                /*if let Err(err) = pipeline.set_state(gstreamer::State::Playing) {
                                     println!("Error setting pipeline state to playing: {:?}", err);
-                                }
+                                }*/
                             }
                         }
-                    }
+                    },
+                    InternalMessage::SocketRtcReady(origin_socketid) => {
+                        if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
+                            webrtc_peer.may_offer = true;
+                            if let Err(err) = webrtc_peer.play() {
+                                println!("Error forceplaying webrtcbin: {:?}", err);
+                            }
+
+                            let socket = self.get_socket();
+                            if let Err(err) = socket.emit("send_to", json!([origin_socketid, StellarFrontendMessage::ProvisionWebRTCReply { provision_ok: true }])) {
+                                println!("Error sending provision reply to socket id {:?}: {:?}", origin_socketid, err);
+                            }
+                        }
+                    },
                     _ => {
                         // TODO: print more descriptive
-                        println!("Unimplemented message {:#?}", imsg.type_id());
+                        println!("BAD: Unimplemented message {:#?}", imsg.type_id());
                     }
                 };
             }

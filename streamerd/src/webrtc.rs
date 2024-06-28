@@ -2,6 +2,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 // tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
+use anyhow::Ok;
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
 use gstreamer_video::{prelude::*, VideoInfo};
 use gstreamer_webrtc::WebRTCSessionDescription;
@@ -17,27 +18,30 @@ pub struct WebRTCPeer {
     pub queue: gstreamer::Element,
     pub webrtcbin: gstreamer::Element,
     pub may_offer: bool,
+    pub bin: gstreamer::Bin,
 }
-
-pub const DISABLE_QUEUES: bool = false;
 
 impl WebRTCPeer {
     pub fn new(id: String) -> Self {
+        let bin = gstreamer::Bin::new();
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
+        let queue = gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element");
+        // temp disabled for debugging
         // webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
-        webrtcbin.set_property_from_str("bundle-policy", "max-compat");
+        webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
+        bin.add(&webrtcbin).expect("adding webrtcbin to bin failed");
+        bin.add(&queue).expect("adding queue to bin failed");
         Self {
             id,
-            queue: gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element"),
+            queue,
             webrtcbin,
             may_offer: true,
+            bin: bin
         }
     }
 
     pub fn play(&self) -> anyhow::Result<()> {
-        if !DISABLE_QUEUES {
-            self.queue.set_state(gstreamer::State::Playing)?;
-        }
+        self.queue.set_state(gstreamer::State::Playing)?;
         self.webrtcbin.set_state(gstreamer::State::Playing)?;
 
         Ok(())
@@ -59,37 +63,36 @@ impl WebRTCPeer {
     }
 
     pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
-        if DISABLE_QUEUES {
-            gstreamer::Element::link_many([tee, &self.webrtcbin]).expect("linking elements failed");
-        }else {
-            gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin]).expect("linking elements failed");
-        }
+        gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin]).expect("linking elements failed");
     }
 
-    pub fn remove_from_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
+    pub fn destroy(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) -> anyhow::Result<()>{
 
         // prepare for unlinking
-
-
+        // ???
 
         // unlink queue and webrtcbin
-        if DISABLE_QUEUES {
-            gstreamer::Element::unlink_many([&tee, &self.webrtcbin]);
-        }else {
-            gstreamer::Element::unlink_many([&tee, &self.queue, &self.webrtcbin]);
-        }
+        gstreamer::Element::unlink_many([&tee, &self.queue, &self.webrtcbin]);
 
         // stop queue and webrtcbin
-        if !DISABLE_QUEUES {
-            self.queue.set_state(gstreamer::State::Null).expect("could not set queue state to null");
-        }
-        self.webrtcbin.set_state(gstreamer::State::Null).expect("could not set webrtcbin state to null");
+        self.stop()?;
 
         // remove queue and webrtcbin from pipeline
-        if !DISABLE_QUEUES {
-            pipeline.remove(&self.queue).expect("removing queue element failed");
-        }
-        pipeline.remove(&self.webrtcbin).expect("removing webrtcbin element failed");
+        self.remove_from_pipeline(pipeline)?;
+
+        Ok(())
+    }
+
+    pub fn remove_from_pipeline(&self, pipeline: &gstreamer::Pipeline) -> anyhow::Result<()> {
+        pipeline.remove(&self.queue)?;
+        pipeline.remove(&self.webrtcbin)?;
+        Ok(())
+    }
+
+    pub fn stop(&self) -> anyhow::Result<()>{
+        self.queue.set_state(gstreamer::State::Null)?;
+        self.webrtcbin.set_state(gstreamer::State::Null)?;
+        Ok(())
     }
 
     pub fn set_local_description(&self, desc_ref: &WebRTCSessionDescription) {
@@ -113,7 +116,7 @@ impl WebRTCPeer {
         self.set_remote_description(&answer);
         let promise = gstreamer::Promise::with_change_func(move |reply| {
             match reply {
-                Ok(answer_option) => {
+                core::result::Result::Ok(answer_option) => {
                     match answer_option {
                         Some(struct_ref) => {
                             let answer_result = struct_ref
@@ -121,7 +124,7 @@ impl WebRTCPeer {
                                 .unwrap()
                                 .get::<gstreamer_webrtc::WebRTCSessionDescription>();
                             match answer_result {
-                                Ok(answer) => {
+                                core::result::Result::Ok(answer) => {
                                     on_answer(answer);
                                 },
                                 Err(err) => {
