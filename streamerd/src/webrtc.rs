@@ -24,7 +24,7 @@ pub const DISABLE_QUEUES: bool = false;
 impl WebRTCPeer {
     pub fn new(id: String) -> Self {
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
-        webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
+        // webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
         webrtcbin.set_property_from_str("bundle-policy", "max-compat");
         Self {
             id,
@@ -70,7 +70,7 @@ impl WebRTCPeer {
 
         // prepare for unlinking
 
-        
+
 
         // unlink queue and webrtcbin
         if DISABLE_QUEUES {

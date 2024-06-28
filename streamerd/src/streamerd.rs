@@ -11,7 +11,7 @@ use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, ErrorMessage, PadProbeReturn, PadProbeType};
 use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
-use gstreamer_webrtc::WebRTCSessionDescription;
+use gstreamer_webrtc::{WebRTCPeerConnectionState, WebRTCSessionDescription};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
 use rust_socketio::{client::Client, ClientBuilder};
@@ -46,6 +46,7 @@ pub enum InternalMessage {
     SocketSdpAnswer(String, WebRTCSessionDescription),
     SocketSdpOffer(String, WebRTCSessionDescription),
     SocketOfferGeneration(String, OfferGenerationOriginType),
+    PeerStateChange(String, WebRTCPeerConnectionState)
 }
 
 pub struct SystemHints {
@@ -524,7 +525,7 @@ impl Streamer {
                         should_update = new_should_update;
                     },
                     InternalMessage::SynchornizationReceived(sync_details) => {
-                        println!("syncing {:#?}", sync_details);
+                        println!("syncing {:?}", sync_details);
                         if let Some(res) = sync_details.resolution {
                             video_info =
                             gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
@@ -577,11 +578,11 @@ impl Streamer {
                                     println!("Error forceplaying preprocessor: {:?}", err);
                                 }
                                 // if downstream_peers.is_empty() {
-                                    pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
+                                    // pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
                                 // }
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 // if downstream_peers.is_empty() {
-                                    pipeline.set_state(gstreamer::State::Playing).expect("play failure");
+                                    // pipeline.set_state(gstreamer::State::Playing).expect("play failure");
                                 // }
                                 downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
                                 // downstream_peer_el_group.add_to_pipeline(&pipeline);
@@ -589,12 +590,13 @@ impl Streamer {
                                 // let queue_sink_pad = downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad");
                                 // let video_tee_dynamic_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from tee");
                                 if let Ok(_) = downstream_peer_el_group.play() {
-
                                     let streaming_cmd_queue_for_negotiation = self.streaming_command_queue.clone();
                                     let origin_socketid_for_negotiation = origin_socketid.clone();
 
                                     downstream_peer_el_group.webrtcbin.connect_closure("on-negotiation-needed", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
                                         println!("element prompted negotiation");
+                                        // this was causing some headaches by being spammed
+                                        // hopefully it stops doing this
                                         // streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone(), OfferGenerationOriginType::Element));
                                     }));
 
@@ -612,6 +614,16 @@ impl Streamer {
                                             println!("Error sending ice candidate to socket id {:?}: {:?}", origin_socketid_for_ice_sending, err);
                                         }
                                     }));
+
+                                    let origin_socketid_for_state_change = origin_socketid.clone();
+                                    let streaming_cmd_queue_for_state_change = self.streaming_command_queue.clone();
+
+                                    // https://github.com/centricular/webrtcsink/blob/main/plugins/src/webrtcsink/imp.rs
+                                    downstream_peer_el_group.webrtcbin.connect_notify(Some("connection-state"),  move |webrtcbin, _pspec| {
+                                        let state = webrtcbin.property::<WebRTCPeerConnectionState>("connection-state");
+                                        println!("{}'s connection state is {:?}", origin_socketid_for_state_change, state);
+                                        streaming_cmd_queue_for_state_change.send(InternalMessage::PeerStateChange(origin_socketid_for_state_change.clone(), state));
+                                    });
 
                                     downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
                                     println!("Added downstream peer to pipeline");
@@ -637,7 +649,7 @@ impl Streamer {
                                 if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
                                     if type_ == "answer" {
                                         webrtc_peer.may_offer = true;
-                                        println!("processing sdp answer");
+                                        println!("processing client sdp answer {}", origin_socketid);
                                         println!("{}", sdp);
                                         if let Err(err) = webrtc_peer.process_sdp_answer(&sdp) {
                                             self.complain_to_socket(&origin_socketid, &format!("Error processing sdp answer from socket id {:?}", err));
@@ -743,7 +755,7 @@ impl Streamer {
                                     if let Ok(Some(offer_structref)) = reply {
                                         let offer = offer_structref
                                             .value("offer")
-                                            .unwrap()
+                                            .expect("Send value")
                                             .get::<gstreamer_webrtc::WebRTCSessionDescription>()
                                             .expect("Invalid argument");
                                         println!("sending offer requested by {:?}", origin);
@@ -761,6 +773,44 @@ impl Streamer {
                             println!("can't generate sdp offer for {:?} because it has not requested rtc", origin_socketid);
                         }
                     },
+                    InternalMessage::PeerStateChange(origin_socketid, state) => {
+
+
+
+                        if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
+
+                            let mut should_disconnect = false;
+
+                            match state {
+                                WebRTCPeerConnectionState::Connected => {
+                                    webrtc_peer.may_offer = true;
+                                    if let Err(err) = webrtc_peer.play() {
+                                        println!("Error forceplaying webrtcbin: {:?}", err);
+                                    }
+                                },
+                                WebRTCPeerConnectionState::Disconnected => {
+                                    should_disconnect = true;
+                                },
+                                WebRTCPeerConnectionState::Failed => {
+                                    should_disconnect = true;
+                                },
+                                WebRTCPeerConnectionState::Closed => {
+                                    should_disconnect = true;
+                                },
+                                _ => {
+                                    println!("unhandled webrtc peer connection state {:?}", state);
+                                },
+                            }
+
+                            if should_disconnect {
+                                webrtc_peer.remove_from_pipeline(&pipeline, &video_tee);
+                                downstream_peers.remove(&origin_socketid); // drop bye bye
+                                if let Err(err) = pipeline.set_state(gstreamer::State::Playing) {
+                                    println!("Error setting pipeline state to playing: {:?}", err);
+                                }
+                            }
+                        }
+                    }
                     _ => {
                         // TODO: print more descriptive
                         println!("Unimplemented message {:#?}", imsg.type_id());
