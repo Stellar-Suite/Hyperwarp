@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 // tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
 use anyhow::Ok;
-use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage};
+use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
 use gstreamer_video::{prelude::*, VideoInfo};
 use gstreamer_webrtc::WebRTCSessionDescription;
 use stellar_protocol::protocol::{EncodingPreset, PipelineOptimization};
@@ -19,6 +19,7 @@ pub struct WebRTCPeer {
     pub webrtcbin: gstreamer::Element,
     pub may_offer: bool,
     pub bin: gstreamer::Bin,
+    pub pad: gstreamer::GhostPad,
 }
 
 impl WebRTCPeer {
@@ -26,21 +27,23 @@ impl WebRTCPeer {
         let bin = gstreamer::Bin::new();
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
         let queue = gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element");
-        // temp disabled for debugging
+        // temp disabled for debugging, this will work on local network anyways
         // webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
         webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
         bin.add(&webrtcbin).expect("adding webrtcbin to bin failed");
         bin.add(&queue).expect("adding queue to bin failed");
 
-        let input_ghost_pad = queue.static_pad("sink").expect("Could not get queue sink pad");
-        input_ghost_pad.
+        let input_pad = queue.static_pad("sink").expect("Could not get queue sink pad");
+        let input_ghost_pad = GhostPad::with_target(&input_pad).expect("Could not create ghost pad");
+        bin.add_pad(&input_ghost_pad).expect("Could not add ghost pad to queue element");
 
         Self {
             id,
             queue,
             webrtcbin,
             may_offer: true,
-            bin: bin
+            bin: bin,
+            pad: input_ghost_pad,
         }
     }
 
@@ -70,6 +73,11 @@ impl WebRTCPeer {
 
     pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) -> anyhow::Result<()> {
         gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin])?;
+        Ok(())
+    }
+
+    pub fn link_internally(&self) -> anyhow::Result<()>{
+        gstreamer::Element::link_many([&self.queue, &self.webrtcbin])?;
         Ok(())
     }
 

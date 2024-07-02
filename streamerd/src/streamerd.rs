@@ -582,12 +582,14 @@ impl Streamer {
                                     // pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
                                 // }
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
+                                downstream_peer_el_group.link_internally().expect("Could not link webrtc peer internally");
+                                
                                 // if downstream_peers.is_empty() {
                                     // pipeline.set_state(gstreamer::State::Playing).expect("play failure");
                                 // }
                                 // downstream_peer_el_group.setup_with_pipeline(&pipeline, &video_tee);
-                                println!("{:?}", downstream_peer_el_group.queue.parent());
-                                downstream_peer_el_group.add_to_pipeline(&pipeline).expect("Could not add peer to pipeline");  
+                                // println!("{:?}", downstream_peer_el_group.queue.parent());
+                                // downstream_peer_el_group.add_to_pipeline(&pipeline).expect("Could not add peer to pipeline");  
                                 // let streaming_cmd_queue_for_setup = self.streaming_command_queue.clone();
                                 // let queue_sink_pad = downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad");
                                 // let video_tee_dynamic_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from tee");
@@ -629,7 +631,7 @@ impl Streamer {
 
                                 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L464
 
-                                let video_sink_pad = downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad"); // data enters here
+                                let video_sink_pad = &downstream_peer_el_group.pad; // downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad"); // data enters here
 
                                 let video_src_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from video tee"); // data leaves here
                                 let video_block = video_src_pad
@@ -638,10 +640,11 @@ impl Streamer {
                                     })
                                     .unwrap();
 
-                                println!("pad setup begin");
-                                println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
-                                println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
-                                video_src_pad.link(&video_sink_pad).expect("Linking video src pad to video sink pad failed");
+                                // println!("pad setup begin");
+                                // println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
+                                // println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
+                                pipeline.add(&downstream_peer_el_group.bin).expect("Could not add peer bin to pipeline");
+                                video_src_pad.link(video_sink_pad).expect("Linking video src pad to video sink pad failed");
 
                                 let streaming_cmd_queue_for_ready = self.streaming_command_queue.clone();
 
