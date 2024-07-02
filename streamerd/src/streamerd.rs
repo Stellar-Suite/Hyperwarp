@@ -231,7 +231,7 @@ impl Streamer {
         .caps(&video_info.to_caps().expect("Cap generation failed"))
         // .is_live(true)
         .block(false)
-        .is_live(true)
+        // .is_live(true)
         .do_timestamp(true)
         .format(gstreamer::Format::Time)
         .build();
@@ -473,7 +473,7 @@ impl Streamer {
                     _ => (),
                 }
                 iter_count += 1;
-                if iter_count > 100 {
+                if iter_count > 1000 {
                     // force processing the queue
                     break;
                 }
@@ -614,8 +614,12 @@ impl Streamer {
 
                                 downstream_peer_el_group.webrtcbin.connect_closure("on-ice-candidate", false, glib::closure!(move |_webrtcbin: &gstreamer::Element, mlineindex: u32, candidate: &str| {
                                     println!("element got (produced) an ice candidate {} {}", mlineindex, candidate);
+                                    let candidate_str = candidate.to_string();
+                                    if candidate_str.len() == 0 {
+                                        println!("{}'s webrtcbin is done sending ice candidates", origin_socketid_for_ice_sending);
+                                    }
                                     let socket = socket_arc.lock().unwrap();
-                                    if let Err(err) = socket.emit("send_to", json!([origin_socketid_for_ice_sending, StellarFrontendMessage::Ice { candidate: candidate.to_string(), sdp_mline_index: mlineindex }])) {
+                                    if let Err(err) = socket.emit("send_to", json!([origin_socketid_for_ice_sending, StellarFrontendMessage::Ice { candidate: candidate_str, sdp_mline_index: mlineindex }])) {
                                         println!("Error sending ice candidate to socket id {:?}: {:?}", origin_socketid_for_ice_sending, err);
                                     }
                                 }));
@@ -681,8 +685,13 @@ impl Streamer {
 
                             },
                             StellarFrontendMessage::Ice { candidate, sdp_mline_index } => {
+                                if candidate.len() == 0 {
+                                    println!("{} is done sending ice candidates", origin_socketid);
+                                }
                                 if let Some(webrtc_peer) = downstream_peers.get(&origin_socketid) {
                                     webrtc_peer.webrtcbin.emit_by_name::<()>("add-ice-candidate", &[&sdp_mline_index, &candidate]);
+                                } else {
+                                    println!("warn: ice candidate accidentally dropped, race?");
                                 }
                             },
                             StellarFrontendMessage::Sdp { type_, sdp } => {
@@ -710,6 +719,8 @@ impl Streamer {
                                     }else{
                                         println!("Unhandled sdp type {:?} from socket id {:?}", type_, origin_socketid);
                                     }
+                                }else {
+                                    println!("warn: sdp accidentally dropped, race?");
                                 }
                             },
                             StellarFrontendMessage::DebugInfoRequest { debug_info_request } => {

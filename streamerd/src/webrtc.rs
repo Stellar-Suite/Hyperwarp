@@ -99,8 +99,9 @@ impl WebRTCPeer {
     }
 
     pub fn remove_from_pipeline(&self, pipeline: &gstreamer::Pipeline) -> anyhow::Result<()> {
-        pipeline.remove(&self.queue)?;
-        pipeline.remove(&self.webrtcbin)?;
+        // pipeline.remove(&self.queue)?;
+        // pipeline.remove(&self.webrtcbin)?;
+        pipeline.remove(&self.bin)?;
         Ok(())
     }
 
@@ -457,6 +458,7 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::NVIDIA => {
                         self.encoder.set_property("zerolatency", true);
                         self.encoder.set_property_from_str("preset","low-latency-hp");
+                        // parser
                         self.extra_middle_elements[1].set_property("config-interval", -1 as i32);
                         // https://github.com/m1k1o/neko/blob/master/server/internal/capture/pipelines.go
                         // preset=2 gop-size=25 spatial-aq=true temporal-aq=true bitrate=%d vbv-buffer-size=%d rc-mode=6
@@ -476,6 +478,7 @@ impl WebRTCPreprocessor {
                         
                     },
                     PipelineOptimization::AMD => {
+                        // set for h264parse
                         self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
                     },
                     _ => {}
