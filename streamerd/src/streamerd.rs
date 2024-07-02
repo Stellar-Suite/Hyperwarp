@@ -582,6 +582,7 @@ impl Streamer {
                                     // pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
                                 // }
                                 let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
+                                downstream_peer_el_group.set_stun_server(&config.stun_server);
                                 downstream_peer_el_group.link_internally().expect("Could not link webrtc peer internally");
                                 
                                 // if downstream_peers.is_empty() {
@@ -730,7 +731,6 @@ impl Streamer {
                                         println!("Error forceplaying webrtcbin: {:?}", err);
                                     }
                                 }
-
                                 if let Err(err) = self.get_socket().emit("send_to", json!([origin_socketid, StellarFrontendMessage::DebugResponse { debug: response }])) {
                                     println!("Error sending debug info request to socket id {:?}: {:?}", origin_socketid, err);
                                 }

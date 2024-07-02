@@ -27,8 +27,8 @@ impl WebRTCPeer {
         let bin = gstreamer::Bin::new();
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin").build().expect("could not create webrtcbin element");
         let queue = gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element");
-        // temp disabled for debugging, this will work on local network anyways
-        // webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
+        // may be temp disabled for debugging, this will work on local network anyways (at least i hope)
+        webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
         webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
         bin.add(&webrtcbin).expect("adding webrtcbin to bin failed");
         bin.add(&queue).expect("adding queue to bin failed");
