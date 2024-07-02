@@ -48,9 +48,9 @@ impl WebRTCPeer {
     }
 
     pub fn play(&self) -> anyhow::Result<()> {
+        self.bin.set_state(gstreamer::State::Playing)?;
         self.queue.set_state(gstreamer::State::Playing)?;
         self.webrtcbin.set_state(gstreamer::State::Playing)?;
-
         Ok(())
     }
 

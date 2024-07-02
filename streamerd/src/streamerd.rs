@@ -654,7 +654,7 @@ impl Streamer {
                                     if let Err(err) = bin.sync_state_with_parent() {
                                         println!("Error syncing bin state with parent: {:?}", err);
                                     } else {
-                                        println!("Bin state synced with parent");
+                                        println!("Bin state synced with parent, new status {:?}", bin.current_state());
                                     }
 
                                     video_src_pad.remove_probe(video_block);
