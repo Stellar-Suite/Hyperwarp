@@ -31,6 +31,10 @@ impl WebRTCPeer {
         webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
         bin.add(&webrtcbin).expect("adding webrtcbin to bin failed");
         bin.add(&queue).expect("adding queue to bin failed");
+
+        let input_ghost_pad = queue.static_pad("sink").expect("Could not get queue sink pad");
+        input_ghost_pad.
+
         Self {
             id,
             queue,
@@ -51,19 +55,22 @@ impl WebRTCPeer {
         self.webrtcbin.set_property_from_str("stun-server", &stun_server);
     }
 
-    pub fn setup_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
-        self.add_to_pipeline(pipeline);
-        self.link_with_pipeline(pipeline, tee);
+    pub fn setup_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) -> anyhow::Result<()> {
+        self.add_to_pipeline(pipeline)?;
+        self.link_with_pipeline(pipeline, tee)?;
+        Ok(())
     }
 
-    pub fn add_to_pipeline(&self, pipeline: &gstreamer::Pipeline) {
+    pub fn add_to_pipeline(&self, pipeline: &gstreamer::Pipeline)-> anyhow::Result<()> {
         // pipeline.add_many([&self.queue, &self.webrtcbin]).expect("adding elements to pipeline failed");
-        pipeline.add(&self.queue).expect("adding elements to pipeline failed");
-        pipeline.add(&self.webrtcbin).expect("adding elements to pipeline failed");
+        pipeline.add(&self.queue)?;
+        pipeline.add(&self.webrtcbin)?;
+        Ok(())
     }
 
-    pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) {
-        gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin]).expect("linking elements failed");
+    pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) -> anyhow::Result<()> {
+        gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin])?;
+        Ok(())
     }
 
     pub fn destroy(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) -> anyhow::Result<()>{
