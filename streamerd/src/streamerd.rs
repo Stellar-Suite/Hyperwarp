@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 
 use crossbeam_channel::{Receiver, Sender};
 use crossbeam_queue::SegQueue;
+use dashmap::DashMap;
 use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, ErrorMessage, PadProbeReturn, PadProbeType};
 use gstreamer_app::AppSrc;
@@ -16,7 +17,7 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, PipelineOptimization, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{create_default_acl, may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, PipelineOptimization, PrivligeDefinition, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
 
 use std::time::Instant;
 
@@ -109,6 +110,8 @@ pub struct Streamer {
     pub streaming_command_recv: Receiver<InternalMessage>,
     pub frame: Arc<RwLock<Vec<u8>>>,
     pub socketio_client: Option<Arc<Mutex<Client>>>,
+    pub channel_id_to_socket_id: Arc<DashMap<i32, String>>,
+    pub acls: DashMap<String, PrivligeDefinition>,
 }
 
 pub fn calc_offset(width: usize, height: usize, x: usize, y: usize) -> Option<usize> {
@@ -132,6 +135,9 @@ pub fn build_capsfilter(caps: gstreamer::Caps) -> anyhow::Result<gstreamer::Elem
     Ok(capsfilter)
 }
 
+
+pub const DEFAULT_ACL: PrivligeDefinition = create_default_acl();
+
 impl Streamer {
     pub fn new(config: StreamerConfig) -> Self {
 
@@ -147,8 +153,18 @@ impl Streamer {
             streaming_command_recv: receiver,
             frame: Arc::new(RwLock::new(vec![])),
             socketio_client: None,
+            channel_id_to_socket_id: Arc::new(DashMap::new()),
+            acls: DashMap::new(),
         }
     }
+
+    /*pub fn get_acl(&self, socket_id: &str) -> &PrivligeDefinition {
+        if let Some(acl_ref) = self.acls.get(socket_id) {
+            acl_ref.value()
+        } else {
+            &DEFAULT_ACL
+        }
+    }*/
 
     pub fn run(&mut self) {
         println!("Starting streamer processing thread");
@@ -611,6 +627,7 @@ impl Streamer {
 
                                 let streaming_cmd_queue_for_data_channel_adding = self.streaming_command_queue.clone();
                                 let origin_socketid_for_data_channel_adding = origin_socketid.clone();
+                                let channel_id_to_socket_id_for_data_channel_adding = self.channel_id_to_socket_id.clone();
                                 // https://github.com/servo/media/blob/45756bef67037ade0f4f0125d579fdc3f3d457c8/backends/gstreamer/webrtc.rs#L584
                                 downstream_peer_el_group.webrtcbin.connect("on-data-channel", false, move |channel| {
                                     println!("on-data-channel called");
@@ -618,6 +635,8 @@ impl Streamer {
                                         .get::<WebRTCDataChannel>()
                                         .map_err(|e| e.to_string())
                                         .expect("Invalid data channel");
+                                    let channel_id = channel.id();
+                                    channel_id_to_socket_id_for_data_channel_adding.insert(channel_id, origin_socketid_for_data_channel_adding.clone());
                                     streaming_cmd_queue_for_data_channel_adding.send(InternalMessage::AddDataChannelForSocket(origin_socketid_for_data_channel_adding.clone(), channel));
                                     None
                                 });
@@ -841,9 +860,6 @@ impl Streamer {
                         }
                     },
                     InternalMessage::PeerStateChange(origin_socketid, state) => {
-
-
-
                         if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
 
                             let mut should_disconnect = false;
@@ -873,7 +889,13 @@ impl Streamer {
                                 println!("disconnecting webrtc peer {}", origin_socketid);
                                 webrtc_peer.stop().expect("Error stopping webrtc peer");
                                 webrtc_peer.remove_from_pipeline(&pipeline).expect("Error removing webrtc peer from pipeline");
-                                downstream_peers.remove(&origin_socketid); // drop bye bye
+                                if webrtc_peer.data_channels.len() > 0 {
+                                    println!("{} data channels removed from peer", webrtc_peer.data_channels.len());
+                                }
+                                webrtc_peer.data_channels.iter().for_each(|channel| {
+                                    self.channel_id_to_socket_id.remove(&channel.id());
+                                });
+                                downstream_peers.remove(&origin_socketid);// drop bye bye
                                 /*if let Err(err) = pipeline.set_state(gstreamer::State::Playing) {
                                     println!("Error setting pipeline state to playing: {:?}", err);
                                 }*/
