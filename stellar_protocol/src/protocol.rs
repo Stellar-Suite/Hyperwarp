@@ -181,6 +181,10 @@ pub enum StellarFrontendMessage {
     },
     OfferRequest {
         offer_request_source: String
+    },
+    DefineACL {
+        acl: PrivligeDefinition,
+        socket_id: String
     }
 }
 
@@ -205,3 +209,38 @@ pub fn should_flip_buffers_for_graphics_api(gapi: GraphicsAPI) -> bool {
     }
 }
 
+// js usable protocol
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(tag = "type")]
+pub enum StellarDirectControlMessage {
+    UpdateWindowTitle {
+        title: String,
+    },
+    UpdateWindowSize {
+        width: u32,
+        height: u32,
+    },
+    MouseMoveRelative {
+        x: i32,
+        y: i32,
+    },
+    MouseMoveAbsolute {
+        x: i32,
+        y: i32,
+    },
+    MouseButton {
+        button: u8,
+        state: bool,
+    },
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct PrivligeDefinition {
+    pub can_chat: bool,
+    pub can_resize: bool,
+    pub can_mouse: bool,
+    pub can_touchscreen: bool,
+    pub can_keyboard: bool,
+    pub can_controller: bool,
+    pub can_manage_controllers: bool,
+}
