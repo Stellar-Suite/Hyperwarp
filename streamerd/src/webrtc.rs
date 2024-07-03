@@ -5,7 +5,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use anyhow::Ok;
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
 use gstreamer_video::{prelude::*, VideoInfo};
-use gstreamer_webrtc::WebRTCSessionDescription;
+use gstreamer_webrtc::{WebRTCDataChannel, WebRTCSessionDescription};
 use stellar_protocol::protocol::{EncodingPreset, PipelineOptimization};
 
 use lazy_static::lazy_static;
@@ -20,6 +20,7 @@ pub struct WebRTCPeer {
     pub may_offer: bool,
     pub bin: gstreamer::Bin,
     pub pad: gstreamer::GhostPad,
+    pub data_channels: Vec<WebRTCDataChannel>,
 }
 
 impl WebRTCPeer {
@@ -47,7 +48,16 @@ impl WebRTCPeer {
             may_offer: true,
             bin: bin,
             pad: input_ghost_pad,
+            data_channels: vec![],
         }
+    }
+
+    pub fn add_data_channel(&mut self, channel: WebRTCDataChannel) {
+        self.data_channels.push(channel);
+    }
+
+    pub fn get_data_channels(&self) -> &Vec<WebRTCDataChannel> {
+        &self.data_channels
     }
 
     pub fn play(&self) -> anyhow::Result<()> {

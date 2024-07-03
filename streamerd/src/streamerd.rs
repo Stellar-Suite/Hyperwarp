@@ -11,7 +11,7 @@ use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, ErrorMessage, PadProbeReturn, PadProbeType};
 use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
-use gstreamer_webrtc::{WebRTCPeerConnectionState, WebRTCSessionDescription};
+use gstreamer_webrtc::{WebRTCDataChannel, WebRTCPeerConnectionState, WebRTCSessionDescription};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
 
 use rust_socketio::{client::Client, ClientBuilder};
@@ -48,6 +48,7 @@ pub enum InternalMessage {
     SocketOfferGeneration(String, OfferGenerationOriginType),
     PeerStateChange(String, WebRTCPeerConnectionState),
     SocketRtcReady(String),
+    AddDataChannelForSocket(String, WebRTCDataChannel),
 }
 
 pub struct SystemHints {
@@ -608,6 +609,19 @@ impl Streamer {
                                     // streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone(), OfferGenerationOriginType::Element));
                                 }));
 
+                                let streaming_cmd_queue_for_data_channel_adding = self.streaming_command_queue.clone();
+                                let origin_socketid_for_data_channel_adding = origin_socketid.clone();
+                                // https://github.com/servo/media/blob/45756bef67037ade0f4f0125d579fdc3f3d457c8/backends/gstreamer/webrtc.rs#L584
+                                downstream_peer_el_group.webrtcbin.connect("on-data-channel", false, move |channel| {
+                                    println!("on-data-channel called");
+                                    let channel = channel[1]
+                                        .get::<WebRTCDataChannel>()
+                                        .map_err(|e| e.to_string())
+                                        .expect("Invalid data channel");
+                                    streaming_cmd_queue_for_data_channel_adding.send(InternalMessage::AddDataChannelForSocket(origin_socketid_for_data_channel_adding.clone(), channel));
+                                    None
+                                });
+
                                 downstream_peer_el_group.webrtcbin.connect_closure("on-new-transceiver", false, glib::closure!(move |_webrtcbin: &gstreamer::Element| {
                                     println!("on-new-transceiver called");
                                 }));
@@ -856,7 +870,7 @@ impl Streamer {
                             }
 
                             if should_disconnect {
-
+                                println!("disconnecting webrtc peer {}", origin_socketid);
                                 webrtc_peer.stop().expect("Error stopping webrtc peer");
                                 webrtc_peer.remove_from_pipeline(&pipeline).expect("Error removing webrtc peer from pipeline");
                                 downstream_peers.remove(&origin_socketid); // drop bye bye
@@ -877,6 +891,21 @@ impl Streamer {
                             if let Err(err) = socket.emit("send_to", json!([origin_socketid, StellarFrontendMessage::ProvisionWebRTCReply { provision_ok: true }])) {
                                 println!("Error sending provision reply to socket id {:?}: {:?}", origin_socketid, err);
                             }
+                        }
+                    },
+                    InternalMessage::AddDataChannelForSocket(origin_socketid, channel) => {
+                        if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
+                            channel.connect_on_message_data(|channel, data_opt| {
+                                if let Some(data) = data_opt {
+                                    
+                                }
+                            });
+                            channel.connect_on_message_string(|channel, data_opt| {
+                                if let Some(data) = data_opt {
+                                    // parse it
+                                }
+                            });
+                            webrtc_peer.add_data_channel(channel);
                         }
                     },
                     _ => { // if thi warns about unreachable code, it's very good because we implemented everything
