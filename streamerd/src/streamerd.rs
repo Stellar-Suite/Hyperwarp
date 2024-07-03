@@ -230,8 +230,11 @@ impl Streamer {
         let appsrc = gstreamer_app::AppSrc::builder()
         .caps(&video_info.to_caps().expect("Cap generation failed"))
         // .is_live(true)
+        .leaky_type(gstreamer_app::AppLeakyType::Downstream)
+        .stream_type(gstreamer_app::AppStreamType::Stream)
         .block(false)
-        // .is_live(true)
+        // this is apparently important
+        .is_live(true)
         .do_timestamp(true)
         .format(gstreamer::Format::Time)
         .build();
