@@ -3,6 +3,7 @@ use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::constants::sdl2::SDL_FALSE;
 
+use crate::constants::Library;
 use crate::host::window::Window;
 use crate::utils::{self, format_window_title_prefix_cstr};
 use crate::utils::manual_types::sdl2::{SDL_Window, Uint32, SDL_Renderer};
@@ -63,7 +64,7 @@ redhook::hook! {
         // who would have a negative window size?
         let window = Window {
             id: result as usize,
-            is_SDL2: true,
+            lib: Library::SDL2,
         };
 
         HOST.onWindowCreate(window, Some(final_x), Some(final_y), Some(final_w.try_into().unwrap()), Some(final_h.try_into().unwrap()));

@@ -11,6 +11,7 @@ pub mod utils;
 pub mod bind;
 pub mod standalone;
 pub mod shim;
+pub mod platform;
 
 // I forgot what this is for. 
 fn main() {

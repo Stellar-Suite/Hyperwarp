@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 use std::ffi::CStr;
 use libc::{c_char, c_void};
 
-use crate::host::hosting::HOST;
+use crate::{constants::Library, host::hosting::HOST};
 
 // types
 // TODO: convert them to without the pointer stuffs
@@ -72,7 +72,7 @@ redhook::hook! {
 
             let window = crate::host::window::Window {
                 id: ((result) as *const c_void) as usize,
-                is_SDL2: false,
+                lib: Library::Xlib,
             };
 
             HOST.onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));

@@ -1,9 +1,11 @@
 use libc::c_void;
 
+use crate::constants::Library;
+
 #[derive(Debug)]
 pub struct Window {
     pub id: usize,
-    pub is_SDL2: bool,
+    pub lib: Library,
 }
 
 impl Window {
