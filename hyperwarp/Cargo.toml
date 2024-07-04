@@ -23,6 +23,8 @@ crossbeam-queue = "0.3.11"
 human-panic = "2.0.0"
 backtrace = "0.3.72"
 dashmap = "6.0.1"
+# "bindgen" itself might be extraneous
+sdl2-sys = { version = "0.37.0", features = ["bindgen", "use-bindgen"] }
 # stellar_core = { path = "../stellar_core" }
 
 [build-dependencies]
