@@ -17,3 +17,11 @@ pub enum Library {
     RustNative,
     CNative
 }
+
+pub fn is_SDL(lib: Library) -> bool {
+    match lib {
+        Library::SDL2 | Library::SDL3 => true,
+        _ => false,
+    }
+}
+

@@ -6,6 +6,7 @@ use super::{feature_flags, hosting::HOST};
 pub struct Mouse {
     pub x: i32,
     pub y: i32,
+    pub buttons: i32,
 }
 
 impl Mouse {
@@ -13,6 +14,7 @@ impl Mouse {
         Mouse {
             x: 0,
             y: 0,
+            buttons: 0,
         }
     }
 }
@@ -34,6 +36,14 @@ impl Keyboard {
         Keyboard {
             state: create_init_keyboard_state(),
         }
+    }
+
+    pub fn calc_modifiers(&self) -> u32 {
+        let mut modifiers = 0;
+
+        
+
+        return 0;
     }
 }
 
