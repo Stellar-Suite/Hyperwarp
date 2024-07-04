@@ -24,6 +24,7 @@ use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
+use super::input::InputManager;
 use super::window::Window;
 use super::{
     feature_flags::FeatureFlags,
@@ -55,6 +56,7 @@ pub struct ApplicationHost {
     pub command_queue: Arc<SegQueue<MainTickMessage>>,
     pub last_sent_state: Arc<RwLock<LastSentState>>, // TODO: remove this arc rwlock if perf is hit hard enough here, may be able to unsafe it
     pub host_info: RwLock<HostInfo>,
+    pub input_manager: Arc<Mutex<InputManager>>,
 }
 
 #[derive(Debug)]
@@ -86,6 +88,7 @@ impl ApplicationHost {
             command_queue: Arc::new(SegQueue::new()),
             last_sent_state: Arc::new(RwLock::new(LastSentState { resolution: (0, 0), graphics_api: host_info.graphics_api })),
             host_info: RwLock::new(host_info),
+            input_manager: Arc::new(Mutex::new(InputManager::new())),
         };
         return host;
     }

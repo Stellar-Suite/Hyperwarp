@@ -1,3 +1,4 @@
+pub mod input;
 pub mod host_behavior;
 pub mod hosting;
 pub mod window;

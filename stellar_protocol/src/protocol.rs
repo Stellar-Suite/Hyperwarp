@@ -234,7 +234,7 @@ pub enum StellarDirectControlMessage {
     },
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Copy, Clone, Debug)]
 pub struct PrivligeDefinition {
     pub can_chat: bool,
     pub can_resize: bool,
@@ -248,15 +248,7 @@ pub struct PrivligeDefinition {
 // TODO: adopt a strict by default model, for now it's full for debug
 impl Default for PrivligeDefinition {
     fn default() -> Self {
-        PrivligeDefinition {
-            can_chat: true,
-            can_resize: true,
-            can_mouse: true,
-            can_touchscreen: true,
-            can_keyboard: true,
-            can_controller: true,
-            can_manage_controllers: true,
-        }
+        create_default_acl()
     }
 }
 
