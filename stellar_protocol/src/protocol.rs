@@ -142,6 +142,7 @@ pub enum StellarMessage {
     UnsubscribeChannel(StellarChannel),
     DebugInfoRequest,
     DebugInfoResponse(DebugInfo),
+    UserInputEvent(InputEvent)
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -261,5 +262,61 @@ pub const fn create_default_acl() -> PrivligeDefinition {
         can_keyboard: true,
         can_controller: true,
         can_manage_controllers: true,
+    }
+}
+
+// input
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InputEvent {
+    pub payload: InputEventPayload,
+    pub metadata: InputMetadata,
+}
+
+impl InputEvent {
+    // untimestamped blank input event
+    pub fn new(payload: InputEventPayload) -> InputEvent {
+        let input_event = InputEvent {
+            payload,
+            metadata: InputMetadata::new(),
+        };
+        input_event
+    }
+
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InputMetadata {
+    pub sdl2_timestamp_ticks: Option<u32>,
+    pub sdl2_timestamp_ticks_u64: Option<u64>,
+    pub sdl3_timestamp_ticks: Option<u32>,
+    pub sdl3_timestamp_ticks_u64: Option<u64>,
+}
+
+
+impl InputMetadata {
+    pub fn new() -> InputMetadata {
+        InputMetadata {
+            sdl2_timestamp_ticks: None,
+            sdl2_timestamp_ticks_u64: None,
+            // heh I will not deal with this for a while
+            sdl3_timestamp_ticks: None,
+            sdl3_timestamp_ticks_u64: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum InputEventPayload {
+    MouseMoveRelative {
+        x: i32,
+        y: i32,
+        x_absolute: i32,
+        y_absolute: i32,
+    },
+    MouseMoveAbsolute(i32, i32),
+    KeyEvent {
+        key: String,
+        scancode: String,
+        state: bool,
     }
 }

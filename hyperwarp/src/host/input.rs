@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
+
 use super::{feature_flags, hosting::HOST};
 
 // abstraction for data
@@ -20,12 +22,14 @@ impl Mouse {
 }
 
 pub struct Keyboard {
-    pub state: HashMap<i32, bool>, // key code _> pressed
+    pub scancodes_state: HashMap<i32, bool>,
+    pub keycodes_state: HashMap<i32, bool>,
+     // key code _> pressed
 }
 
 pub fn create_init_keyboard_state() -> HashMap<i32, bool> {
     let mut state = HashMap::new();
-    for i in 0..256 {
+    for i in 0..1024 { // maybe make this 256
         state.insert(i, false);
     }
     state
@@ -34,8 +38,14 @@ pub fn create_init_keyboard_state() -> HashMap<i32, bool> {
 impl Keyboard {
     pub fn new() -> Keyboard {
         Keyboard {
-            state: create_init_keyboard_state(),
+            scancodes_state: create_init_keyboard_state(),
+            keycodes_state: create_init_keyboard_state(),
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.scancodes_state = create_init_keyboard_state();
+        self.keycodes_state = create_init_keyboard_state();
     }
 
     pub fn calc_modifiers(&self) -> u32 {
@@ -47,45 +57,12 @@ impl Keyboard {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct InputEvent {
-    pub payload: InputEventPayload,
-    pub metadata: InputMetadata,
+pub trait Timestampable {
+    fn timestamp(&mut self);
 }
 
-impl InputEvent {
-    pub fn new(payload: InputEventPayload) -> InputEvent {
-        let mut input_event = InputEvent {
-            payload,
-            metadata: InputMetadata::new(),
-        };
-        input_event.metadata.timestamp();
-        input_event
-    }
-
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct InputMetadata {
-    pub sdl2_timestamp_ticks: Option<u32>,
-    pub sdl2_timestamp_ticks_u64: Option<u64>,
-    pub sdl3_timestamp_ticks: Option<u32>,
-    pub sdl3_timestamp_ticks_u64: Option<u64>,
-}
-
-
-impl InputMetadata {
-    pub fn new() -> InputMetadata {
-        InputMetadata {
-            sdl2_timestamp_ticks: None,
-            sdl2_timestamp_ticks_u64: None,
-            // heh I will not deal with this for a while
-            sdl3_timestamp_ticks: None,
-            sdl3_timestamp_ticks_u64: None,
-        }
-    }
-
-    pub fn timestamp(&mut self) {
+impl Timestampable for InputMetadata {
+    fn timestamp(&mut self) {
         {
             let feature_flags = HOST.features.lock().unwrap();
             if feature_flags.sdl2_enabled {
@@ -97,19 +74,6 @@ impl InputMetadata {
             // TODO: sdl3
         }
     }
-}
-
-
-
-#[derive(Debug, Copy, Clone)]
-pub enum InputEventPayload {
-    MouseMoveRelative {
-        x: i32,
-        y: i32,
-        x_absolute: i32,
-        y_absolute: i32,
-    },
-    MouseMoveAbsolute(i32, i32),
 }
 
 pub struct InputManager {
@@ -150,7 +114,7 @@ impl InputManager {
     }
 
     pub fn set_key(&mut self, key: i32, state: bool) {
-        self.keyboard.state.insert(key, state);
+        self.keyboard.scancodes_state.insert(key, state);
     }
 
     pub fn new() -> InputManager {

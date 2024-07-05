@@ -1,6 +1,7 @@
 use sdl2_sys::SDL_PushEvent;
+use stellar_protocol::protocol::{InputEvent, InputEventPayload};
 
-use crate::host::{hosting::HOST, input::{InputEvent, InputEventPayload}};
+use crate::host::{hosting::HOST};
 
 pub fn process_event(input_event: &InputEvent) {
     match input_event.payload {
