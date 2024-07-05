@@ -184,6 +184,8 @@ impl ApplicationHost {
             },
             None => {}
         }
+
+        self.input_manager.lock().unwrap().flush_queue();
     }
 
     pub fn sync(&self){
@@ -249,6 +251,8 @@ impl ApplicationHost {
         let handler_signals = handler_wrapper.clone();
 
         let command_queue = self.command_queue.clone();
+
+        let input_manager = self.input_manager.clone();
 
         std::thread::spawn(move || {
             // let mut frame_sub_endpoints: Vec<Endpoint> = vec![];
@@ -325,6 +329,12 @@ impl ApplicationHost {
                                                     println!("Subscribing to channel {:?} from {:?}", channel, endpoint.addr());
                                                 }
                                                 pubsub.get_mut(&channel).unwrap().push(endpoint.clone());
+                                            },
+                                            StellarMessage::UserInputEvent(input_event) => {
+                                                if config.debug_mode {
+                                                    println!("User input event received from {:?} {:?}", endpoint.addr(), input_event);
+                                                }
+                                                input_manager.lock().unwrap().push_event(input_event);
                                             },
                                             _ => {
                                                 if config.debug_mode {

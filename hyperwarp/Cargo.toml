@@ -32,7 +32,7 @@ cc = "1.0"
 
 [lib]
 name = "hyperwarphooker"
-crate_type = ["dylib", "rlib"]
+crate-type = ["dylib", "rlib"]
 
 # The development profile, used for `cargo build`
 [profile.dev]

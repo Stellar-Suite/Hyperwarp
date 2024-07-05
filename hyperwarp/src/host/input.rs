@@ -130,4 +130,8 @@ impl InputManager {
 
         }
     }
+
+    pub fn push_event(&mut self, event: InputEvent) {
+        self.event_queue.push(event);
+    }
 }
