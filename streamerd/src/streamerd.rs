@@ -622,6 +622,7 @@ impl Streamer {
                                     println!("element prompted negotiation");
                                     // this was causing some headaches by being spammed
                                     // hopefully it stops doing this
+                                    // normally in js you can call setLocalDescription and do something
                                     // streaming_cmd_queue_for_negotiation.send(InternalMessage::SocketOfferGeneration(origin_socketid_for_negotiation.clone(), OfferGenerationOriginType::Element));
                                 }));
 
@@ -741,7 +742,7 @@ impl Streamer {
                                             println!("Error processing sdp answer from socket id {:?}: {:?}", origin_socketid, err);
                                         }
                                     }else if type_ == "offer" {
-                                        // client makes offer, unused for now?
+                                        // client makes offer, unused no more.
                                         let streaming_cmd_queue_for_reply = self.streaming_command_queue.clone();
                                         let source_id = origin_socketid.clone();
                                         println!("processing sdp offer");

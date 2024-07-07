@@ -132,6 +132,20 @@ impl WebRTCPeer {
         self.webrtcbin.emit_by_name::<()>("set-remote-description", &[desc_ref, &None::<gstreamer::Promise>]);
     }
 
+    pub fn set_remote_description_and_cb(&self, desc_ref: &WebRTCSessionDescription, on_promise: Box<dyn FnOnce() + Send>) {
+        let promise = gstreamer::Promise::with_change_func(move |reply| {
+            match reply {
+                core::result::Result::Ok(_) => {
+                    on_promise();
+                },
+                Err(err) => {
+                    println!("failed at getting answer struct: {:?}", err);
+                }
+            }
+        });
+        self.webrtcbin.emit_by_name::<()>("set-remote-description", &[desc_ref, &promise]);
+    }
+
     pub fn process_sdp_answer(&self, sdp: &str) -> anyhow::Result<()> {
         let sdp_message = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())?;
         let answer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Answer, sdp_message);
