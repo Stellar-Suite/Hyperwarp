@@ -391,10 +391,10 @@ impl WebRTCPreprocessor {
 
         match preset {
             EncodingPreset::H264 => {
-                suffix.push(build_capsfilter(gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H264,payload=96").expect("Could not use default H264 caps")).expect("Could not construct rtp capsfilter"));
+                suffix.push(build_capsfilter(gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H264").expect("Could not use default H264 caps")).expect("Could not construct rtp capsfilter"));
             },
             EncodingPreset::H265 => {
-                suffix.push(build_capsfilter(gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H265,payload=96").expect("Could not use default H265 caps")).expect("Could not construct rtp capsfilter"));
+                suffix.push(build_capsfilter(gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H265").expect("Could not use default H265 caps")).expect("Could not construct rtp capsfilter"));
             },
             _ => {
                 // don't put capsfilter yet
@@ -476,7 +476,7 @@ impl WebRTCPreprocessor {
 
     pub fn set_default_settings(&mut self){
         self.payloader.set_property_from_str("config-interval", "-1");
-        self.payloader.set_property_from_str("pt", "96");
+        // self.payloader.set_property_from_str("pt", "96");
         match self.preset {
             // TODO: fix this, but it defaults to 0 which is based off resolution
             EncodingPreset::H264 => {

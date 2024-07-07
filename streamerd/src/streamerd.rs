@@ -808,6 +808,7 @@ impl Streamer {
                     InternalMessage::SocketSdpAnswer(origin_socketid, desc) => {
                         if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
                             webrtc_peer.set_remote_description(&desc);
+                            println!("sending our answer sdp to socket id {:?}", origin_socketid);
                             let reply = StellarFrontendMessage::Sdp {
                                 type_: "answer".to_string(),
                                 sdp: desc.sdp().as_text().expect("Could not turn the session description into a string").to_string(),
