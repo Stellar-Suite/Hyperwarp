@@ -603,8 +603,9 @@ impl Streamer {
                                 // }
                                 let mut downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 downstream_peer_el_group.set_stun_server(&config.stun_server);
+                                // downstream_peer_el_group.add_default_data_channels();
                                 downstream_peer_el_group.link_internally().expect("Could not link webrtc peer internally");
-                                downstream_peer_el_group.add_default_data_channels();
+                                
 
                                 // if downstream_peers.is_empty() {
                                     // pipeline.set_state(gstreamer::State::Playing).expect("play failure");
@@ -630,13 +631,7 @@ impl Streamer {
                                 let streaming_cmd_queue_for_data_channel_adding = self.streaming_command_queue.clone();
                                 let origin_socketid_for_data_channel_adding = origin_socketid.clone();
                                 let channel_id_to_socket_id_for_data_channel_adding = self.channel_id_to_socket_id.clone();
-                                // existing data channels are def created by us
-                                for channel in downstream_peer_el_group.get_data_channels() {
-                                    let channel_id = channel.id();
-                                    channel_id_to_socket_id_for_data_channel_adding.insert(channel_id, origin_socketid_for_data_channel_adding.clone());
-                                    // TODO: attach handlers manually here
-
-                                }
+                                
                                 // https://github.com/servo/media/blob/45756bef67037ade0f4f0125d579fdc3f3d457c8/backends/gstreamer/webrtc.rs#L584
                                 downstream_peer_el_group.webrtcbin.connect("on-data-channel", false, move |channel| {
                                     println!("on-data-channel called");
@@ -713,6 +708,17 @@ impl Streamer {
                                     let _ = streaming_cmd_queue_for_ready.send(InternalMessage::SocketRtcReady(origin_socketid_for_ready));
 
                                 });
+
+                                downstream_peer_el_group.bin.set_state(gstreamer::State::Ready).expect("Could not set webrtcpeer's bin state to ready");
+                                downstream_peer_el_group.add_default_data_channels();
+                                // existing data channels are def created by us
+                                for channel in downstream_peer_el_group.get_data_channels() {
+                                    let channel_id = channel.id();
+                                    self.channel_id_to_socket_id.insert(channel_id, origin_socketid.clone());
+                                    // TODO: attach handlers manually here
+
+
+                                }
 
                                 downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
                                 println!("Added downstream peer to pipeline");
