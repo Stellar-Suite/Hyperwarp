@@ -157,7 +157,7 @@ impl WebRTCPeer {
         let sdp_message = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())?;
         let offer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Offer, sdp_message);
         // self.set_remote_description(&offer);
-        let webrtc_ref = self.webrtcbin.clone();/// we can do this lol thank god
+        let webrtc_ref = self.webrtcbin.clone();// we can do this lol thank god
         let promise = gstreamer::Promise::with_change_func(move |reply| {
             let answer_recv_promise = gstreamer::Promise::with_change_func(move |reply| {
                 match reply {

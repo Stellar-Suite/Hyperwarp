@@ -743,16 +743,21 @@ impl Streamer {
                                         }
                                     }else if type_ == "offer" {
                                         // client makes offer, unused no more.
-                                        let streaming_cmd_queue_for_reply = self.streaming_command_queue.clone();
-                                        let source_id = origin_socketid.clone();
-                                        println!("processing sdp offer");
-                                        if let Err(err) = webrtc_peer.process_sdp_offer(&sdp, Box::new(move |reply| {
-                                            println!("answering sdp offer");
-                                            streaming_cmd_queue_for_reply.send(InternalMessage::SocketSdpAnswer(source_id.clone(), reply));
-                                        })) {
-                                            self.complain_to_socket(&origin_socketid, &format!("Error processing sdp offer from socket id {:?}", err));
-                                            println!("Error processing sdp offer from socket id {:?}: {:?}", origin_socketid, err);
+                                        if webrtc_peer.may_offer {
+                                            let streaming_cmd_queue_for_reply = self.streaming_command_queue.clone();
+                                            let source_id = origin_socketid.clone();
+                                            println!("processing sdp offer");
+                                            if let Err(err) = webrtc_peer.process_sdp_offer(&sdp, Box::new(move |reply| {
+                                                println!("answering sdp offer");
+                                                streaming_cmd_queue_for_reply.send(InternalMessage::SocketSdpAnswer(source_id.clone(), reply));
+                                            })) {
+                                                self.complain_to_socket(&origin_socketid, &format!("Error processing sdp offer from socket id {:?}", err));
+                                                println!("Error processing sdp offer from socket id {:?}: {:?}", origin_socketid, err);
+                                            }    
+                                        } else {
+                                            println!("ignoring sdp offer are already doing something");
                                         }
+                                        
                                     }else{
                                         println!("Unhandled sdp type {:?} from socket id {:?}", type_, origin_socketid);
                                     }
@@ -855,6 +860,8 @@ impl Streamer {
                                 });
 
                                 webrtc_peer.webrtcbin.emit_by_name::<()>("create-offer", &[&None::<gstreamer::Structure>, &promise]);
+                            } else {
+                                println!("ignoring offer generation because we are already generating offer {}", origin_socketid);
                             }
                         } else {
                             println!("can't generate sdp offer for {:?} because it has not requested rtc", origin_socketid);
