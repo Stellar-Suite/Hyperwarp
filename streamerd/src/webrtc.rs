@@ -155,37 +155,41 @@ impl WebRTCPeer {
 
     pub fn process_sdp_offer(&self, sdp: &str, on_answer: Box<dyn FnOnce(WebRTCSessionDescription) + Send>) -> anyhow::Result<()> {
         let sdp_message = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())?;
-        let answer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Answer, sdp_message);
-        self.set_remote_description(&answer);
+        let offer = gstreamer_webrtc::WebRTCSessionDescription::new(gstreamer_webrtc::WebRTCSDPType::Offer, sdp_message);
+        // self.set_remote_description(&offer);
+        let webrtc_ref = self.webrtcbin.clone();/// we can do this lol thank god
         let promise = gstreamer::Promise::with_change_func(move |reply| {
-            match reply {
-                core::result::Result::Ok(answer_option) => {
-                    match answer_option {
-                        Some(struct_ref) => {
-                            let answer_result = struct_ref
-                                .value("answer")
-                                .unwrap()
-                                .get::<gstreamer_webrtc::WebRTCSessionDescription>();
-                            match answer_result {
-                                core::result::Result::Ok(answer) => {
-                                    on_answer(answer);
-                                },
-                                Err(err) => {
-                                    println!("failed at getting answer struct: {:?}", err);
+            let answer_recv_promise = gstreamer::Promise::with_change_func(move |reply| {
+                match reply {
+                    core::result::Result::Ok(answer_option) => {
+                        match answer_option {
+                            Some(struct_ref) => {
+                                let answer_result = struct_ref
+                                    .value("answer")
+                                    .unwrap()
+                                    .get::<gstreamer_webrtc::WebRTCSessionDescription>();
+                                match answer_result {
+                                    core::result::Result::Ok(answer) => {
+                                        on_answer(answer);
+                                    },
+                                    Err(err) => {
+                                        println!("failed at getting answer struct: {:?}", err);
+                                    }
                                 }
+                            },
+                            None => {
+                                println!("no answer created");
                             }
-                        },
-                        None => {
-                            println!("no answer created");
                         }
+                    },
+                    Err(err) => {
+                        println!("early error creating answer: {:?}", err);
                     }
-                },
-                Err(err) => {
-                    println!("early error creating answer: {:?}", err);
                 }
-            }
+            });
+            webrtc_ref.emit_by_name::<()>("create-answer", &[&None::<gstreamer::Structure>, &answer_recv_promise]);
         });
-        self.webrtcbin.emit_by_name::<()>("create-answer", &[&None::<gstreamer::Structure>, &promise]);
+        self.webrtcbin.emit_by_name::<()>("set-remote-description", &[&offer, &promise]);
 
         Ok(())
     }
