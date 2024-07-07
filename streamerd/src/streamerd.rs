@@ -49,7 +49,7 @@ pub enum InternalMessage {
     SocketOfferGeneration(String, OfferGenerationOriginType),
     PeerStateChange(String, WebRTCPeerConnectionState),
     SocketRtcReady(String),
-    AddDataChannelForSocket(String, WebRTCDataChannel),
+    AddDataChannelForSocket(String, WebRTCDataChannel, bool), // last bool is for if it originated from the client
 }
 
 pub struct SystemHints {
@@ -601,10 +601,11 @@ impl Streamer {
                                 // if downstream_peers.is_empty() {
                                     // pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
                                 // }
-                                let downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
+                                let mut downstream_peer_el_group = webrtc::WebRTCPeer::new(origin_socketid.clone());
                                 downstream_peer_el_group.set_stun_server(&config.stun_server);
                                 downstream_peer_el_group.link_internally().expect("Could not link webrtc peer internally");
-                                
+                                downstream_peer_el_group.add_default_data_channels();
+
                                 // if downstream_peers.is_empty() {
                                     // pipeline.set_state(gstreamer::State::Playing).expect("play failure");
                                 // }
@@ -629,6 +630,13 @@ impl Streamer {
                                 let streaming_cmd_queue_for_data_channel_adding = self.streaming_command_queue.clone();
                                 let origin_socketid_for_data_channel_adding = origin_socketid.clone();
                                 let channel_id_to_socket_id_for_data_channel_adding = self.channel_id_to_socket_id.clone();
+                                // existing data channels are def created by us
+                                for channel in downstream_peer_el_group.get_data_channels() {
+                                    let channel_id = channel.id();
+                                    channel_id_to_socket_id_for_data_channel_adding.insert(channel_id, origin_socketid_for_data_channel_adding.clone());
+                                    // TODO: attach handlers manually here
+
+                                }
                                 // https://github.com/servo/media/blob/45756bef67037ade0f4f0125d579fdc3f3d457c8/backends/gstreamer/webrtc.rs#L584
                                 downstream_peer_el_group.webrtcbin.connect("on-data-channel", false, move |channel| {
                                     println!("on-data-channel called");
@@ -638,7 +646,7 @@ impl Streamer {
                                         .expect("Invalid data channel");
                                     let channel_id = channel.id();
                                     channel_id_to_socket_id_for_data_channel_adding.insert(channel_id, origin_socketid_for_data_channel_adding.clone());
-                                    streaming_cmd_queue_for_data_channel_adding.send(InternalMessage::AddDataChannelForSocket(origin_socketid_for_data_channel_adding.clone(), channel));
+                                    streaming_cmd_queue_for_data_channel_adding.send(InternalMessage::AddDataChannelForSocket(origin_socketid_for_data_channel_adding.clone(), channel, true));
                                     None
                                 });
 
@@ -924,11 +932,12 @@ impl Streamer {
                             }
                         }
                     },
-                    InternalMessage::AddDataChannelForSocket(origin_socketid, channel) => {
+                    InternalMessage::AddDataChannelForSocket(origin_socketid, channel, originated_from_client) => {
                         if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
                             channel.connect_on_message_data(|channel, data_opt| {
                                 if let Some(data) = data_opt {
-                                    
+                                    // TODO: another thread for data channel io!
+                                    // cause why not 
                                 }
                             });
                             channel.connect_on_message_string(|channel, data_opt| {
@@ -936,7 +945,9 @@ impl Streamer {
                                     // parse it
                                 }
                             });
-                            webrtc_peer.add_data_channel(channel);
+                            if originated_from_client {
+                                webrtc_peer.add_data_channel(channel);
+                            }
                         }
                     },
                     _ => { // if thi warns about unreachable code, it's very good because we implemented everything

@@ -52,6 +52,32 @@ impl WebRTCPeer {
         }
     }
 
+    pub fn add_default_data_channels(&mut self) {
+        // https://github.com/servo/media/blob/45756bef67037ade0f4f0125d579fdc3f3d457c8/backends/gstreamer/datachannel.rs#L17
+        // TODO: dry this
+
+        let unreliable_init_struct = gstreamer::Structure::builder("options")
+            .field("ordered", false)
+            .field("max-retransmits", 0)
+            .field("negotiated", false)
+            .build();
+
+        let unreliable_channel = self.webrtcbin.emit_by_name::<WebRTCDataChannel>("create-data-channel", &[&"unreliable", &unreliable_init_struct]);
+
+        self.add_data_channel(unreliable_channel);
+
+        let reliable_init_struct = gstreamer::Structure::builder("options")
+            .field("ordered", true)
+            .field("max-retransmits", -1)
+            .field("negotiated", false)
+            .build();
+
+        let reliable_channel = self.webrtcbin.emit_by_name::<WebRTCDataChannel>("create-data-channel", &[&"reliable", &reliable_init_struct]);
+
+        self.add_data_channel(reliable_channel);
+
+    }
+
     pub fn add_data_channel(&mut self, channel: WebRTCDataChannel) {
         self.data_channels.push(channel);
     }
