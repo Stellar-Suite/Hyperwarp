@@ -189,9 +189,12 @@ pub enum StellarFrontendMessage {
     }
 }
 
+// js usable protocol
+// bypass stargate so faster
+// use rename for clientbound
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(tag = "type")]
-pub enum StellarFrontendDirectMessage {
+pub enum StellarDirectControlMessage {
     #[serde(rename = "update_window_title")]
     UpdateWindowTitle {
         title: String,
@@ -199,6 +202,26 @@ pub enum StellarFrontendDirectMessage {
     #[serde(alias = "keychange")]
     KeyChange {
         // TODO
+    },
+    #[serde(rename = "update_window_size")]
+    UpdateWindowSize {
+        width: u32,
+        height: u32,
+    },
+    #[serde(alias = "mouse_rel")]
+    MouseMoveRelative {
+        x: i32,
+        y: i32,
+    },
+    #[serde(alias = "mouse_abs")]
+    MouseMoveAbsolute { // tablet style input
+        x: i32,
+        y: i32,
+    },
+    #[serde(alias = "mouse_btn")]
+    MouseButton {
+        button: u8,
+        state: bool,
     },
 }
 
@@ -221,31 +244,6 @@ pub fn should_flip_buffers_for_graphics_api(gapi: GraphicsAPI) -> bool {
         GraphicsAPI::Metal => false,
         GraphicsAPI::Unknown => false,
     }
-}
-
-// js usable protocol
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(tag = "type")]
-pub enum StellarDirectControlMessage {
-    UpdateWindowTitle {
-        title: String,
-    },
-    UpdateWindowSize {
-        width: u32,
-        height: u32,
-    },
-    MouseMoveRelative {
-        x: i32,
-        y: i32,
-    },
-    MouseMoveAbsolute {
-        x: i32,
-        y: i32,
-    },
-    MouseButton {
-        button: u8,
-        state: bool,
-    },
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Copy, Clone, Debug)]

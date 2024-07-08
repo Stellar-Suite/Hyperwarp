@@ -13,7 +13,7 @@ use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, Err
 use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCPeerConnectionState, WebRTCSessionDescription};
-use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}, util::thread};
+use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::{adapter::NetworkAddr, Endpoint}, node::{self, NodeEvent, NodeHandler}, util::thread};
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
@@ -50,6 +50,7 @@ pub enum InternalMessage {
     PeerStateChange(String, WebRTCPeerConnectionState),
     SocketRtcReady(String),
     AddDataChannelForSocket(String, WebRTCDataChannel, bool), // last bool is for if it originated from the client
+    ProcessDirectMessage(String, stellar_protocol::protocol::StellarDirectControlMessage),
 }
 
 pub struct SystemHints {
@@ -97,7 +98,8 @@ impl std::fmt::Display for OperationMode {
 }
 
 pub enum StreamerSignal {
-    DataChannelContent(Vec<u8>)   
+    DataChannelContent(Vec<u8>),   // apparently useless, will deprecated later
+    ProcessInput(stellar_protocol::protocol::InputEvent),
 }
 
 pub struct Streamer {
@@ -204,6 +206,17 @@ impl Streamer {
         std::thread::spawn(move || {
             for msg in my_comms_queue.recv() {
                 match msg {
+                    InternalMessage::ProcessDirectMessage(source_socket_id, message ) => {
+                        match message {
+
+                            _ => {
+                                println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
+                            }
+                        }
+                    },
+                    _ => {
+                        // overlap in unhandled messages
+                    }
                 }
             }
         })
@@ -731,11 +744,35 @@ impl Streamer {
                                 downstream_peer_el_group.bin.set_state(gstreamer::State::Ready).expect("Could not set webrtcpeer's bin state to ready");
                                 downstream_peer_el_group.add_default_data_channels();
                                 // existing data channels are def created by us
+                                
                                 for channel in downstream_peer_el_group.get_data_channels() {
                                     let channel_id = channel.id();
                                     self.channel_id_to_socket_id.insert(channel_id, origin_socketid.clone());
                                     // TODO: attach handlers manually here
+                                    channel.connect_on_message_data(|channel, data_opt| {
+                                        if let Some(data) = data_opt {
+                                            // TODO: another thread for data channel io!
+                                            
+                                        }
+                                    });
 
+                                    let message_handler_queue = self.client_comms_command_queue.clone();
+                                    let socket_id_for_data_channels = origin_socketid.clone();
+
+                                    channel.connect_on_message_string(move |channel, data_opt| {
+                                        if let Some(data) = data_opt {
+                                            // parse it
+                                            let message = match serde_json::from_str::<stellar_protocol::protocol::StellarDirectControlMessage>(data) {
+                                                Ok(message) => message,
+                                                Err(err) => {
+                                                    println!("Error parsing direct control message from data channel: {:?}", err);
+                                                    return;
+                                                }
+                                            };
+
+                                            let _ = message_handler_queue.send(InternalMessage::ProcessDirectMessage(socket_id_for_data_channels.clone(), message));
+                                        }
+                                    });
 
                                 }
 
@@ -961,13 +998,22 @@ impl Streamer {
                         if let Some(webrtc_peer) = downstream_peers.get_mut(&origin_socketid) {
                             channel.connect_on_message_data(|channel, data_opt| {
                                 if let Some(data) = data_opt {
-                                    // TODO: another thread for data channel io!
-                                    // cause why not 
+                                    // TODO: what do I do with binary messages?
                                 }
                             });
-                            channel.connect_on_message_string(|channel, data_opt| {
+                            let message_handler_queue = self.client_comms_command_queue.clone();
+                            channel.connect_on_message_string(move |channel, data_opt| {
                                 if let Some(data) = data_opt {
                                     // parse it
+                                    let message = match serde_json::from_str::<stellar_protocol::protocol::StellarDirectControlMessage>(data) {
+                                        Ok(message) => message,
+                                        Err(err) => {
+                                            println!("Error parsing direct control message from data channel: {:?}", err);
+                                            return;
+                                        }
+                                    };
+
+                                    let _ = message_handler_queue.send(InternalMessage::ProcessDirectMessage(origin_socketid.clone(), message));
                                 }
                             });
                             if originated_from_client {
@@ -1086,6 +1132,7 @@ impl Streamer {
             let inner_run = || -> Result<()> {
                 println!("Enter Hyperwarp client event processing");
                 let mut shm_file: Option<std::fs::File> = None;
+                let mut current_endpoint: Option<Endpoint> = None;
                 listener.for_each(move |event| {
                     match event {
                         NodeEvent::Network(netevent) => {
@@ -1106,6 +1153,7 @@ impl Streamer {
                                     } else {
                                         println!("One client did not successfully ready. {}", endpoint.addr());
                                     }
+                                    current_endpoint = Some(endpoint);
                                 },
                                 message_io::network::NetEvent::Accepted(_, _) => {
                                     println!("Connect accepted from Hyperwarp socket");
@@ -1160,6 +1208,7 @@ impl Streamer {
                                 },
                                 message_io::network::NetEvent::Disconnected(_) => {
                                     println!("Disconnected from Hyperwarp socket...");
+                                    current_endpoint = None;
                                 },
                             }
                         },
@@ -1167,6 +1216,14 @@ impl Streamer {
                             match signal {
                                 StreamerSignal::DataChannelContent(_) => {
                                     
+                                },
+                                StreamerSignal::ProcessInput(input_event) => {
+                                    let handler = handler_wrapper.lock().unwrap();
+                                    let network = handler.network();
+                                    let message = stellar_protocol::protocol::StellarMessage::UserInputEvent(input_event);
+                                    if let Some(endpoint) = &current_endpoint {
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
+                                    }
                                 },
                             }
                         }
