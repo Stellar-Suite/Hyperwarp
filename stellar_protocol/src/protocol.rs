@@ -201,7 +201,11 @@ pub enum StellarDirectControlMessage {
     },
     #[serde(alias = "keychange")]
     KeyChange {
-        // TODO
+        key: String,
+        code: String,
+        composition: bool,
+        state: bool,
+        timestamp: u64,
     },
     #[serde(rename = "update_window_size")]
     UpdateWindowSize {
@@ -212,16 +216,19 @@ pub enum StellarDirectControlMessage {
     MouseMoveRelative {
         x: i32,
         y: i32,
+        timestamp: u64,
     },
     #[serde(alias = "mouse_abs")]
     MouseMoveAbsolute { // tablet style input
         x: i32,
         y: i32,
+        timestamp: u64,
     },
     #[serde(alias = "mouse_btn")]
     MouseButton {
         button: u8,
         state: bool,
+        timestamp: u64,
     },
 }
 

@@ -17,7 +17,7 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{create_default_acl, may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, PipelineOptimization, PrivligeDefinition, StellarChannel, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{create_default_acl, may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, PipelineOptimization, PrivligeDefinition, StellarChannel, StellarDirectControlMessage, StellarFrontendMessage, StellarMessage, StreamerState};
 
 use std::time::Instant;
 
@@ -182,6 +182,7 @@ impl Streamer {
         }
         self.started = true;
         self.start_stargate_client_thread().expect("Stargate connection failed.");
+        self.start_data_channels_thread();
         self.run_gstreamer().expect("Streamer thread panicked");
     }
 
@@ -198,17 +199,26 @@ impl Streamer {
         }
     }
 
-    pub fn run_data_channels_thread(&mut self) -> JoinHandle<()> {
+    pub fn broadcast_to_data_channels(&self, message: &StellarDirectControlMessage) {
+        // TODO: make internal message
+    }
+
+    pub fn start_data_channels_thread(&mut self) -> JoinHandle<()> {
         let config = self.config.clone();
         let stopper = self.stop.clone();
         let socket = self.get_socket();
         let my_comms_queue = self.client_comms_command_recv.clone();
+        let handler_lock = self.messaging_handler.clone().unwrap();
         std::thread::spawn(move || {
-            for msg in my_comms_queue.recv() {
+            println!("Starting data channel message processing thread");
+            while let Ok(msg) = my_comms_queue.recv() {
                 match msg {
                     InternalMessage::ProcessDirectMessage(source_socket_id, message ) => {
+                        let handler = handler_lock.lock().unwrap(); // TODO: mimimize locking this
                         match message {
-
+                            StellarDirectControlMessage::KeyChange { key, code, composition, state, timestamp } => {
+                                
+                            },
                             _ => {
                                 println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
                             }
@@ -219,6 +229,7 @@ impl Streamer {
                     }
                 }
             }
+            println!("data channel work queue died");
         })
     }
 
@@ -1215,12 +1226,13 @@ impl Streamer {
                         NodeEvent::Signal(signal) => {
                             match signal {
                                 StreamerSignal::DataChannelContent(_) => {
-                                    
+                                    // unused apparently
                                 },
                                 StreamerSignal::ProcessInput(input_event) => {
                                     let handler = handler_wrapper.lock().unwrap();
                                     let network = handler.network();
                                     let message = stellar_protocol::protocol::StellarMessage::UserInputEvent(input_event);
+                                    println!("sent input");
                                     if let Some(endpoint) = &current_endpoint {
                                         network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
                                     }

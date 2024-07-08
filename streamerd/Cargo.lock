@@ -1972,6 +1972,7 @@ dependencies = [
  "gstreamer-video",
  "gstreamer-webrtc",
  "lazy_static",
+ "libc",
  "message-io",
  "num",
  "rust_socketio",
