@@ -332,13 +332,13 @@ pub enum InputEventPayload {
     },
     MouseMoveAbsolute(i32, i32),
     KeyEvent {
-        key: i32,
-        scancode: i32,
+        key: u32,
+        scancode: u32,
         state: bool,
         modifiers: u16,
     },
     KeyEventLite {
-        key: i32,
+        key: u32,
         state: bool,
     }
 }

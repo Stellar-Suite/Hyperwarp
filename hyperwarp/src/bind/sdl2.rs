@@ -5,6 +5,8 @@
 
 use crate::utils::manual_types::sdl2::SDL_Window;
 
+// *const libc::c_char is a String
+
 lazy_static::lazy_static! {
     pub static ref SDL_GetWindowSize: unsafe extern "C" fn(window: *const SDL_Window, w: *mut i32, h: *mut i32) -> libc::c_void = unsafe {
         let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_GetWindowSize\0".as_ptr() as _);
@@ -14,6 +16,12 @@ lazy_static::lazy_static! {
 
     pub static ref SDL_GetWindowID: unsafe extern "C" fn(window: *const SDL_Window) -> libc::c_uint = unsafe {
         let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_GetWindowID\0".as_ptr() as _);
+        assert!(!ptr.is_null());
+        std::mem::transmute(ptr)
+    };
+
+    pub static ref SDL_GetError: unsafe extern "C" fn() -> *const libc::c_char = unsafe {
+        let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_GetError\0".as_ptr() as _);
         assert!(!ptr.is_null());
         std::mem::transmute(ptr)
     };

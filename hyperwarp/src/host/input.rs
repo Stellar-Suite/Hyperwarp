@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
 use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
+use stellar_shared::constants::sdl2::{is_unknown_scancode_u32, map_key_code_to_scancode_cursed_u32};
+
+use crate::bind::sdl2_safe;
 
 use super::{feature_flags, hosting::HOST};
 
@@ -23,7 +26,8 @@ impl Mouse {
 
 pub struct Keyboard {
     // pub scancodes_state: HashMap<i32, bool>,
-    pub keycodes_state: HashMap<i32, bool>,
+    pub keycodes_state: HashMap<u32, bool>,
+    pub sdl2_virt_array: [u8; 513],
      // key code _> pressed
 }
 
@@ -40,16 +44,35 @@ impl Keyboard {
         Keyboard {
             // scancodes_state: create_init_keyboard_state(),
             keycodes_state: create_init_keyboard_state(),
+            sdl2_virt_array: [0; 513],
         }
     }
 
     pub fn reset(&mut self) {
         // self.scancodes_state = create_init_keyboard_state();
         self.keycodes_state = create_init_keyboard_state();
+        self.sdl2_virt_array.fill(0);
+    }
+
+    pub fn set_key(&mut self, key: u32, state: bool) -> Option<bool>{
+        let output = self.keycodes_state.insert(key, state);
+
+        let sdl_scancode_u32 = map_key_code_to_scancode_cursed_u32(key);
+        
+        if !is_unknown_scancode_u32(sdl_scancode_u32) {
+            if sdl_scancode_u32 < self.sdl2_virt_array.len() as u32 {
+                self.sdl2_virt_array[sdl_scancode_u32 as usize] = state as u8;
+            } else {
+                println!("uh oh, sdl2 scancode out of bounds {}, impossible?", sdl_scancode_u32);
+            }
+        }
+
+        output
     }
 
     pub fn calc_modifiers(&self) -> u16 {
         let mut modifiers = 0u16;
+
 
         return 0;
     }
@@ -118,8 +141,8 @@ impl InputManager {
         }));
     }
 
-    pub fn set_key(&mut self, key: i32, state: bool) {
-        if let Some(prev) = self.keyboard.keycodes_state.insert(key, state) {
+    pub fn set_key(&mut self, key: u32, state: bool) {
+        if let Some(prev) = self.keyboard.set_key(key, state) {
             let repeating = prev == state;
             // we only care about these for now
             if prev != state {
@@ -154,11 +177,14 @@ impl InputManager {
                             sdl2_sys::SDL_GetScancodeFromKey(key) // hack for now
                         };
                         let keysym = 0;
+                        let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
+                        let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
+
                         let mut event = sdl2_sys::SDL_Event {
                             key: sdl2_sys::SDL_KeyboardEvent { 
                                 type_: event_type as u32,
-                                timestamp: event.metadata.sdl2_timestamp_ticks.unwrap_or(0),
-                                windowID: HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0),
+                                timestamp: timestamp,
+                                windowID: wid,
                                 state: sdl_state as u8,
                                 repeat: 0,
                                 padding2: 0,
@@ -170,7 +196,11 @@ impl InputManager {
                             // TODO: handle errors
                             // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
                             // also maybe don't use unsafe directly?
-                            sdl2_sys::SDL_PushEvent(&mut event);
+                            let result_ok = sdl2_sys::SDL_PushEvent(&mut event);
+                            if result_ok != 1 {
+                                let error_str = sdl2_safe::SDL_GetError_safe();
+                                println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                            }
                         }
 
                         println!("pushed event new kbd event");
