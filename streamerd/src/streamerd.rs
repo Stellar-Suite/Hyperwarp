@@ -17,7 +17,8 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
-use stellar_protocol::protocol::{create_default_acl, may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, PipelineOptimization, PrivligeDefinition, StellarChannel, StellarDirectControlMessage, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_protocol::protocol::{create_default_acl, may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, InputEvent, InputEventPayload, PipelineOptimization, PrivligeDefinition, StellarChannel, StellarDirectControlMessage, StellarFrontendMessage, StellarMessage, StreamerState};
+use stellar_shared::constants::sdl2::{decode_keyevent_code_int, decode_keyevent_key_int};
 
 use std::time::Instant;
 
@@ -217,6 +218,12 @@ impl Streamer {
                         let handler = handler_lock.lock().unwrap(); // TODO: mimimize locking this
                         match message {
                             StellarDirectControlMessage::KeyChange { key, code, composition, state, timestamp } => {
+                                let input_event = InputEvent::new(InputEventPayload::KeyEvent {
+                                     key: decode_keyevent_key_int(&key),
+                                     scancode: decode_keyevent_code_int(&key),
+                                     state,
+                                     modifiers: 0 // will be calculated by Hyperwarp
+                                });
                                 
                             },
                             _ => {

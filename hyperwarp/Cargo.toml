@@ -19,6 +19,7 @@ tokio = { version = "1", features = ["full"] }
 # We don't need message-io websocket for now.
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 stellar_protocol = { path = "../stellar_protocol" }
+stellar_shared = { path = "../stellar_shared" }
 crossbeam-queue = "0.3.11"
 human-panic = "2.0.0"
 backtrace = "0.3.72"

@@ -22,6 +22,7 @@ gstreamer-sdp = { version ="0.22.6", features = ["v1_24"] }
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 # stellar_core = { path = "../stellar_core" }
 stellar_protocol = { path = "../stellar_protocol" }
+stellar_shared = { path = "../stellar_shared" }
 rust_socketio = "*"
 serde_json = "1.0"
 lazy_static = "1.4.0"

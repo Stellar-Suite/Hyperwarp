@@ -1,15 +1,7 @@
-use sdl2_sys::{SDL_KeyCode, SDL_Scancode};
-
-use crate::utils::manual_types::libc::ENUM_TYPE;
-
-// TRUE FALSE are enums
-
-// usually a signed integer
-pub const SDL_TRUE: ENUM_TYPE = 1;
-pub const SDL_FALSE: ENUM_TYPE = 0;
-
 // portable key mods, from SDL
 // https://wiki.libsdl.org/SDL2/SDL_Keymod
+
+use crate::vendor::sdl_bindings::{SDL_KeyCode, SDL_Scancode};
 
 pub const KMOD_NONE: u32 = 0x0000;
 pub const KMOD_LSHIFT: u32 = 0x0001;
@@ -166,3 +158,6 @@ pub fn decode_keyevent_key(key: &str) -> SDL_KeyCode {
     }
 }
 
+pub fn decode_keyevent_key_int(code: &str) -> i32 {
+    decode_keyevent_key(code) as i32
+}

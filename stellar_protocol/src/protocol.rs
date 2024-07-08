@@ -299,7 +299,6 @@ impl InputEvent {
         };
         input_event
     }
-
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -333,8 +332,13 @@ pub enum InputEventPayload {
     },
     MouseMoveAbsolute(i32, i32),
     KeyEvent {
-        key: String,
-        scancode: String,
+        key: i32,
+        scancode: i32,
+        state: bool,
+        modifiers: u16,
+    },
+    KeyEventLite {
+        key: i32,
         state: bool,
     }
 }

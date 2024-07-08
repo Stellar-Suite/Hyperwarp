@@ -24,7 +24,7 @@ use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
-use super::input::InputManager;
+use super::input::{InputManager, Timestampable};
 use super::window::Window;
 use super::{
     feature_flags::FeatureFlags,
@@ -334,7 +334,13 @@ impl ApplicationHost {
                                                 if config.debug_mode {
                                                     println!("User input event received from {:?} {:?}", endpoint.addr(), input_event);
                                                 }
-                                                input_manager.lock().unwrap().push_event(input_event);
+                                                {
+                                                    let mut input_event = input_event.clone();
+                                                    input_event.metadata.timestamp(); // TODO: timestamp this more accurately
+                                                    let mut input_manager_locked = input_manager.lock().unwrap();
+                                                    input_manager_locked.process_event(input_event);
+                                                }
+                                               
                                             },
                                             _ => {
                                                 if config.debug_mode {

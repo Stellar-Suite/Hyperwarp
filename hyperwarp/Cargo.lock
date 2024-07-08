@@ -362,6 +362,7 @@ dependencies = [
  "serde",
  "serde_json",
  "stellar_protocol",
+ "stellar_shared",
  "tokio",
 ]
 
@@ -874,6 +875,14 @@ dependencies = [
  "serde_repr",
  "strum 0.26.2",
  "strum_macros 0.26.3",
+]
+
+[[package]]
+name = "stellar_shared"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "libc",
 ]
 
 [[package]]

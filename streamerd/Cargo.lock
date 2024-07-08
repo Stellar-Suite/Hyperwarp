@@ -1954,6 +1954,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar_shared"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "libc",
+]
+
+[[package]]
 name = "streamerd"
 version = "0.1.0"
 dependencies = [
@@ -1978,6 +1986,7 @@ dependencies = [
  "rust_socketio",
  "serde_json",
  "stellar_protocol",
+ "stellar_shared",
 ]
 
 [[package]]
