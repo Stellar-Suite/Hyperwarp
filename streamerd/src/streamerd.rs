@@ -13,7 +13,7 @@ use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, Err
 use gstreamer_app::AppSrc;
 use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCPeerConnectionState, WebRTCSessionDescription};
-use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}};
+use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::adapter::NetworkAddr, node::{self, NodeEvent, NodeHandler}, util::thread};
 
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
@@ -108,6 +108,8 @@ pub struct Streamer {
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<StreamerSignal>>>>,
     pub streaming_command_queue: Sender<InternalMessage>,
     pub streaming_command_recv: Receiver<InternalMessage>,
+    pub client_comms_command_queue: Sender<InternalMessage>,
+    pub client_comms_command_recv: Receiver<InternalMessage>,
     pub frame: Arc<RwLock<Vec<u8>>>,
     pub socketio_client: Option<Arc<Mutex<Client>>>,
     pub channel_id_to_socket_id: Arc<DashMap<i32, String>>,
@@ -142,6 +144,7 @@ impl Streamer {
     pub fn new(config: StreamerConfig) -> Self {
 
         let (sender, receiver) = crossbeam_channel::unbounded::<InternalMessage>();
+        let (sender_2, receiver_2) = crossbeam_channel::unbounded::<InternalMessage>();
 
         Self { 
             config: Arc::new(config),
@@ -155,6 +158,8 @@ impl Streamer {
             socketio_client: None,
             channel_id_to_socket_id: Arc::new(DashMap::new()),
             acls: DashMap::new(),
+            client_comms_command_queue: sender_2,
+            client_comms_command_recv: receiver_2,
         }
     }
 
@@ -178,6 +183,7 @@ impl Streamer {
         self.run_gstreamer().expect("Streamer thread panicked");
     }
 
+
     pub fn get_socket(&self) -> MutexGuard<Client> {
         self.socketio_client.as_ref().expect("Socketio client not initialized").lock().unwrap()
     }
@@ -188,6 +194,19 @@ impl Streamer {
         if let Err(err) = socket.emit("send_to", json!([socket_id, error_msg])) {
             println!("Error complaining to socket: {:?}", err);
         }
+    }
+
+    pub fn run_data_channels_thread(&mut self) -> JoinHandle<()> {
+        let config = self.config.clone();
+        let stopper = self.stop.clone();
+        let socket = self.get_socket();
+        let my_comms_queue = self.client_comms_command_recv.clone();
+        std::thread::spawn(move || {
+            for msg in my_comms_queue.recv() {
+                match msg {
+                }
+            }
+        })
     }
 
     pub fn run_gstreamer(&mut self) -> anyhow::Result<()> {

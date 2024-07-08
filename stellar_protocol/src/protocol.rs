@@ -189,6 +189,19 @@ pub enum StellarFrontendMessage {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(tag = "type")]
+pub enum StellarFrontendDirectMessage {
+    #[serde(rename = "update_window_title")]
+    UpdateWindowTitle {
+        title: String,
+    },
+    #[serde(alias = "keychange")]
+    KeyChange {
+        // TODO
+    },
+}
+
 pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {
     match message {
         StellarFrontendMessage::Ice { candidate, sdp_mline_index } => true,
