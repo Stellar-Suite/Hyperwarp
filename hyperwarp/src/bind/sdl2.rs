@@ -12,5 +12,9 @@ lazy_static::lazy_static! {
         std::mem::transmute(ptr)
     };
 
-
+    pub static ref SDL_GetWindowID: unsafe extern "C" fn(window: *const SDL_Window) -> libc::c_uint = unsafe {
+        let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_GetWindowID\0".as_ptr() as _);
+        assert!(!ptr.is_null());
+        std::mem::transmute(ptr)
+    };
 }

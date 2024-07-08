@@ -26,7 +26,7 @@ use std::time::Duration;
 
 // for now we only handle a single window
 // TODO: make casing consistent
-pub trait HostBehavior: Send {
+/*pub trait HostBehavior: Send {
     fn onStart(&mut self) {}
 
     fn onWindowCreate(
@@ -60,7 +60,7 @@ pub trait HostBehavior: Send {
         let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
         file_loc
     }
-}
+}*/
 
 #[derive(Debug)]
 pub struct DefaultHostBehavior {
@@ -83,8 +83,15 @@ impl DefaultHostBehavior {
     }
 }
 
-impl HostBehavior for DefaultHostBehavior {
-    fn onWindowCreate(
+impl DefaultHostBehavior {
+
+    pub fn get_shimg_path(&self, config: &Config) -> PathBuf {
+        let base_loc = Path::new("/dev/shm");
+        let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
+        file_loc
+    }
+
+    pub fn onWindowCreate(
         &mut self,
         win: Window,
         x: Option<i32>,
@@ -100,7 +107,7 @@ impl HostBehavior for DefaultHostBehavior {
         }
     }
 
-    fn onFrameSwapBegin(&mut self) {
+    pub fn onFrameSwapBegin(&mut self) {
         // HOST.tick();
         let start = Instant::now();
         if HOST.config.capture_mode {
@@ -159,17 +166,17 @@ impl HostBehavior for DefaultHostBehavior {
         }
     }
 
-    fn onFrameSwapEnd(&mut self) {
-        // TODO: notify rendered frame\
+    pub fn onFrameSwapEnd(&mut self) {
+
     }
 
-    fn getFramebufferForCapture(&self) -> Option<&Vec<u8>> {
+    pub fn getFramebufferForCapture(&self) -> Option<&Vec<u8>> {
         Some(self.fb.as_ref())
     }
 
-    fn tick(&mut self) {}
+    pub fn tick(&mut self) {}
 
-    fn get_fb_size(&self) -> Option<(u32, u32)> {
+    pub fn get_fb_size(&self) -> Option<(u32, u32)> {
         if let Some(width) = self.fb_width {
             if let Some(height) = self.fb_height {
                 return Some((width, height));
@@ -199,15 +206,16 @@ impl DefaultHostBehavior {
     }
 
     pub fn get_largest_sdl2_window(&self) -> Option<(i32, i32)> {
+        let mut la = 0;
         let mut lw = 0;
         let mut lh = 0;
         for window in &self.windows {
             let (w, h) = sdl2_safe::SDL_GetWindowSize_safe(window.id as *mut sdl2::SDL_Window);
             // println!("gws {} {}", w, h);
-            if w > lw {
+            
+            if w * h > la {
+                la = w * h;
                 lw = w;
-            }
-            if h > lh {
                 lh = h;
             }
         }
@@ -216,6 +224,27 @@ impl DefaultHostBehavior {
         } else {
             Some((lw, lh))
         }
+    }
+
+    pub fn get_largest_sdl2_window_id(&self) -> Option<u32> {
+        let mut la = 0;
+        let mut lw = 0;
+        let mut lh = 0;
+        if self.windows.len() == 0 {
+            return None;
+        }
+        let mut chosen: u32 = 0;
+        for window in &self.windows {
+            let (w, h) = sdl2_safe::SDL_GetWindowSize_safe(window.id as *mut sdl2::SDL_Window);
+            // println!("gws {} {}", w, h);
+            if w * h > la {
+                la = w * h;
+                lw = w;
+                lh = h;
+                chosen = sdl2_safe::SDL_GetWindowID_safe(window.id as *mut sdl2::SDL_Window);
+            }
+        }
+        Some(chosen)
     }
 
     pub fn spawn_writer_thread(&mut self, config: &Config) -> JoinHandle<()> {

@@ -3,6 +3,7 @@ use message_io::adapters::unix_socket::{create_null_socketaddr, UnixSocketListen
 use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
+use stellar_protocol::deserialize;
 use stellar_protocol::protocol::{get_all_channels, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
@@ -28,7 +29,7 @@ use super::input::{InputManager, Timestampable};
 use super::window::Window;
 use super::{
     feature_flags::FeatureFlags,
-    host_behavior::{DefaultHostBehavior, HostBehavior},
+    host_behavior::{DefaultHostBehavior},
 };
 
 pub struct CaptureHelper {
@@ -49,7 +50,7 @@ pub struct LastSentState {
 pub struct ApplicationHost {
     pub config: Arc<Config>,
     pub features: Mutex<FeatureFlags>,
-    pub behavior: Arc<Mutex<Box<dyn HostBehavior + Send>>>,
+    pub behavior: Arc<Mutex<DefaultHostBehavior>>,
     pub func_pointers: Mutex<HashMap<String, Pointer>>,
     pub capture_helper: Option<CaptureHelper>,
     pub messaging_handler: Option<Arc<Mutex<NodeHandler<InternalSignals>>>>,
@@ -81,7 +82,7 @@ impl ApplicationHost {
         let host = ApplicationHost {
             config: Arc::new(config),
             features: Mutex::new(FeatureFlags::new()),
-            behavior: Arc::new(Mutex::new(Box::new(default_behavior))),
+            behavior: Arc::new(Mutex::new(default_behavior)),
             func_pointers: Mutex::new(HashMap::new()),
             capture_helper: None,
             messaging_handler: None,
@@ -351,7 +352,12 @@ impl ApplicationHost {
                                     },
                                     None => {
                                         if config.debug_mode {
-                                            println!("Error deserializing message (malformed?):");
+                                            // redeserialize to get error
+                                            if let Err(err) = stellar_protocol::deserialize_result(data) {
+                                                println!("malformed message error: {:?}", err);
+                                            } else {
+                                                println!("Error deserializing message (malformed?), for unknown reason.");
+                                            }
                                         }
                                     }
                                 }
@@ -462,7 +468,7 @@ impl ApplicationHost {
         }
     }
 
-    pub fn get_behavior(&self) -> MutexGuard<Box<dyn HostBehavior + Send>> {
+    pub fn get_behavior(&self) -> MutexGuard<DefaultHostBehavior> {
         self.behavior.lock().unwrap()
     }
 

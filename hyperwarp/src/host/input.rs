@@ -151,20 +151,29 @@ impl InputManager {
                         let event_type = if state { sdl2_sys::SDL_EventType::SDL_KEYDOWN } else { sdl2_sys::SDL_EventType::SDL_KEYUP };
                         let sdl_state = if state { sdl2_sys::SDL_PRESSED } else { sdl2_sys::SDL_RELEASED };
                         let scancode = unsafe {
-                            sdl2_sys:: SDL_GetScancodeFromKey(key) // hack for now
+                            sdl2_sys::SDL_GetScancodeFromKey(key) // hack for now
                         };
                         let keysym = 0;
-                        let event = sdl2_sys::SDL_Event {
+                        let mut event = sdl2_sys::SDL_Event {
                             key: sdl2_sys::SDL_KeyboardEvent { 
                                 type_: event_type as u32,
                                 timestamp: event.metadata.sdl2_timestamp_ticks.unwrap_or(0),
-                                windowID: 0,
+                                windowID: HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0),
                                 state: sdl_state as u8,
                                 repeat: 0,
                                 padding2: 0,
                                 padding3: 0,
                                 keysym: sdl2_sys::SDL_Keysym { scancode: scancode, sym: key, mod_: modifiers, unused: 0 } }
                         };
+
+                        unsafe {
+                            // TODO: handle errors
+                            // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
+                            // also maybe don't use unsafe directly?
+                            sdl2_sys::SDL_PushEvent(&mut event);
+                        }
+
+                        println!("pushed event new kbd event");
                     }
                 }
                 _ => {
@@ -184,6 +193,9 @@ impl InputManager {
         new_event.metadata.timestamp();
 
         match event.payload {
+            InputEventPayload::KeyEvent { key, scancode, state, modifiers } => {
+                self.set_key(key, state);
+            },
             _ => {
                 self.event_queue.push(new_event);
             }

@@ -9,3 +9,9 @@ pub fn SDL_GetWindowSize_safe(window: *const SDL_Window) -> (i32, i32)  {
     }
     (outputX, outputY)
 }
+
+pub fn SDL_GetWindowID_safe(window: *const SDL_Window) -> u32 {
+    unsafe {
+        super::sdl2::SDL_GetWindowID(window)
+    }
+}

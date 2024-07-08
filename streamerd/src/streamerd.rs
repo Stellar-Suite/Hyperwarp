@@ -224,7 +224,8 @@ impl Streamer {
                                      state,
                                      modifiers: 0 // will be calculated by Hyperwarp
                                 });
-                                
+                                // send signal
+                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
                             },
                             _ => {
                                 println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
@@ -783,7 +784,7 @@ impl Streamer {
                                             let message = match serde_json::from_str::<stellar_protocol::protocol::StellarDirectControlMessage>(data) {
                                                 Ok(message) => message,
                                                 Err(err) => {
-                                                    println!("Error parsing direct control message from data channel: {:?}", err);
+                                                    println!("Error parsing direct control message from data channel: {:?} string contents {}", err, data);
                                                     return;
                                                 }
                                             };

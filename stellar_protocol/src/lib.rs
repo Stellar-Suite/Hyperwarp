@@ -21,3 +21,7 @@ pub fn deserialize(data: &[u8]) -> StellarMessage {
 pub fn deserialize_safe(data: &[u8]) -> Option<StellarMessage> {
     bincode::deserialize(data).ok()
 }
+
+pub fn deserialize_result(data: &[u8]) -> Result<StellarMessage, bincode::Error> {
+    bincode::deserialize(data)
+}
