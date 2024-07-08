@@ -10,7 +10,6 @@ use clap::Parser;
 
 use crate::streamerd::{Streamer, StreamerConfig};
 pub mod producer;
-pub mod vendor;
 pub mod webrtc;
 pub mod streamerd;
 pub mod test;
