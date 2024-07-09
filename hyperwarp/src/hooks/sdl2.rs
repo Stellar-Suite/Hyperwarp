@@ -1,3 +1,5 @@
+use std::ffi::c_short;
+
 use libc::{c_char, c_int, c_void};
 use stellar_protocol::protocol::GraphicsAPI;
 
@@ -151,5 +153,28 @@ redhook::hook! {
 redhook::hook! {
     unsafe fn SDL_SetWindowTitle_hw_direct(display: *mut SDL_Window, title: *const c_char) => sdl_setwindowtitle_hw_direct {
         // shim so I can run redhook::real on it   
+    }
+}
+
+// c_char is one way of getting a u8 array in c
+redhook::hook! {
+    unsafe fn SDL_GetKeyboardState(count: *const c_int)-> *const c_char => sdl_getkeyboardstate_first {
+        if HOST.config.debug_mode {
+
+        }
+
+        if HOST.config.enable_sdl2 {
+            let result = redhook::real!(SDL_GetKeyboardState_hw_direct)(count);
+            std::mem::transmute(HOST.input_manager.lock().unwrap().keyboard.get_virt_array_ptr())
+        } else {
+            std::ptr::null()
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_GetKeyboardState_hw_direct(count: *const c_int) -> *const c_char => sdl_getkeyboardstate_hw_direct {
+        // shim so I can run redhook::real on it   
+        std::ptr::null()
     }
 }

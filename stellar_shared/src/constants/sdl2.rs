@@ -110,8 +110,8 @@ pub fn decode_keyevent_code(code: &str) -> SDL_Scancode {
     }
 }
 
-pub fn decode_keyevent_code_int(code: &str) -> i32 {
-    decode_keyevent_code(code) as i32
+pub fn decode_keyevent_code_int(code: &str) -> u32 {
+    decode_keyevent_code(code) as u32
 }
 
 pub fn decode_keyevent_key(key: &str) -> SDL_KeyCode {
@@ -160,8 +160,8 @@ pub fn decode_keyevent_key(key: &str) -> SDL_KeyCode {
     }
 }
 
-pub fn decode_keyevent_key_int(code: &str) -> i32 {
-    decode_keyevent_key(code) as i32
+pub fn decode_keyevent_key_int(code: &str) -> u32 {
+    decode_keyevent_key(code) as u32
 }
 
 pub fn map_keycode_to_scancode(code: SDL_KeyCode) -> SDL_Scancode {

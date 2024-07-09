@@ -31,11 +31,12 @@ pub struct Keyboard {
      // key code _> pressed
 }
 
-pub fn create_init_keyboard_state() -> HashMap<i32, bool> {
+pub fn create_init_keyboard_state() -> HashMap<u32, bool> {
     let mut state = HashMap::new();
-    for i in 0..1024 { // maybe make this 256
+    // the below actuallu onlu worked for scancode
+    /*for i in 0..1024 { // maybe make this 256
         state.insert(i, false);
-    }
+    }*/
     state
 }
 
@@ -61,7 +62,7 @@ impl Keyboard {
         
         if !is_unknown_scancode_u32(sdl_scancode_u32) {
             if sdl_scancode_u32 < self.sdl2_virt_array.len() as u32 {
-                self.sdl2_virt_array[sdl_scancode_u32 as usize] = state as u8;
+                self.sdl2_virt_array[sdl_scancode_u32 as usize] = state as u8; // 1 means pressed, 0 means released
             } else {
                 println!("uh oh, sdl2 scancode out of bounds {}, impossible?", sdl_scancode_u32);
             }
@@ -76,6 +77,10 @@ impl Keyboard {
 
         return 0;
     }
+
+    pub fn get_virt_array_ptr(&self) -> *const u8 {
+        self.sdl2_virt_array.as_ptr()
+    }
 }
 
 pub trait Timestampable {
@@ -89,7 +94,7 @@ impl Timestampable for InputMetadata {
             if feature_flags.sdl2_enabled {
                 unsafe {
                     self.sdl2_timestamp_ticks = Some(sdl2_sys::SDL_GetTicks());
-                    self.sdl2_timestamp_ticks_u64 = Some(sdl2_sys::SDL_GetTicks64());
+                    self.sdl2_timestamp_ticks_u64 = Some(sdl2_sys::SDL_GetTicks() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
                 }
             }
             // TODO: sdl3
@@ -168,13 +173,14 @@ impl InputManager {
         let feature_flags = HOST.features.lock().unwrap();
         for event in self.event_queue.drain(..) {
             match event.payload {
+                // type confusion note: no sdl enum key values are negative yet
                 InputEventPayload::KeyEvent { key, scancode, state, modifiers } => {
                     // we're going to ignore scancode for now
                     if feature_flags.sdl2_enabled {
                         let event_type = if state { sdl2_sys::SDL_EventType::SDL_KEYDOWN } else { sdl2_sys::SDL_EventType::SDL_KEYUP };
                         let sdl_state = if state { sdl2_sys::SDL_PRESSED } else { sdl2_sys::SDL_RELEASED };
                         let scancode = unsafe {
-                            sdl2_sys::SDL_GetScancodeFromKey(key) // hack for now
+                            sdl2_sys::SDL_GetScancodeFromKey(key as i32) // hack for now
                         };
                         let keysym = 0;
                         let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
@@ -189,7 +195,7 @@ impl InputManager {
                                 repeat: 0,
                                 padding2: 0,
                                 padding3: 0,
-                                keysym: sdl2_sys::SDL_Keysym { scancode: scancode, sym: key, mod_: modifiers, unused: 0 } }
+                                keysym: sdl2_sys::SDL_Keysym { scancode: scancode, sym: key as i32, mod_: modifiers, unused: 0 } }
                         };
 
                         unsafe {
