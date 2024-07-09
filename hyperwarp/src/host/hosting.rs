@@ -4,7 +4,7 @@ use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
 use stellar_protocol::deserialize;
-use stellar_protocol::protocol::{get_all_channels, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarMessage, Synchornization};
+use stellar_protocol::protocol::{get_all_channels, DebugInfo, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
 
@@ -249,6 +249,7 @@ impl ApplicationHost {
         let handler_wrapper = Arc::new(Mutex::new(handler));
         let handler_wrapper_2 = handler_wrapper.clone();
         let handler_wrapper_3 = handler_wrapper.clone();
+        let handler_wrapper_instant_responses = handler_wrapper.clone();
         let handler_signals = handler_wrapper.clone();
 
         let command_queue = self.command_queue.clone();
@@ -342,6 +343,11 @@ impl ApplicationHost {
                                                     input_manager_locked.process_event(input_event);
                                                 }
                                                
+                                            },
+                                            StellarMessage::DebugInfoRequest => {
+                                                let mut output = "Debug Info:\n".to_string();
+                                                output += &format!("Features: {:#?}", HOST.features.lock().unwrap());
+                                                handler_wrapper_instant_responses.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::DebugInfoResponse(DebugInfo { message: output })));
                                             },
                                             _ => {
                                                 if config.debug_mode {
