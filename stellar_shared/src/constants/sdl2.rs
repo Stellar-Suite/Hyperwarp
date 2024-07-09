@@ -5,26 +5,26 @@ use std::mem::transmute;
 
 use crate::vendor::sdl_bindings::{SDL_KeyCode, SDL_Scancode};
 
-pub const KMOD_NONE: u32 = 0x0000;
-pub const KMOD_LSHIFT: u32 = 0x0001;
-pub const KMOD_RSHIFT: u32 = 0x0002;
-pub const KMOD_LCTRL: u32 = 0x0040;
-pub const KMOD_RCTRL: u32 = 0x0080;
-pub const KMOD_LALT: u32 = 0x0100;
-pub const KMOD_RALT: u32 = 0x0200;
-pub const KMOD_LGUI: u32 = 0x0400;
-pub const KMOD_RGUI: u32 = 0x0800;
-pub const KMOD_NUM: u32 = 0x1000;
-pub const KMOD_CAPS: u32 = 0x2000;
-pub const KMOD_MODE: u32 = 0x4000;
-pub const KMOD_SCROLL: u32 = 0x8000;
+pub const KMOD_NONE: u16 = 0x0000;
+pub const KMOD_LSHIFT: u16 = 0x0001;
+pub const KMOD_RSHIFT: u16 = 0x0002;
+pub const KMOD_LCTRL: u16 = 0x0040;
+pub const KMOD_RCTRL: u16 = 0x0080;
+pub const KMOD_LALT: u16 = 0x0100;
+pub const KMOD_RALT: u16 = 0x0200;
+pub const KMOD_LGUI: u16 = 0x0400;
+pub const KMOD_RGUI: u16 = 0x0800;
+pub const KMOD_NUM: u16 = 0x1000;
+pub const KMOD_CAPS: u16 = 0x2000;
+pub const KMOD_MODE: u16 = 0x4000;
+pub const KMOD_SCROLL: u16 = 0x8000;
 
-pub const KMOD_CTRL: u32 = KMOD_LCTRL | KMOD_RCTRL;
-pub const KMOD_SHIFT: u32 = KMOD_LSHIFT | KMOD_RSHIFT;
-pub const KMOD_ALT: u32 = KMOD_LALT | KMOD_RALT;
-pub const KMOD_GUI: u32 = KMOD_LGUI | KMOD_RGUI;
+pub const KMOD_CTRL: u16 = KMOD_LCTRL | KMOD_RCTRL;
+pub const KMOD_SHIFT: u16 = KMOD_LSHIFT | KMOD_RSHIFT;
+pub const KMOD_ALT: u16 = KMOD_LALT | KMOD_RALT;
+pub const KMOD_GUI: u16 = KMOD_LGUI | KMOD_RGUI;
 
-pub const KMOD_RESERVED: u32 = KMOD_SCROLL; /* "This is for source-level compatibility with SDL 2.0.0."" */
+pub const KMOD_RESERVED: u16 = KMOD_SCROLL; /* "This is for source-level compatibility with SDL 2.0.0."" */
 
 // https://www.toptal.com/developers/keycode/table
 // this sucks because "This table is based on the US standard 101 keyboard, the values may vary based on a specific hardware."
@@ -156,6 +156,18 @@ pub fn decode_keyevent_key(key: &str) -> SDL_KeyCode {
         " " => SDL_KeyCode::SDLK_SPACE,
         "-" => SDL_KeyCode::SDLK_MINUS,
         "=" => SDL_KeyCode::SDLK_EQUALS,
+        "ArrowUp" => SDL_KeyCode::SDLK_UP,
+        "ArrowDown" => SDL_KeyCode::SDLK_DOWN,
+        "ArrowLeft" => SDL_KeyCode::SDLK_LEFT,
+        "ArrowRight" => SDL_KeyCode::SDLK_RIGHT,
+        "Backspace" => SDL_KeyCode::SDLK_BACKSPACE,
+        "Tab" => SDL_KeyCode::SDLK_TAB,
+        "Control" => SDL_KeyCode::SDLK_LCTRL, // TODO: this is a hack
+        "Shift" => SDL_KeyCode::SDLK_LSHIFT, // TODO: this is a hack
+        "Alt" => SDL_KeyCode::SDLK_LALT, // TODO: this is a hack
+        "Escape" => SDL_KeyCode::SDLK_ESCAPE,
+        "Space" => SDL_KeyCode::SDLK_SPACE,
+        "CapsLock" => SDL_KeyCode::SDLK_CAPSLOCK,
         _ => SDL_KeyCode::SDLK_UNKNOWN
     }
 }

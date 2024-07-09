@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
-use stellar_shared::constants::sdl2::{is_unknown_scancode_u32, map_key_code_to_scancode_cursed_u32};
+use stellar_shared::constants::sdl2::*;
+use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
 use crate::bind::sdl2_safe;
 
@@ -71,9 +72,31 @@ impl Keyboard {
         output
     }
 
+    pub fn get_keycode_state(&self, keycode: u32) -> bool {
+        self.keycodes_state.get(&keycode).unwrap_or(&false).clone()
+    }
+
     pub fn calc_modifiers(&self) -> u16 {
         let mut modifiers = 0u16;
 
+        if self.get_keycode_state(SDL_KeyCode::SDLK_LSHIFT as u32) {
+            modifiers |= KMOD_LSHIFT;
+        }
+        if self.get_keycode_state(SDL_KeyCode::SDLK_RSHIFT as u32) {
+            modifiers |= KMOD_RSHIFT;
+        }
+        if self.get_keycode_state(SDL_KeyCode::SDLK_LCTRL as u32) {
+            modifiers |= KMOD_LCTRL;
+        }
+        if self.get_keycode_state(SDL_KeyCode::SDLK_RCTRL as u32) {
+            modifiers |= KMOD_RCTRL;
+        }
+        if self.get_keycode_state(SDL_KeyCode::SDLK_LALT as u32) {
+            modifiers |= KMOD_LALT;
+        }
+        if self.get_keycode_state(SDL_KeyCode::SDLK_RALT as u32) {
+            modifiers |= KMOD_RALT;
+        }
 
         return 0;
     }
