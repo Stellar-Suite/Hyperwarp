@@ -102,6 +102,9 @@ impl DefaultHostBehavior {
         self.windows.push(win);
         if let Some(width) = width {
             if let Some(height) = height {
+                if HOST.config.debug_mode {
+                    println!("Create fb (from window creation): {}x{}", width, height);
+                }
                 self.setup_framebuffer(width, height);
             }
         }
