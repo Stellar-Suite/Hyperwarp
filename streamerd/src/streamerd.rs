@@ -11,7 +11,7 @@ use dashmap::DashMap;
 use gio::glib::{self, bitflags::Flags};
 use gstreamer::{prelude::*, Buffer, BufferFlags, DebugGraphDetails, Element, ErrorMessage, PadProbeReturn, PadProbeType};
 use gstreamer_app::AppSrc;
-use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo};
+use gstreamer_video::{prelude::*, VideoColorimetry, VideoFlags, VideoInfo, VideoInterlaceMode};
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCPeerConnectionState, WebRTCSessionDescription};
 use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConnectConfig}, network::{adapter::NetworkAddr, Endpoint}, node::{self, NodeEvent, NodeHandler}, util::thread};
 
@@ -280,16 +280,17 @@ impl Streamer {
         let streaming_cmd_queue_for_cb_2 = self.streaming_command_queue.clone();
         let self_frame = self.frame.clone();
 
-        videoconvert.set_property_from_str("qos", "true");
+        // videoconvert.set_property_from_str("qos", "true");
 
         let mut downstream_peers: HashMap<String, WebRTCPeer> = HashMap::new();
 
         let mut video_info =
         // default to 100x100
-        gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, 100, 100)
+        gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, 500, 500)
     //         .fps(gst::Fraction::new(2, 1))
            // .flags(VideoFlags::VARIABLE_FPS)
-           .fps(gstreamer::Fraction::new(self.config.fps.unwrap_or(60) as i32, 1))
+            .interlace_mode(VideoInterlaceMode::Progressive)
+            .fps(gstreamer::Fraction::new(self.config.fps.unwrap_or(60) as i32, 1))
             .build()
             .expect("Failed to create video info on demand for source");
 
@@ -304,6 +305,7 @@ impl Streamer {
         // this is apparently important
         .is_live(true)
         .do_timestamp(true)
+        .automatic_eos(false)
         .format(gstreamer::Format::Time)
         .build();
 
@@ -535,10 +537,11 @@ impl Streamer {
                         break;
                     },
                     MessageView::Error(err) => {
+                        println!("Error: {} {:?}", err.error(), err.debug());
                         pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("errordump.dot"));
                         pipeline.set_state(gstreamer::State::Null).expect("could not reset pipeline state");
                         running = false;
-                        println!("Error: {} {:?}", err.error(), err.debug());
+                        println!("Error (repeat): {} {:?}", err.error(), err.debug());
                         return Ok(());
                     }
                     _ => (),
@@ -621,7 +624,10 @@ impl Streamer {
                             } else {
                                 videoflip.set_property("method", "none");
                             }
+                        
                         }
+
+                        appsrc.set_state(gstreamer::State::Playing);
                     },
                     InternalMessage::SocketConnected => {
                         if !socket_connected {
@@ -730,11 +736,11 @@ impl Streamer {
                                 let video_sink_pad = &downstream_peer_el_group.pad; // downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad"); // data enters here
 
                                 let video_src_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from video tee"); // data leaves here
-                                let video_block = video_src_pad
+                                /*let video_block = video_src_pad
                                     .add_probe(gstreamer::PadProbeType::BLOCK_DOWNSTREAM, |_pad, _info| {
                                         gstreamer::PadProbeReturn::Ok
                                     })
-                                    .unwrap();
+                                    .unwrap();*/
 
                                 // println!("pad setup begin");
                                 // println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
@@ -753,12 +759,14 @@ impl Streamer {
                                         println!("Bin state synced with parent, new status {:?}", bin.current_state());
                                     }
 
-                                    video_src_pad.remove_probe(video_block);
+                                    // video_src_pad.remove_probe(video_block);
 
                                     // send init thing
                                     let _ = streaming_cmd_queue_for_ready.send(InternalMessage::SocketRtcReady(origin_socketid_for_ready));
 
                                 });
+
+                                // downstream_peer_el_group.bin.set_state(gstreamer::State::Playing).expect("Could not set webrtcpeer's bin state to ready");
 
                                 downstream_peer_el_group.bin.set_state(gstreamer::State::Ready).expect("Could not set webrtcpeer's bin state to ready");
                                 downstream_peer_el_group.add_default_data_channels();
