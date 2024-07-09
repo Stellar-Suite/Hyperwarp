@@ -29,6 +29,7 @@ lazy_static = "1.4.0"
 num = "0.4.3"
 dashmap = "6.0.1"
 libc = "0.2.155"
+once_cell = "1.19.0"
 
 [target.x86_64-unknown-linux-gnu]
 linker = "/usr/bin/clang"

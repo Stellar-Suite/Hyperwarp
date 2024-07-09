@@ -3,11 +3,12 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 // tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
 use anyhow::Ok;
-use gio::glib;
-use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
+use gio::{glib, subclass::prelude::ObjectImpl};
+use gstreamer::{prelude::*, subclass::prelude::{ElementImpl, GstObjectImpl}, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
 use gstreamer_video::{prelude::*, VideoInfo};
-use gstreamer_rtp::{prelude::RTPHeaderExtensionExt, RTPHeaderExtensionFlags};
+use gstreamer_rtp::{prelude::RTPHeaderExtensionExt, subclass::prelude::RTPHeaderExtensionImpl, RTPHeaderExtensionFlags};
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCSessionDescription};
+use once_cell::sync::Lazy;
 use stellar_protocol::protocol::{EncodingPreset, PipelineOptimization};
 
 use gio::subclass::prelude::ObjectSubclass;
@@ -23,11 +24,41 @@ const PLAYOUT_DELAY_URI: &str = "http://www.webrtc.org/experiments/rtp-hdrext/pl
 #[derive(Default)]
 pub struct PlayoutDelayRTPExperiment {}
 
+pub mod inner {
+    use gstreamer::glib;
+
+    glib::wrapper! {
+        pub struct PlayoutDelayRTPExperiment(ObjectSubclass<super::PlayoutDelayRTPExperiment>) @extends gstreamer_rtp::RTPHeaderExtension, gstreamer::Element, gstreamer::Object;
+    }
+
+    unsafe impl Send for PlayoutDelayRTPExperiment {}
+    unsafe impl Sync for PlayoutDelayRTPExperiment {}
+}
+
 #[glib::object_subclass]
 impl ObjectSubclass for PlayoutDelayRTPExperiment {
     const NAME: &'static str = "PlayoutDelayRTPExperiment";
-    type Type = PlayoutDelayRTPExperiment;
+    type Type = inner::PlayoutDelayRTPExperiment;
     type ParentType = gstreamer_rtp::RTPHeaderExtension;
+}
+
+impl ObjectImpl for PlayoutDelayRTPExperiment {}
+
+impl GstObjectImpl for PlayoutDelayRTPExperiment {}
+
+impl ElementImpl for PlayoutDelayRTPExperiment {
+    fn metadata() -> Option<&'static gstreamer::subclass::ElementMetadata> {
+        static ELEMENT_METADATA: Lazy<gstreamer::subclass::ElementMetadata> = Lazy::new(|| {
+            gstreamer::subclass::ElementMetadata::new(
+                "Custom RTP Header Extension for setting playout-delay",
+                &gstreamer_rtp::RTP_HDREXT_ELEMENT_CLASS,
+                "Custom RTP Header Extension for setting playout-delay",
+                "todo <example@example.com>",
+            )
+        });
+
+        Some(&*ELEMENT_METADATA)
+    }
 }
 
 // https://github.com/centricular/aes67-relay-chunker/blob/5e688f5c258b7a236cb25adc221184e915f05587/src/bin/rtp_hdr_ext/rtp_hdr_ext_ptp.rs#L55
@@ -38,7 +69,7 @@ impl RTPHeaderExtensionImpl for PlayoutDelayRTPExperiment {
         RTPHeaderExtensionFlags::ONE_BYTE | RTPHeaderExtensionFlags::TWO_BYTE
     }
 
-    fn max_size(&self, _input: &gst::BufferRef) -> usize {
+    fn max_size(&self, _input: &gstreamer::BufferRef) -> usize {
         3
     }
 
@@ -48,28 +79,10 @@ impl RTPHeaderExtensionImpl for PlayoutDelayRTPExperiment {
         _write_flags: RTPHeaderExtensionFlags,
         output: &mut gstreamer::BufferRef,
         output_data: &mut [u8],
-    ) -> Result<usize, gst::LoggableError> {
-        assert!(output_data.len() >= 8);
-
-        let pts = match output.meta::<gst::meta::ReferenceTimestampMeta>() {
-            Some(meta) => meta.timestamp(),
-            // No timestamp meta means no PTP clock sync yet
-            None => return Err(gst::loggable_error!(gst::CAT_RUST, "No PTP sync yet")),
-        };
-
-        gst::log!(
-            CAT,
-            imp: self,
-            "Writing timestamp {:?} duration {:?}",
-            pts,
-            output.duration()
-        );
-
-        let pts_bytes = pts.to_be_bytes();
-
-        output_data[0..8].copy_from_slice(&pts_bytes[0..8]);
-
-        Ok(8)
+    ) -> Result<usize, gstreamer::LoggableError> {
+        assert!(output_data.len() >= 3);
+        output_data[0..3].fill(0);
+        core::result::Result::Ok(3)
     }
 
     fn read(
@@ -79,8 +92,28 @@ impl RTPHeaderExtensionImpl for PlayoutDelayRTPExperiment {
         output: &mut gstreamer::BufferRef,
     ) -> Result<(), gstreamer::LoggableError> {
         assert_eq!(input_data.len(), 3); 
-        Ok(())
+        core::result::Result::Ok(())
     }
+    
+    /*fn set_non_rtp_sink_caps(&self, caps: &gstreamer::Caps) -> Result<(), gstreamer::LoggableError> {
+        core::result::Result::Ok(())
+    }
+    
+    fn update_non_rtp_src_caps(&self, caps: &mut gstreamer::CapsRef) -> Result<(), gstreamer::LoggableError> {
+        core::result::Result::Ok(())
+    }
+    
+    fn set_attributes(
+        &self,
+        direction: gstreamer_rtp::RTPHeaderExtensionDirection,
+        attributes: &str,
+    ) -> Result<(), gstreamer::LoggableError> {
+        core::result::Result::Ok(())
+    }
+    
+    fn set_caps_from_attributes(&self, caps: &mut gstreamer::CapsRef) -> Result<(), gstreamer::LoggableError> {
+        core::result::Result::Ok(())
+    }*/
 }
 
 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L305
@@ -575,6 +608,29 @@ impl WebRTCPreprocessor {
         let twcc = gstreamer_rtp::RTPHeaderExtension::create_from_uri(TWCC_URI).unwrap();
         twcc.set_id(1);
         self.payloader.emit_by_name::<()>("add-extension", &[&twcc]);
+    }
+
+    // two funcs are heavily adapted from https://github.com/centricular/aes67-relay-chunker/blob/main/src/bin/fragment-enc.rs#L244
+    // which saved me a lot of time figuring out how gstreamer works in rust
+    pub fn install_experimental_extensions_globally() -> anyhow::Result<()> {
+        gstreamer::Element::register(
+            None,
+            "x-playoutdelay",
+            gstreamer::Rank::NONE,
+            inner::PlayoutDelayRTPExperiment::static_type(),
+        )?;
+        Ok(())
+    }
+
+    pub fn add_experimental_extension(&mut self) -> anyhow::Result<()> {
+        // TODO: make this actually catch errors
+        let playout_delay = gstreamer::ElementFactory::make("x-playoutdelay")
+            .build()
+            .unwrap()
+            .downcast::<gstreamer_rtp::RTPHeaderExtension>().expect("could not downcast to x-playoutdelay");
+        playout_delay.set_id(2);
+        self.payloader.emit_by_name::<()>("add-extension", &[&playout_delay]);
+        Ok(())
     }
 
     pub fn set_default_settings(&mut self){

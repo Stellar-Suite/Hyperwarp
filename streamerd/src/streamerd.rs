@@ -69,6 +69,8 @@ pub struct StreamerConfig {
     socket: Option<PathBuf>,
     #[arg(short = 't', long = "test", help = "Test mode", default_value_t = false)]
     test_mode: bool,
+    #[arg(long = "realtime", help = "experimental realtime tricks", default_value_t = true)]
+    experimental_realtime: bool,
     #[arg(short, long, default_value_t = GraphicsAPI::Unknown, help = "Graphics api to assume. Will autodetect if not specified.")]
     pub graphics_api: GraphicsAPI,
     #[arg(short = 'u', long = "url", default_value_t = { "http://127.0.0.1:8001".to_string() }, help = "Stargate address to connect to. Needed for signaling and other small things.")]
@@ -252,6 +254,10 @@ impl Streamer {
         println!("initalizing streaming");
         gstreamer::init().expect("library load failed");
 
+        if self.config.experimental_realtime {
+            WebRTCPreprocessor::install_experimental_extensions_globally().expect("could not install experimental extensions");
+        }
+
         print!("loaded streaming library");
 
         let pipeline = gstreamer::Pipeline::default();
@@ -344,6 +350,8 @@ impl Streamer {
 
         let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations);
         preprocessor.set_config(config.clone());
+        preprocessor.add_congestion_control_extension();
+        preprocessor.add_experimental_extension().expect("could not add experimental extension");
         preprocessor.set_default_settings();
         preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
 
