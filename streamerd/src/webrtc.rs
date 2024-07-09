@@ -3,11 +3,14 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 // tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
 use anyhow::Ok;
+use gio::glib;
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
 use gstreamer_video::{prelude::*, VideoInfo};
-use gstreamer_rtp::prelude::RTPHeaderExtensionExt;
+use gstreamer_rtp::{prelude::RTPHeaderExtensionExt, RTPHeaderExtensionFlags};
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCSessionDescription};
 use stellar_protocol::protocol::{EncodingPreset, PipelineOptimization};
+
+use gio::subclass::prelude::ObjectSubclass;
 
 use lazy_static::lazy_static;
 
@@ -15,6 +18,70 @@ use crate::streamerd::{build_capsfilter, StreamerConfig};
 
 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/sendrecv/gst-rust/src/main.rs#L30
 const TWCC_URI: &str = "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01";
+const PLAYOUT_DELAY_URI: &str = "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay";
+
+#[derive(Default)]
+pub struct PlayoutDelayRTPExperiment {}
+
+#[glib::object_subclass]
+impl ObjectSubclass for PlayoutDelayRTPExperiment {
+    const NAME: &'static str = "PlayoutDelayRTPExperiment";
+    type Type = PlayoutDelayRTPExperiment;
+    type ParentType = gstreamer_rtp::RTPHeaderExtension;
+}
+
+// https://github.com/centricular/aes67-relay-chunker/blob/5e688f5c258b7a236cb25adc221184e915f05587/src/bin/rtp_hdr_ext/rtp_hdr_ext_ptp.rs#L55
+impl RTPHeaderExtensionImpl for PlayoutDelayRTPExperiment {
+    const URI: &'static str = "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay";
+
+    fn supported_flags(&self) -> RTPHeaderExtensionFlags {
+        RTPHeaderExtensionFlags::ONE_BYTE | RTPHeaderExtensionFlags::TWO_BYTE
+    }
+
+    fn max_size(&self, _input: &gst::BufferRef) -> usize {
+        3
+    }
+
+    fn write(
+        &self,
+        _input: &gstreamer::BufferRef,
+        _write_flags: RTPHeaderExtensionFlags,
+        output: &mut gstreamer::BufferRef,
+        output_data: &mut [u8],
+    ) -> Result<usize, gst::LoggableError> {
+        assert!(output_data.len() >= 8);
+
+        let pts = match output.meta::<gst::meta::ReferenceTimestampMeta>() {
+            Some(meta) => meta.timestamp(),
+            // No timestamp meta means no PTP clock sync yet
+            None => return Err(gst::loggable_error!(gst::CAT_RUST, "No PTP sync yet")),
+        };
+
+        gst::log!(
+            CAT,
+            imp: self,
+            "Writing timestamp {:?} duration {:?}",
+            pts,
+            output.duration()
+        );
+
+        let pts_bytes = pts.to_be_bytes();
+
+        output_data[0..8].copy_from_slice(&pts_bytes[0..8]);
+
+        Ok(8)
+    }
+
+    fn read(
+        &self,
+        _read_flags: RTPHeaderExtensionFlags,
+        input_data: &[u8],
+        output: &mut gstreamer::BufferRef,
+    ) -> Result<(), gstreamer::LoggableError> {
+        assert_eq!(input_data.len(), 3); 
+        Ok(())
+    }
+}
 
 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L305
 pub struct WebRTCPeer {
