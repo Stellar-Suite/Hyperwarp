@@ -35,15 +35,15 @@ redhook::hook! {
     unsafe fn XCreateWindow(
         display: Display,
         parent: Window,
-        x: i32,
-        y: i32,
-        width: u32,
-        height: u32,
-        border_width: u32,
-        depth: i32,
-        class: u32,
+        x: libc::c_int,
+        y: libc::c_int,
+        width: libc::c_uint,
+        height: libc::c_uint,
+        border_width: libc::c_uint,
+        depth: libc::c_int,
+        class: libc::c_uint,
         visual: Visual,
-        value_mask: u64,
+        value_mask: libc::c_ulong,
         attributes: XSetWindowAttributes
     ) -> Window => x_create_window_first {
         if HOST.config.enable_x11 {
@@ -68,6 +68,57 @@ redhook::hook! {
             );
             if HOST.config.debug_mode {
                 println!("XCreateWindow: {}", result as u64);
+            }
+
+            let window = crate::host::window::Window {
+                id: ((result) as *const c_void) as usize,
+                lib: Library::Xlib,
+            };
+
+            HOST.onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
+            
+            result
+        } else {
+            if HOST.config.debug_mode {
+                println!("Attempted to create window, denied by config");
+            }
+            std::ptr::null()
+        }
+    }
+}
+
+
+redhook::hook! {
+    unsafe fn XCreateSimpleWindow(
+        display: Display,
+        parent: Window,
+        x: libc::c_int,
+        y: libc::c_int,
+        width: libc::c_uint,
+        height: libc::c_uint,
+        border_width: libc::c_uint,
+        border: libc::c_ulong,
+        background: libc::c_ulong
+    ) -> Window => x_create_simple_window_first {
+        if HOST.config.enable_x11 {
+            HOST.test();
+
+            let mut features = HOST.features.lock().unwrap();
+            features.enable_x11();
+
+            let result = redhook::real!(XCreateSimpleWindow)(
+                display,
+                parent,
+                x,
+                y,
+                width,
+                height,
+                border_width,
+                border,
+                background,
+            );
+            if HOST.config.debug_mode {
+                println!("XCreateSimpleWindow: {}", result as u64);
             }
 
             let window = crate::host::window::Window {
