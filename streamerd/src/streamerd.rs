@@ -351,7 +351,9 @@ impl Streamer {
         let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations);
         preprocessor.set_config(config.clone());
         preprocessor.add_congestion_control_extension();
-        preprocessor.add_experimental_extension().expect("could not add experimental extension");
+        if self.config.experimental_realtime {
+            preprocessor.add_experimental_extension().expect("could not add experimental extension");
+        }
         preprocessor.set_default_settings();
         preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
 
