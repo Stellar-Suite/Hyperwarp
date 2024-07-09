@@ -5,12 +5,16 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use anyhow::Ok;
 use gstreamer::{prelude::*, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
 use gstreamer_video::{prelude::*, VideoInfo};
+use gstreamer_rtp::prelude::RTPHeaderExtensionExt;
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCSessionDescription};
 use stellar_protocol::protocol::{EncodingPreset, PipelineOptimization};
 
 use lazy_static::lazy_static;
 
 use crate::streamerd::{build_capsfilter, StreamerConfig};
+
+// https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/sendrecv/gst-rust/src/main.rs#L30
+const TWCC_URI: &str = "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01";
 
 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/multiparty-sendrecv/gst-rust/src/main.rs?ref_type=heads#L305
 pub struct WebRTCPeer {
@@ -500,9 +504,16 @@ impl WebRTCPreprocessor {
         }
     }
 
+    pub fn add_congestion_control_extension(&mut self){
+        let twcc = gstreamer_rtp::RTPHeaderExtension::create_from_uri(TWCC_URI).unwrap();
+        twcc.set_id(1);
+        self.payloader.emit_by_name::<()>("add-extension", &[&twcc]);
+    }
+
     pub fn set_default_settings(&mut self){
         self.payloader.set_property_from_str("config-interval", "-1");
         self.payloader.set_property_from_str("pt", "96");
+        
         match self.preset {
             // TODO: fix this, but it defaults to 0 which is based off resolution
             EncodingPreset::H264 => {
@@ -537,6 +548,8 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::AMD => {
                         // set for h264parse
                         self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
+                        self.encoder.set_property("aud", false);
+                        self.encoder.set_property_from_str("target-usage", "6");
                     },
                     _ => {}
                 }
@@ -548,6 +561,8 @@ impl WebRTCPreprocessor {
                     },
                     PipelineOptimization::AMD => {
                         self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
+                        self.encoder.set_property("aud", false);
+                        self.encoder.set_property_from_str("target-usage", "6");
                     },
                     _ => {}
                 }
