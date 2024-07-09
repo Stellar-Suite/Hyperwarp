@@ -1,4 +1,5 @@
 pub mod sdl2;
+pub mod xlib;
 
 pub const LIBRARY_NAME: &str = "Hyperwarp";
 
