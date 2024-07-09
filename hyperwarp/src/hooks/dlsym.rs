@@ -6,7 +6,7 @@ use libc::{c_void, c_char};
 
 use crate::shim;
 
-use super::{glx, sdl2};
+use super::{glx, sdl2, xlib};
 
 extern "C" {
     pub fn odlsym(handle: *const c_void, symbol: *const c_char) -> *mut c_void;
@@ -31,6 +31,8 @@ redhook::hook! {
             unsafe {
                 std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
             }
+        } else if symbol_name == "XCreateWindow" {
+            unsafe { std::mem::transmute(xlib::x_create_window_first as *const c_void) }
         } else if symbol_name == "glXSwapBuffers" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers as *const c_void) }
         } else if symbol_name == "glXSwapBuffersMscOML" {
@@ -60,7 +62,7 @@ redhook::hook! {
             // println!("brace");
             let result = odlsym(handle, symbol);
             // println!("nothing exploded looking up {}",symbol_name);
-            // println!("dlsym({})",symbol_name);
+            println!("dlsym({})",symbol_name);
             result
         }
     }
