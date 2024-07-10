@@ -209,11 +209,12 @@ impl ApplicationHost {
     }
 
     pub fn premain(&self) {
-        println!("I became alive inside {}", stellar_protocol::util::prog().expect("Could not get program name"));
+        // println!("I became alive inside {}", stellar_protocol::util::prog().expect("Could not get program name"));
     }
 
     pub fn check_should_use_netural_mode() -> bool {
         if let Some(name) = stellar_protocol::util::prog() {
+            // println!("'{}' is blacklisted {}", name, BLACKLISTED_PROCESS_NAMES.contains(&name.as_str()));
             if BLACKLISTED_PROCESS_NAMES.contains(&name.as_str()){ // weird thing here
                 return false;
             }
@@ -530,9 +531,11 @@ impl ApplicationHost {
 
 fn create_host() -> ApplicationHost {
     let mut config = Config::from_env();
+    // println!("i became alive inside {}", stellar_protocol::util::prog().expect("Could not get program name"));
     if ApplicationHost::check_should_use_netural_mode() {
         config.debug_mode = false;
         config.tracing_mode = false;
+        config.netural_mode = true;
     }
     if config.debug_mode {
         // println!("Selected Connection type: {}", config.connection_type);

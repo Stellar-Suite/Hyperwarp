@@ -130,6 +130,9 @@ int wrap_main(int argc, char **argv, char **envp)
     premain_debug();
   }
   preglue_plugin();
+  if(DEBUG){
+    printf("Glue: entering premain plugin\n");
+  }
   premain_plugin();
   int main_res = real_main(argc, argv, envp);
   if (DEBUG)
