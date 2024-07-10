@@ -7,6 +7,7 @@ use std::{
     time::{Instant, UNIX_EPOCH},
 };
 
+use backtrace::Backtrace;
 use gl::{RGBA, UNSIGNED_BYTE};
 
 use crate::{
@@ -76,6 +77,8 @@ pub struct DefaultHostBehavior {
 impl DefaultHostBehavior {
     fn setup_framebuffer(&mut self, width: u32, height: u32) {
         println!("Create fb: {}x{}", width, height);
+        let bt = Backtrace::new();
+        println!("Create fb backtrace: {:?}", bt);
         self.fb_width = Some(width);
         self.fb_height = Some(height);
         self.fb = vec![0; (width * height * 4) as usize];

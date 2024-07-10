@@ -48,9 +48,12 @@ redhook::hook! {
     ) -> Window => x_create_window_first {
         if HOST.config.enable_x11 {
             HOST.test();
-
-            let mut features = HOST.features.lock().unwrap();
-            features.enable_x11();
+            
+            // TODO: various feature flags locks are held longer than they should be, I should be adding more blocks to limit the lock time
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_x11();
+            }
 
             let result = redhook::real!(XCreateWindow)(
                 display,
@@ -75,6 +78,7 @@ redhook::hook! {
                 lib: Library::Xlib,
             };
 
+            // WARNING: implicit tick
             HOST.onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
             
             result

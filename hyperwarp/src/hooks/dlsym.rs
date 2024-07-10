@@ -62,7 +62,7 @@ redhook::hook! {
             // println!("brace");
             let result = odlsym(handle, symbol);
             // println!("nothing exploded looking up {}",symbol_name);
-            println!("dlsym({})",symbol_name);
+            // println!("dlsym({})",symbol_name);
             result
         }
     }
