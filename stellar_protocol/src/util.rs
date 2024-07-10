@@ -5,7 +5,7 @@ use std::path::Path;
 use std::ffi::OsStr;
 
 pub fn prog() -> Option<String> {
-    env::args().next()
+    env::current_exe().ok()
         .as_ref()
         .map(Path::new)
         .and_then(Path::file_name)

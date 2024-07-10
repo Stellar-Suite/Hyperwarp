@@ -21,6 +21,7 @@ use std::{
 
 use std::thread; // for test func
 
+use crate::constants::BLACKLISTED_PROCESS_NAMES;
 use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
@@ -74,9 +75,11 @@ impl ApplicationHost {
         if config.debug_mode {
             println!("Spawning writer thread...");
         }
-        let handle = default_behavior.spawn_writer_thread(&config);
-        if config.debug_mode {
-            println!("Default behavior thread handle: {:?}", handle);
+        if !config.netural_mode {
+            let handle = default_behavior.spawn_writer_thread(&config);
+            if config.debug_mode {
+                println!("Default behavior thread handle: {:?}", handle);
+            }
         }
         let host_info = HostInfo::default();
         let host = ApplicationHost {
@@ -205,7 +208,25 @@ impl ApplicationHost {
         }
     }
 
+    pub fn premain(&self) {
+
+    }
+
+    pub fn check_should_use_netural_mode() -> bool {
+        if let Some(name) = stellar_protocol::util::prog() {
+            if BLACKLISTED_PROCESS_NAMES.contains(&name.as_str()){ // weird thing here
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn start_server(&mut self) {
+
+        if self.config.netural_mode {
+            return;
+        }
+
         let (handler, listener) = node::split::<InternalSignals>();
 
         // bind unix always
@@ -509,7 +530,11 @@ impl ApplicationHost {
 }
 
 fn create_host() -> ApplicationHost {
-    let config = Config::from_env();
+    let mut config = Config::from_env();
+    if ApplicationHost::check_should_use_netural_mode() {
+        config.debug_mode = false;
+        config.tracing_mode = false;
+    }
     if config.debug_mode {
         // println!("Selected Connection type: {}", config.connection_type);
         println!("Host config: {:?}", config);

@@ -21,7 +21,8 @@ fn main() {
 redhook::hook! {
     unsafe fn premain_plugin() => premain_plugin_first {
         setup_panic!();
-        if HOST.config.debug_mode { // this will trigger initalization of host as lazy_static likes it
+        HOST.premain(); // this will trigger initalization of host as lazy_static likes it
+        if HOST.config.debug_mode { 
             println!("Premain starting. Please wait. ");
         }
     }

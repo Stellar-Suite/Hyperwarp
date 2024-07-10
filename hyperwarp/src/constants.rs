@@ -26,3 +26,8 @@ pub fn is_SDL(lib: Library) -> bool {
     }
 }
 
+// try to avoid doing stuff here
+pub const BLACKLISTED_PROCESS_NAMES: &[&str] = &[
+    "env",
+    "exec"
+];
