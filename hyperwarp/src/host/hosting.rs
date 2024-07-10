@@ -216,10 +216,10 @@ impl ApplicationHost {
         if let Some(name) = stellar_protocol::util::prog() {
             // println!("'{}' is blacklisted {}", name, BLACKLISTED_PROCESS_NAMES.contains(&name.as_str()));
             if BLACKLISTED_PROCESS_NAMES.contains(&name.as_str()){ // weird thing here
-                return false;
+                return true;
             }
         }
-        true
+        false
     }
 
     pub fn start_server(&mut self) {
