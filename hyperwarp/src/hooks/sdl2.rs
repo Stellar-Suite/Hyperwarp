@@ -64,10 +64,7 @@ redhook::hook! {
 
         // this should never panic
         // who would have a negative window size?
-        let window = Window {
-            id: result as usize,
-            lib: Library::SDL2,
-        };
+        let window = Window::new(result as usize, Library::SDL2);
 
         HOST.onWindowCreate(window, Some(final_x), Some(final_y), Some(final_w.try_into().unwrap()), Some(final_h.try_into().unwrap()));
 

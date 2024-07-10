@@ -15,8 +15,7 @@ use crate::{
         gl::{K_GL_RGBA, K_GL_UNSIGNED_BYTE},
         gl_safe::glReadPixelsSafe,
         sdl2_safe,
-    },
-    utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8},
+    }, constants::Library, utils::{config::Config, manual_types::sdl2, utils::convert_header_to_u8}
 };
 
 use super::{hosting::HOST, window::Window};
@@ -211,13 +210,19 @@ impl DefaultHostBehavior {
         }
     }
 
-    pub fn get_largest_sdl2_window(&self) -> Option<(i32, i32)> {
+    pub fn get_largest_sdl2_window(&mut self) -> Option<(i32, i32)> {
         let mut la = 0;
         let mut lw = 0;
         let mut lh = 0;
-        for window in &self.windows {
+        for window in self.windows.iter_mut() {
+            if window.lib != Library::SDL2 {
+                continue;
+            }
             let (w, h) = sdl2_safe::SDL_GetWindowSize_safe(window.id as *mut sdl2::SDL_Window);
             // println!("gws {} {}", w, h);
+            if (w as u32) != window.width || (h as u32) != window.height {
+                window.resize(w as u32, h as u32);
+            }
             
             if w * h > la {
                 la = w * h;

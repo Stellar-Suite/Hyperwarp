@@ -73,10 +73,7 @@ redhook::hook! {
                 println!("XCreateWindow: {}", result as u64);
             }
 
-            let window = crate::host::window::Window {
-                id: ((result) as *const c_void) as usize,
-                lib: Library::Xlib,
-            };
+            let window = crate::host::window::Window::new(((result) as *const c_void) as usize, Library::Xlib);
 
             // WARNING: implicit tick
             HOST.onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
@@ -144,10 +141,7 @@ redhook::hook! {
                 println!("XCreateSimpleWindow: {}", result as u64);
             }
 
-            let window = crate::host::window::Window {
-                id: ((result) as *const c_void) as usize,
-                lib: Library::Xlib,
-            };
+            let window = crate::host::window::Window::new(((result) as *const c_void) as usize, Library::Xlib);
 
             HOST.onWindowCreate(window, Some(x), Some(y), Some(width), Some(height));
             
@@ -181,9 +175,10 @@ redhook::hook! {
     unsafe fn XConfigureWindow(display: Display, window: Window, value_mask: libc::c_ulong, values: *const XWindowChanges) => x_configure_window_first {
         if HOST.config.enable_x11 {
             // HOST.test();
-
-            let mut features = HOST.features.lock().unwrap();
-            features.enable_x11();
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_x11();
+            }
 
             redhook::real!(XConfigureWindow_hw_direct)(
                 display,
@@ -206,5 +201,37 @@ redhook::hook! {
 
 redhook::hook! {
     unsafe fn XConfigureWindow_hw_direct(display: Display, window: Window, value_mask: libc::c_ulong, values: *const XWindowChanges) => x_configure_window_hw_direct {
+    }
+}
+
+// https://tronche.com/gui/x/xlib/window/XResizeWindow.html
+redhook::hook! {
+    unsafe fn XResizeWindow(display: Display, window: Window, width: libc::c_uint, height: libc::c_uint) => x_resize_window_first {
+        println!("XResizeWindow called");
+        if HOST.config.enable_x11 {
+            // HOST.test();
+
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_x11();
+            }
+
+            redhook::real!(XResizeWindow_hw_direct)(
+                display,
+                window,
+                width,
+                height,
+            );
+
+        } else {
+            if HOST.config.debug_mode {
+                println!("Attempted to resize window, denied by config");
+            }
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn XResizeWindow_hw_direct(display: Display, window: Window, width: libc::c_uint, height: libc::c_uint) => x_resize_window_hw_direct {
     }
 }

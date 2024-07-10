@@ -3,7 +3,7 @@ pub mod xlib;
 
 pub const LIBRARY_NAME: &str = "Hyperwarp";
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Library {
     SDL2,
     SDL3,
