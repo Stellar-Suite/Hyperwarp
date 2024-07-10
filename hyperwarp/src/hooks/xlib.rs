@@ -223,6 +223,8 @@ redhook::hook! {
                 height,
             );
 
+            HOST.onWindowResize(window as usize, width, height);
+
         } else {
             if HOST.config.debug_mode {
                 println!("Attempted to resize window, denied by config");

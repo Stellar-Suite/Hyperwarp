@@ -527,6 +527,11 @@ impl ApplicationHost {
         self.get_behavior().onWindowCreate(win, x, y, width, height);
         self.tick();
     }
+
+    pub fn onWindowResize(&self, win_id: usize, width: u32, height: u32) {
+        self.get_behavior().onWindowResize(win_id, width, height);
+        self.tick();
+    }
 }
 
 fn create_host() -> ApplicationHost {

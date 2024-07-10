@@ -112,6 +112,25 @@ impl DefaultHostBehavior {
         }
     }
 
+    pub fn onWindowResize(&mut self, win_id: usize, width: u32, height: u32) {
+        self.windows.iter_mut().find(|w| w.id == win_id).unwrap().resize(width, height);
+    }
+
+    pub fn get_largest_window(&self) -> Option<(u32, u32)> {
+        let mut largest_area = 0;
+        let mut largest_width = 0;
+        let mut largest_height = 0;
+        for window in self.windows.iter() {
+            let area = window.width * window.height;
+            if area > largest_area {
+                largest_area = area;
+                largest_width = window.width;
+                largest_height = window.height;
+            }
+        }
+        Some((largest_width, largest_height))
+    }
+
     pub fn onFrameSwapBegin(&mut self) {
         // HOST.tick();
         let start = Instant::now();
@@ -121,6 +140,9 @@ impl DefaultHostBehavior {
                 // let wh = sdl2_safe::SDL_GetWindowSize_safe();
                 // surely no one uses both sdl2 and something else
                 if features.sdl2_enabled {
+                    self.get_largest_sdl2_window(); // this forces a sync of the window sizes for SDL
+                }
+                /*if features.sdl2_enabled {
                     if let Some((width, height)) = self.get_largest_sdl2_window() {
                         if self.fb_width != Some(width.try_into().unwrap())
                             || self.fb_height != Some(height.try_into().unwrap())
@@ -135,6 +157,20 @@ impl DefaultHostBehavior {
                         }
                     } else {
                         //  println!("sdl2 window not found");
+                    }
+                }*/
+                let largest_dims = self.get_largest_window();
+                if let Some((width, height)) = largest_dims {
+                    if self.fb_width != Some(width.try_into().unwrap())
+                        || self.fb_height != Some(height.try_into().unwrap())
+                    {
+                        if HOST.config.debug_mode {
+                            println!("resize fb {}x{}", width, height);
+                        }
+                        self.setup_framebuffer(
+                            width.try_into().unwrap(),
+                            height.try_into().unwrap(),
+                        );
                     }
                 }
                 if let Some(_capture) = HOST.capture_helper.as_ref() {

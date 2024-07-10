@@ -31,6 +31,8 @@ redhook::hook! {
             unsafe {
                 std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
             }
+        } else if symbol_name == "XResizeWindow" {
+            unsafe { std::mem::transmute(xlib::x_resize_window_first as *const c_void) }
         } else if symbol_name == "XConfigureWindow" {
             unsafe { std::mem::transmute(xlib::x_configure_window_first as *const c_void) }
         }else if symbol_name == "XCreateWindow" {
