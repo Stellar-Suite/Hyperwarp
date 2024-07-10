@@ -20,8 +20,10 @@ pub fn modify_pointers(name: &str, pointer: Pointer) -> Pointer{
     match name {
         "glXSwapBuffers" => {
             println!("overrode glxswapbuffers");
-            let mut features = HOST.features.lock().unwrap();
-            features.enable_glx();
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_glx();
+            }
             HOST.suggest_graphics_api(GraphicsAPI::OpenGL);
             // memorize the real glxSwapBuffers pointer and return our shim instead
             HOST.func_pointers.lock().unwrap().insert(name.to_string(), pointer);

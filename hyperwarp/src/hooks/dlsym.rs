@@ -1,10 +1,12 @@
 // ugly dlsym router
 
-use std::ffi::CString;
+use std::{collections::HashMap, ffi::CString, sync::Mutex};
+
+use lazy_static::lazy_static;
 
 use libc::{c_void, c_char};
 
-use crate::shim;
+use crate::{shim, utils::pointer::Pointer};
 
 use super::{glx, sdl2, xlib};
 
@@ -14,6 +16,10 @@ extern "C" {
 
 extern "C" {
     pub fn init_if_needed();
+}
+
+lazy_static! {
+    static ref DLSYM_CACHE: Mutex<HashMap<String, Pointer>> = Mutex::new(HashMap::new());
 }
 
 // #[cfg(crate_type="dylib")]

@@ -116,6 +116,10 @@ impl DefaultHostBehavior {
         self.windows.iter_mut().find(|w| w.id == win_id).unwrap().resize(width, height);
     }
 
+    pub fn onWindowDestroy(&mut self, win_id: usize) {
+        self.windows.retain(|w| w.id != win_id);
+    }
+
     pub fn get_largest_window(&self) -> Option<(u32, u32)> {
         let mut largest_area = 0;
         let mut largest_width = 0;
@@ -130,6 +134,7 @@ impl DefaultHostBehavior {
         }
         Some((largest_width, largest_height))
     }
+
 
     pub fn onFrameSwapBegin(&mut self) {
         // HOST.tick();

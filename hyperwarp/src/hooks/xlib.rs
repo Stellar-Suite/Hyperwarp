@@ -216,6 +216,8 @@ redhook::hook! {
                 features.enable_x11();
             }
 
+            println!("XResizeWindow called {}x{}", width, height);
+
             redhook::real!(XResizeWindow_hw_direct)(
                 display,
                 window,
