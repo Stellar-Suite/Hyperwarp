@@ -47,7 +47,7 @@ redhook::hook! {
         attributes: XSetWindowAttributes
     ) -> Window => x_create_window_first {
         if HOST.config.enable_x11 {
-            HOST.test();
+            // HOST.test();
             
             // TODO: various feature flags locks are held longer than they should be, I should be adding more blocks to limit the lock time
             {
@@ -55,7 +55,7 @@ redhook::hook! {
                 features.enable_x11();
             }
 
-            let result = redhook::real!(XCreateWindow)(
+            let result = redhook::real!(XCreateWindow_hw_direct)(
                 display,
                 parent,
                 x,
@@ -91,6 +91,25 @@ redhook::hook! {
     }
 }
 
+redhook::hook! {
+    unsafe fn XCreateWindow_hw_direct(
+        display: Display,
+        parent: Window,
+        x: libc::c_int,
+        y: libc::c_int,
+        width: libc::c_uint,
+        height: libc::c_uint,
+        border_width: libc::c_uint,
+        depth: libc::c_int,
+        class: libc::c_uint,
+        visual: Visual,
+        value_mask: libc::c_ulong,
+        attributes: XSetWindowAttributes
+    ) -> Window => x_create_window_hw_direct {
+        std::ptr::null()
+    }
+}
+
 
 redhook::hook! {
     unsafe fn XCreateSimpleWindow(
@@ -105,12 +124,12 @@ redhook::hook! {
         background: libc::c_ulong
     ) -> Window => x_create_simple_window_first {
         if HOST.config.enable_x11 {
-            HOST.test();
+            // HOST.test();
 
             let mut features = HOST.features.lock().unwrap();
             features.enable_x11();
 
-            let result = redhook::real!(XCreateSimpleWindow)(
+            let result = redhook::real!(XCreateSimpleWindow_hw_direct)(
                 display,
                 parent,
                 x,
@@ -139,5 +158,21 @@ redhook::hook! {
             }
             std::ptr::null()
         }
+    }
+}
+
+redhook::hook! {
+    unsafe fn XCreateSimpleWindow_hw_direct(
+        display: Display,
+        parent: Window,
+        x: libc::c_int,
+        y: libc::c_int,
+        width: libc::c_uint,
+        height: libc::c_uint,
+        border_width: libc::c_uint,
+        border: libc::c_ulong,
+        background: libc::c_ulong
+    ) -> Window => x_create_simple_window_hw_direct {
+        std::ptr::null()
     }
 }

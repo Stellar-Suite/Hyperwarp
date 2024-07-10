@@ -501,7 +501,7 @@ impl ApplicationHost {
 
     pub fn test(&self) {
         // TODO: supress test func in non-debug mode
-        println!("test func called on thread {:?}", thread::current().id());
+        // println!("test func called on thread {:?}", thread::current().id());
     }
 
     pub fn onFrameSwapBegin(&self) {
@@ -533,7 +533,7 @@ fn create_host() -> ApplicationHost {
     let mut config = Config::from_env();
     // println!("i became alive inside {}", stellar_protocol::util::prog().expect("Could not get program name"));
     if ApplicationHost::check_should_use_netural_mode() {
-        println!("engaging netural mode");
+        // println!("engaging netural mode");
         config.debug_mode = false;
         config.tracing_mode = false;
         config.netural_mode = true;

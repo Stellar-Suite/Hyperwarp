@@ -31,7 +31,7 @@ redhook::hook! {
             unsafe {
                 std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
             }
-        } else if symbol_name == "XCreateWindowL" {
+        } else if symbol_name == "XCreateWindow" {
             unsafe { std::mem::transmute(xlib::x_create_window_first as *const c_void) }
         } else if symbol_name == "glXSwapBuffers" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers as *const c_void) }
@@ -62,7 +62,7 @@ redhook::hook! {
             // println!("brace");
             let result = odlsym(handle, symbol);
             // println!("nothing exploded looking up {}",symbol_name);
-            // println!("dlsym({})",symbol_name);
+            println!("dlsym({})",symbol_name);
             result
         }
     }
