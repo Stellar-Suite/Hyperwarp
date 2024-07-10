@@ -7,6 +7,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 
 static int DEBUG = 0;
 
@@ -114,6 +115,10 @@ void postmain_plugin()
 void premain_debug()
 {
   printf("Glue: Process id: %i, group: %i user: %i, parent pid: %i\n", getpid(), getgid(), getuid(), getppid());
+  printf("Glue: Process name: %s\n", program_invocation_name);
+  if(getenv("_") != NULL){
+    printf("Glue: Process name 2: %s\n", getenv("_"));
+  }
 }
 
 int wrap_main(int argc, char **argv, char **envp)

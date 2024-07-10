@@ -209,7 +209,7 @@ impl ApplicationHost {
     }
 
     pub fn premain(&self) {
-
+        println!("I became alive inside {}", stellar_protocol::util::prog().expect("Could not get program name"));
     }
 
     pub fn check_should_use_netural_mode() -> bool {
@@ -222,7 +222,6 @@ impl ApplicationHost {
     }
 
     pub fn start_server(&mut self) {
-
         if self.config.netural_mode {
             return;
         }
