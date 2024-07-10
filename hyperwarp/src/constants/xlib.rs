@@ -2,6 +2,7 @@ use crate::hooks::xlib::Window;
 
 // https://tronche.com/gui/x/xlib/window/configure.html#XWindowChanges
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct XWindowChanges {
     pub x: libc::c_int,
     pub y: libc::c_int,

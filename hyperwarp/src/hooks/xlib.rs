@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 use std::ffi::CStr;
 use libc::{c_char, c_void};
 
-use crate::{constants::Library, host::hosting::HOST};
+use crate::{constants::{xlib::XWindowChanges, Library}, host::hosting::HOST};
 
 // types
 // TODO: convert them to without the pointer stuffs
@@ -174,5 +174,37 @@ redhook::hook! {
         background: libc::c_ulong
     ) -> Window => x_create_simple_window_hw_direct {
         std::ptr::null()
+    }
+}
+
+redhook::hook! {
+    unsafe fn XConfigureWindow(display: Display, window: Window, value_mask: libc::c_ulong, values: *const XWindowChanges) => x_configure_window_first {
+        if HOST.config.enable_x11 {
+            // HOST.test();
+
+            let mut features = HOST.features.lock().unwrap();
+            features.enable_x11();
+
+            redhook::real!(XConfigureWindow_hw_direct)(
+                display,
+                window,
+                value_mask,
+                values,
+            );
+
+            let configuration = values.as_ref().unwrap();
+            println!("reconfigure: {:#?}", configuration);
+
+            // HOST.onWindowConfigure(window, values);
+        } else {
+            if HOST.config.debug_mode {
+                println!("Attempted to configure window, denied by config");
+            }
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn XConfigureWindow_hw_direct(display: Display, window: Window, value_mask: libc::c_ulong, values: *const XWindowChanges) => x_configure_window_hw_direct {
     }
 }
