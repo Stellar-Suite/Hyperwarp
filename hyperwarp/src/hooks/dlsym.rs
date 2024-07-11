@@ -70,7 +70,7 @@ redhook::hook! {
         } else if symbol_name == "SDL_SetWindowTitle" {
             if LOG_DLSYM { println!("modified SDL_SetWindowTitle"); }
             unsafe { std::mem::transmute(sdl2::sdl_setwindowtitle_first as *const c_void) }
-        else if symbol_name == "glXSwapBuffers" {
+        } else if symbol_name == "glXSwapBuffers" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers as *const c_void) }
         } else if symbol_name == "glXSwapBuffersMscOML" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers_msc_oml as *const c_void) }
