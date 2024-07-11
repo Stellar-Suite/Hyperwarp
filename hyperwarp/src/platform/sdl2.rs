@@ -1,7 +1,7 @@
 use sdl2_sys_lite::bindings::{SDL_PushEvent, SDL_Event, SDL_MouseMotionEvent, SDL_EventType};
 use stellar_protocol::protocol::{InputEvent, InputEventPayload};
 
-use crate::host::{hosting::HOST};
+use crate::{bind::sdl2_safe::SDL_PushEvent_safe, host::hosting::HOST};
 
 pub fn process_event(input_event: &InputEvent) {
     match input_event.payload {
@@ -19,9 +19,7 @@ pub fn process_event(input_event: &InputEvent) {
                     yrel: y,
                 }
             };
-            unsafe {
-                SDL_PushEvent(&mut mouse_event);
-            }
+            SDL_PushEvent_safe(&mut mouse_event);
         },
         InputEventPayload::MouseMoveAbsolute(x, y) => {
 
