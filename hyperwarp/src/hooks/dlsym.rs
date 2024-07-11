@@ -34,11 +34,39 @@ redhook::hook! {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
         // println!("dlsym: symbol name {}",symbol_name);
         // TODO: refactor the long if else into a map?
+        if symbol_name.starts_with("SDL_") || symbol_name.starts_with("glX") || symbol_name.starts_with("X") {
+            // caching
+            let symbol_cstring = CString::new(symbol_name.replace("SDL_","")).unwrap();
+            let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
+            if !symbol_pointer.is_null() {
+                println!("cache {} pointer {}",symbol_name,symbol_pointer as usize);
+                let mut cache = DLSYM_CACHE.lock().unwrap();
+                cache.insert(symbol_name.to_string(), Pointer(symbol_pointer));
+            }
+        }
         if symbol_name.ends_with("_hw_direct") {
             init_if_needed();
             // this is only slow for the one lookup yk
             let symbol_string = CString::new(symbol_name.replace("_hw_direct","")).unwrap();
-            odlsym(handle, symbol_string.as_ptr() as *const c_char)
+            let real_symbol_name = symbol_name.replace("_hw_direct","");
+            let pointer = odlsym(handle, symbol_string.as_ptr() as *const c_char);
+            if pointer.is_null() {
+                println!("impending null pointer for {}",symbol_name);
+                let cache_hit = {
+                    DLSYM_CACHE.lock().unwrap().contains_key(&real_symbol_name)
+                };
+                if cache_hit {
+                    println!("luckily the cache contains the symbol");
+                    let pointer = DLSYM_CACHE.lock().unwrap().get(&real_symbol_name).unwrap().as_mut_func();
+                    // this shouldn't trigger
+                    if pointer.is_null() {
+                        println!("that pointer is also null :( it is {}", pointer as usize);
+                    }
+                    return pointer;
+                }
+            }
+            println!("direct resolving {} pointer {}",symbol_name,pointer as usize);
+            pointer
         }  else if symbol_name == "_internal_rust_launch" {
             unsafe {
                 std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
@@ -78,15 +106,6 @@ redhook::hook! {
             unsafe { std::mem::transmute(glx::gl_x_get_proc_address as *const c_void) }
         } else if symbol_name == "glXGetProcAddressARB" {
             unsafe { std::mem::transmute(glx::gl_x_get_proc_address as *const c_void) }
-        }else if symbol_name == "SDL_CreateWindow" {
-            println!("dropped SDL_CreateWindow modifacation");
-            unsafe { std::mem::transmute(sdl2::sdl_createwindow_first as *const c_void) }
-        }else if symbol_name == "SDL_GL_SwapBuffers" {
-            println!("dropped SDL_GL_SwapBuffers modifacation");
-            unsafe { std::mem::transmute(sdl2::sdl_gl_swapbuffers_first as *const c_void) }
-        }else if symbol_name == "SDL_GL_SwapWindow" {
-            println!("dropped SDL_GL_SwapWindow modifacation");
-            unsafe { std::mem::transmute(sdl2::sdl_gl_swapwindow_first as *const c_void) }
         } else {
             /*if symbol_name.contains("udev") {
                 let bt = Backtrace::new();

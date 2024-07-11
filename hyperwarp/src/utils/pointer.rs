@@ -6,6 +6,10 @@ impl Pointer {
     pub fn as_func(&self) -> *const c_void {
         self.0
     }
+
+    pub fn as_mut_func(&self) -> *mut c_void {
+        self.0 as *mut c_void
+    }
 }
 
 unsafe impl Send for Pointer {}

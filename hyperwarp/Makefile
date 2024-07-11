@@ -8,7 +8,7 @@ rshim: shim.c
 	gcc -o target/rshim -O3 -D_GNU_SOURCE shim.c
 
 rust:
-	cargo build
+	cargo build --features "log_dlsym"
 
 rust_release:
 	cargo build -r
