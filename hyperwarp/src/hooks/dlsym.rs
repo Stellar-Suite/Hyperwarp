@@ -23,6 +23,11 @@ lazy_static! {
     static ref DLSYM_CACHE: Mutex<HashMap<String, Pointer>> = Mutex::new(HashMap::new());
 }
 
+#[cfg(feature = "log_dlsym")]
+pub const LOG_DLSYM: bool = true;
+#[cfg(not(feature = "log_dlsym"))]
+pub const LOG_DLSYM: bool = false;
+
 // #[cfg(crate_type="dylib")]
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
@@ -39,18 +44,33 @@ redhook::hook! {
                 std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
             }
         } else if symbol_name == "XResizeWindow" {
-            println!("modified XResizeWindow");
+            if LOG_DLSYM { println!("modified XResizeWindow"); }
             unsafe { std::mem::transmute(xlib::x_resize_window_first as *const c_void) }
         } else if symbol_name == "XConfigureWindow" {
-            println!("modified XConfigureWindow");
+            if LOG_DLSYM { println!("modified XConfigureWindow"); }
             unsafe { std::mem::transmute(xlib::x_configure_window_first as *const c_void) }
         }else if symbol_name == "XCreateWindow" {
-            println!("modified XCreateWindow");
+            if LOG_DLSYM { println!("modified XCreateWindow"); }
             unsafe { std::mem::transmute(xlib::x_create_window_first as *const c_void) }
         } else if symbol_name == "XCreateSimpleWindow" {
-            println!("modified XCreateSimpleWindow");
+            if LOG_DLSYM { println!("modified XCreateSimpleWindow"); }
             unsafe { std::mem::transmute(xlib::x_create_simple_window_first as *const c_void) }
-        } else if symbol_name == "glXSwapBuffers" {
+        } else if symbol_name == "SDL_CreateWindow" {
+            if LOG_DLSYM { println!("modified SDL_CreateWindow"); }
+            unsafe { std::mem::transmute(sdl2::sdl_createwindow_first as *const c_void) }
+        } else if symbol_name == "SDL_GL_SwapBuffers" {
+            if LOG_DLSYM { println!("modified SDL_GL_SwapBuffers"); }
+            unsafe { std::mem::transmute(sdl2::sdl_gl_swapbuffers_first as *const c_void) }
+        } else if symbol_name == "SDL_GL_SwapWindow" {
+            if LOG_DLSYM { println!("modified SDL_GL_SwapWindow"); }
+            unsafe { std::mem::transmute(sdl2::sdl_gl_swapwindow_first as *const c_void) }
+        } else if symbol_name == "SDL_GetKeyboardState" {
+            if LOG_DLSYM { println!("modified SDL_GetKeyboardState"); }
+            unsafe { std::mem::transmute(sdl2::sdl_getkeyboardstate_first as *const c_void) }
+        } else if symbol_name == "SDL_SetWindowTitle" {
+            if LOG_DLSYM { println!("modified SDL_SetWindowTitle"); }
+            unsafe { std::mem::transmute(sdl2::sdl_setwindowtitle_first as *const c_void) }
+        else if symbol_name == "glXSwapBuffers" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers as *const c_void) }
         } else if symbol_name == "glXSwapBuffersMscOML" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers_msc_oml as *const c_void) }
@@ -83,7 +103,9 @@ redhook::hook! {
             // println!("brace");
             let result = odlsym(handle, symbol);
             // println!("nothing exploded looking up {}",symbol_name);
-            println!("dlsym({})",symbol_name);
+            if LOG_DLSYM {
+                println!("dlsym({})",symbol_name);
+        }
             result
         }
     }

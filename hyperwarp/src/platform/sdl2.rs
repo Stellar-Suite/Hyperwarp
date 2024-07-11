@@ -1,4 +1,4 @@
-use sdl2_sys_lite::bindings::{SDL_PushEvent, SDL_Event, SDL_MouseMotionEvent, SDL_EventType};
+use sdl2_sys_lite::bindings::{SDL_Event, SDL_MouseMotionEvent, SDL_EventType};
 use stellar_protocol::protocol::{InputEvent, InputEventPayload};
 
 use crate::{bind::sdl2_safe::SDL_PushEvent_safe, host::hosting::HOST};
@@ -22,7 +22,8 @@ pub fn process_event(input_event: &InputEvent) {
             SDL_PushEvent_safe(&mut mouse_event);
         },
         InputEventPayload::MouseMoveAbsolute(x, y) => {
-
+            // pov: drawing tablets
+            // TODO: I don't have one so I can test but maybe a touchscreen will suffice?
         },
         _ => {
             if HOST.config.debug_mode {

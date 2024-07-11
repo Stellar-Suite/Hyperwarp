@@ -44,3 +44,7 @@ debug = true   # Controls whether the compiler passes `-g`
 [profile.release]
 opt-level = 3
 debug = false
+
+[features]
+log_dlsym = []
+default = []
