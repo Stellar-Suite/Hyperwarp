@@ -1,3 +1,5 @@
+use sdl_bindings::SDL_Scancode;
+
 // comment this out for performance lol
 // pub mod sdl_bindings;
 // lite version
@@ -583,4 +585,3 @@ pub mod sdl_bindings {
         SDL_NUM_SCANCODES = 512,
     }
 }
-

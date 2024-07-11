@@ -4,7 +4,7 @@ use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::bind::sdl2_safe;
+use crate::bind::sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -116,8 +116,8 @@ impl Timestampable for InputMetadata {
             let feature_flags = HOST.features.lock().unwrap();
             if feature_flags.sdl2_enabled {
                 unsafe {
-                    self.sdl2_timestamp_ticks = Some(sdl2_sys_lite::bindings::SDL_GetTicks());
-                    self.sdl2_timestamp_ticks_u64 = Some(sdl2_sys_lite::bindings::SDL_GetTicks() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
+                    self.sdl2_timestamp_ticks = Some(SDL_GetTicks_safe());
+                    self.sdl2_timestamp_ticks_u64 = Some(SDL_GetTicks_safe() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
                 }
             }
             // TODO: sdl3
@@ -202,8 +202,10 @@ impl InputManager {
                     if feature_flags.sdl2_enabled {
                         let event_type = if state { sdl2_sys_lite::bindings::SDL_EventType::SDL_KEYDOWN } else { sdl2_sys_lite::bindings::SDL_EventType::SDL_KEYUP };
                         let sdl_state = if state { sdl2_sys_lite::bindings::SDL_PRESSED } else { sdl2_sys_lite::bindings::SDL_RELEASED };
-                        let scancode = unsafe {
-                            sdl2_sys_lite::bindings::SDL_GetScancodeFromKey(key as i32) // hack for now
+                        let scancode = SDL_GetScancodeFromKey_safe(get_sdl_keycode(key)); // hack for now
+                        // TODO: move hack into function
+                        let scancode_for_bindings: sdl2_sys_lite::bindings::SDL_Scancode = unsafe {
+                            std::mem::transmute(scancode)
                         };
                         let keysym = 0;
                         let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
@@ -218,14 +220,15 @@ impl InputManager {
                                 repeat: 0,
                                 padding2: 0,
                                 padding3: 0,
-                                keysym: sdl2_sys_lite::bindings::SDL_Keysym { scancode: scancode, sym: key as i32, mod_: modifiers, unused: 0 } }
+                                keysym: sdl2_sys_lite::bindings::SDL_Keysym { scancode: scancode_for_bindings, sym: key as i32, mod_: modifiers, unused: 0 } }
                         };
 
+                        // TODO: remove this
                         unsafe {
                             // TODO: handle errors
                             // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
                             // also maybe don't use unsafe directly?
-                            let result_ok = sdl2_sys_lite::bindings::SDL_PushEvent(&mut event);
+                            let result_ok = SDL_PushEvent_safe(&mut event);
                             if result_ok != 1 {
                                 let error_str = sdl2_safe::SDL_GetError_safe();
                                 println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
