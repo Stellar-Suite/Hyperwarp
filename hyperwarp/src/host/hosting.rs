@@ -524,7 +524,7 @@ impl ApplicationHost {
         width: Option<u32>,
         height: Option<u32>,
     ) {
-        if x == Some(-32) && y == Some(-32) && width == Some(32) && height == Some(32) {
+        if width == Some(32) && height == Some(32) {
             // ignore SDL opengl test
             return;
         }

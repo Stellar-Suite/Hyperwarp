@@ -116,8 +116,8 @@ impl Timestampable for InputMetadata {
             let feature_flags = HOST.features.lock().unwrap();
             if feature_flags.sdl2_enabled {
                 unsafe {
-                    self.sdl2_timestamp_ticks = Some(sdl2_sys::SDL_GetTicks());
-                    self.sdl2_timestamp_ticks_u64 = Some(sdl2_sys::SDL_GetTicks() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
+                    self.sdl2_timestamp_ticks = Some(sdl2_sys_lite::bindings::SDL_GetTicks());
+                    self.sdl2_timestamp_ticks_u64 = Some(sdl2_sys_lite::bindings::SDL_GetTicks() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
                 }
             }
             // TODO: sdl3
@@ -200,17 +200,17 @@ impl InputManager {
                 InputEventPayload::KeyEvent { key, scancode, state, modifiers } => {
                     // we're going to ignore scancode for now
                     if feature_flags.sdl2_enabled {
-                        let event_type = if state { sdl2_sys::SDL_EventType::SDL_KEYDOWN } else { sdl2_sys::SDL_EventType::SDL_KEYUP };
-                        let sdl_state = if state { sdl2_sys::SDL_PRESSED } else { sdl2_sys::SDL_RELEASED };
+                        let event_type = if state { sdl2_sys_lite::bindings::SDL_EventType::SDL_KEYDOWN } else { sdl2_sys_lite::bindings::SDL_EventType::SDL_KEYUP };
+                        let sdl_state = if state { sdl2_sys_lite::bindings::SDL_PRESSED } else { sdl2_sys_lite::bindings::SDL_RELEASED };
                         let scancode = unsafe {
-                            sdl2_sys::SDL_GetScancodeFromKey(key as i32) // hack for now
+                            sdl2_sys_lite::bindings::SDL_GetScancodeFromKey(key as i32) // hack for now
                         };
                         let keysym = 0;
                         let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
                         let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
 
-                        let mut event = sdl2_sys::SDL_Event {
-                            key: sdl2_sys::SDL_KeyboardEvent { 
+                        let mut event = sdl2_sys_lite::bindings::SDL_Event {
+                            key: sdl2_sys_lite::bindings::SDL_KeyboardEvent { 
                                 type_: event_type as u32,
                                 timestamp: timestamp,
                                 windowID: wid,
@@ -218,14 +218,14 @@ impl InputManager {
                                 repeat: 0,
                                 padding2: 0,
                                 padding3: 0,
-                                keysym: sdl2_sys::SDL_Keysym { scancode: scancode, sym: key as i32, mod_: modifiers, unused: 0 } }
+                                keysym: sdl2_sys_lite::bindings::SDL_Keysym { scancode: scancode, sym: key as i32, mod_: modifiers, unused: 0 } }
                         };
 
                         unsafe {
                             // TODO: handle errors
                             // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
                             // also maybe don't use unsafe directly?
-                            let result_ok = sdl2_sys::SDL_PushEvent(&mut event);
+                            let result_ok = sdl2_sys_lite::bindings::SDL_PushEvent(&mut event);
                             if result_ok != 1 {
                                 let error_str = sdl2_safe::SDL_GetError_safe();
                                 println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);

@@ -123,8 +123,10 @@ redhook::hook! {
         if HOST.config.enable_x11 {
             // HOST.test();
 
-            let mut features = HOST.features.lock().unwrap();
-            features.enable_x11();
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_x11();
+            }
 
             let result = redhook::real!(XCreateSimpleWindow_hw_direct)(
                 display,

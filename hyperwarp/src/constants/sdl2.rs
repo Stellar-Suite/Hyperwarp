@@ -1,4 +1,4 @@
-use sdl2_sys::{SDL_KeyCode, SDL_Scancode};
+use sdl2_sys_lite::bindings::{SDL_KeyCode, SDL_Scancode};
 
 use crate::utils::manual_types::libc::ENUM_TYPE;
 

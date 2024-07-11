@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, ffi::CString, sync::Mutex};
 
+use backtrace::Backtrace;
 use lazy_static::lazy_static;
 
 use libc::{c_void, c_char};
@@ -38,11 +39,17 @@ redhook::hook! {
                 std::mem::transmute(shim::launch::rust_launch_first as *const c_void) 
             }
         } else if symbol_name == "XResizeWindow" {
+            println!("modified XResizeWindow");
             unsafe { std::mem::transmute(xlib::x_resize_window_first as *const c_void) }
         } else if symbol_name == "XConfigureWindow" {
+            println!("modified XConfigureWindow");
             unsafe { std::mem::transmute(xlib::x_configure_window_first as *const c_void) }
         }else if symbol_name == "XCreateWindow" {
+            println!("modified XCreateWindow");
             unsafe { std::mem::transmute(xlib::x_create_window_first as *const c_void) }
+        } else if symbol_name == "XCreateSimpleWindow" {
+            println!("modified XCreateSimpleWindow");
+            unsafe { std::mem::transmute(xlib::x_create_simple_window_first as *const c_void) }
         } else if symbol_name == "glXSwapBuffers" {
             unsafe { std::mem::transmute(glx::gl_x_swap_buffers as *const c_void) }
         } else if symbol_name == "glXSwapBuffersMscOML" {
@@ -61,6 +68,10 @@ redhook::hook! {
             println!("dropped SDL_GL_SwapWindow modifacation");
             unsafe { std::mem::transmute(sdl2::sdl_gl_swapwindow_first as *const c_void) }
         } else {
+            /*if symbol_name.contains("udev") {
+                let bt = Backtrace::new();
+                println!("dlsym: symbol name {} backtrace {:?}", symbol_name, bt);
+            }*/
             // odlsym is from preglue
             // println!("using odlsym");
             /*unsafe {

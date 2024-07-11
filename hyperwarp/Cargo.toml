@@ -25,7 +25,8 @@ human-panic = "2.0.0"
 backtrace = "0.3.72"
 dashmap = "6.0.1"
 # "bindgen" itself might be extraneous
-sdl2-sys = { version = "0.37.0", features = ["bindgen", "use-bindgen"] }
+# TODO new SDL2
+sdl2-sys-lite = { git = "https://github.com/Stellar-Suite/sdl2-sys-lite", version = "0.1.0" }
 # stellar_core = { path = "../stellar_core" }
 
 [build-dependencies]
