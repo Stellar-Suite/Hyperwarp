@@ -14,6 +14,8 @@ use crate::host::hosting::HOST;
 
 // Many of these hooks
 
+pub const SDL_DYNAPI_TABLE_MAX_SIZE: usize = 1024;
+
 redhook::hook! {
     unsafe fn SDL_Init(flags: Uint32) -> c_int => sdl_init_first {
         if HOST.config.debug_mode {
