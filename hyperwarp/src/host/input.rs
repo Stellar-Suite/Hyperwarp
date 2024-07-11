@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use backtrace::Backtrace;
 use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
@@ -236,6 +237,9 @@ impl InputManager {
                         }
 
                         println!("pushed event new kbd event");
+                        // debug thing
+                        let bt = Backtrace::new();
+                        println!("input kbd backtrace: {:?}", bt);
                     }
                 }
                 _ => {
