@@ -577,7 +577,7 @@ impl WebRTCPreprocessor {
     pub fn get_optimizations(&self) -> PipelineOptimization {
         match &self.config {
             Some(config) => {
-                config.optipt mizations
+                config.optimizations
             },
             None => PipelineOptimization::None,
         }
