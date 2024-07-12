@@ -22,10 +22,17 @@ redhook::hook! {
             println!("SDL_Init called");
         }
         if HOST.config.enable_sdl2 {
-            redhook::real!(SDL_Init)(flags)
+            redhook::real!(SDL_Init_hw_direct)(flags)
         } else {
             SDL_FALSE
         }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_Init_hw_direct(flags: Uint32) -> c_int => sdl_init_hw_direct {
+        // shim so I can run redhook::real on it
+        0
     }
 }
 

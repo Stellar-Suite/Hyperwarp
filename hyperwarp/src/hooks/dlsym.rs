@@ -103,7 +103,8 @@ redhook::hook! {
             pointer
         } else if let Some(pointer) = sdl2::try_modify_symbol(symbol_name) {
             pointer
-        } else if symbol_name == "SDL_DYNAPI_entry_disabled" {
+        } else if symbol_name == "SDL_DYNAPI_entry" {
+            // TODO: allow this to be disabled
             if LOG_DLSYM {
                 println!("sent modified SDL_DYNAPI_entry");
             }
