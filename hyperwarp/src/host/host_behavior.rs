@@ -291,6 +291,9 @@ impl DefaultHostBehavior {
         }
         let mut chosen: u32 = 0;
         for window in &self.windows {
+            if window.lib != Library::SDL2 {
+                continue;
+            }
             let (w, h) = sdl2_safe::SDL_GetWindowSize_safe(window.id as *mut sdl2::SDL_Window);
             // println!("gws {} {}", w, h);
             if w * h > la {

@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use backtrace::Backtrace;
 use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::bind::sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe};
+use crate::{bind::sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}, hooks::dlsym::check_cache_integrity};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -99,7 +99,7 @@ impl Keyboard {
             modifiers |= KMOD_RALT;
         }
 
-        return 0;
+        return modifiers;
     }
 
     pub fn get_virt_array_ptr(&self) -> *const u8 {
@@ -200,19 +200,28 @@ impl InputManager {
                 // type confusion note: no sdl enum key values are negative yet
                 InputEventPayload::KeyEvent { key, scancode, state, modifiers } => {
                     // we're going to ignore scancode for now
+                    // let start_time = Instant::now();
                     if feature_flags.sdl2_enabled {
                         let event_type = if state { sdl2_sys_lite::bindings::SDL_EventType::SDL_KEYDOWN } else { sdl2_sys_lite::bindings::SDL_EventType::SDL_KEYUP };
                         let sdl_state = if state { sdl2_sys_lite::bindings::SDL_PRESSED } else { sdl2_sys_lite::bindings::SDL_RELEASED };
-                        let scancode = SDL_GetScancodeFromKey_safe(get_sdl_keycode(key)); // hack for now
+                        // println!("Resolving keycode enum of {}", key);
+                        let keycode = get_sdl_keycode(key);
+                        // println!("Resolving scancode of {:?}", keycode);
+                        let scancode = SDL_GetScancodeFromKey_safe(keycode); // hack for now
                         // TODO: move hack into function
+                        // println!("perform stupid transmute");
                         let scancode_for_bindings: sdl2_sys_lite::bindings::SDL_Scancode = unsafe {
                             std::mem::transmute(scancode)
                         };
+                        // println!("stupid transmute works");
                         let keysym = 0;
                         let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
+                        // println!("wid is {}", wid);
                         let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
+                        // println!("metadata generated for event in {}ms", start_time.elapsed().as_millis());
+                        // println!("timestamp is {}", timestamp);
 
-                        println!("constructing artifical event");
+                        // println!("constructing artifical event");
 
                         let mut event = sdl2_sys_lite::bindings::SDL_Event {
                             key: sdl2_sys_lite::bindings::SDL_KeyboardEvent { 
@@ -225,9 +234,7 @@ impl InputManager {
                                 padding3: 0,
                                 keysym: sdl2_sys_lite::bindings::SDL_Keysym { scancode: scancode_for_bindings, sym: key as i32, mod_: modifiers, unused: 0 } }
                         };
-
-                        let bt = Backtrace::new();
-                        println!("input kbd backtrace: {:?}", bt);
+                        // println!("constructed event in {}ms", start_time.elapsed().as_millis());
 
                         // TODO: remove this
                         unsafe {
@@ -235,17 +242,16 @@ impl InputManager {
                             // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
                             // also maybe don't use unsafe directly?
                             let result_ok = SDL_PushEvent_safe(&mut event);
+                            // println!("pushing event in {}ms", start_time.elapsed().as_millis());
                             if result_ok != 1 {
                                 let error_str = sdl2_safe::SDL_GetError_safe();
-                                println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                                // println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
                             }
                         }
 
                         println!("pushed event new kbd event");
-                        // debug thing
-                        let bt = Backtrace::new();
-                        println!("input kbd backtrace: {:?}", bt);
                     }
+                    // println!("pushed event new kbd event in {}ms", start_time.elapsed().as_millis());
                 }
                 _ => {
                     println!("unhandled event: {:?}", event);

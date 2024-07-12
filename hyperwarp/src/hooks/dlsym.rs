@@ -34,6 +34,15 @@ pub const LOG_DLSYM: bool = false;
 
 pub const USE_CACHE_WORKAROUND: bool = true;
 
+pub fn check_cache_integrity() {
+    let cache = DLSYM_CACHE.lock().unwrap();
+    for (symbol_name, pointer) in cache.iter() {
+        if pointer.0.is_null() {
+            println!("cache integrity error: symbol {} has a null pointer", symbol_name);
+        }
+    }
+}
+
 // #[cfg(crate_type="dylib")]
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
