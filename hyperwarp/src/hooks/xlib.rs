@@ -287,6 +287,7 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "XCreateSimpleWindow" => Some(x_create_simple_window_first as *mut c_void),
         "XConfigureWindow" => Some(x_configure_window_first as *mut c_void),
         "XResizeWindow" => Some(x_resize_window_first as *mut c_void),
+        "XDestroyWindow" => Some(x_destroy_window_first as *mut c_void),
         _ => None
     }
 }
