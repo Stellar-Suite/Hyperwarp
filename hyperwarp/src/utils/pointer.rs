@@ -1,5 +1,6 @@
 use libc::c_void;
 
+#[derive(Clone, Copy, Debug)]
 pub struct Pointer(pub *const c_void);
 
 impl Pointer {

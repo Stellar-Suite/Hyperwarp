@@ -177,3 +177,16 @@ redhook::hook! {
         std::ptr::null()
     }
 }
+
+pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
+    match symbol_name {
+        "SDL_Init" => Some(sdl_init_first as *mut c_void),
+        "SDL_CreateWindow" => Some(sdl_createwindow_first as *mut c_void),
+        "SDL_GL_SwapBuffers" => Some(sdl_gl_swapbuffers_first as *mut c_void),
+        "SDL_GL_SwapWindow" => Some(sdl_gl_swapwindow_first as *mut c_void),
+        "SDL_RenderPresent" => Some(sdl_renderpresent_first as *mut c_void),
+        "SDL_SetWindowTitle" => Some(sdl_setwindowtitle_first as *mut c_void),
+        "SDL_GetKeyboardState" => Some(sdl_getkeyboardstate_first as *mut c_void),
+        _ => None
+    }
+}

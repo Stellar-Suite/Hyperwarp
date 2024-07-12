@@ -241,3 +241,14 @@ redhook::hook! {
     unsafe fn XResizeWindow_hw_direct(display: Display, window: Window, width: libc::c_uint, height: libc::c_uint) => x_resize_window_hw_direct {
     }
 }
+
+pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
+    match symbol_name {
+        "XOpenDisplay" => Some(x_open_display_first as *mut c_void),
+        "XCreateWindow" => Some(x_create_window_first as *mut c_void),
+        "XCreateSimpleWindow" => Some(x_create_simple_window_first as *mut c_void),
+        "XConfigureWindow" => Some(x_configure_window_first as *mut c_void),
+        "XResizeWindow" => Some(x_resize_window_first as *mut c_void),
+        _ => None
+    }
+}
