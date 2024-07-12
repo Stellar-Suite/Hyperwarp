@@ -3,3 +3,5 @@ libhyperglue.so
 libhyperpreglue.so
 preglue
 libTAS_sdlhooks.h
+valgrind-out.txt
+vgcore.*

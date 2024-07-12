@@ -37,12 +37,6 @@ redhook::hook! {
 }
 
 redhook::hook! {
-    unsafe fn SDL_CreateWindow_hw_direct(title: *const c_char, x: c_int, y: c_int, w: c_int, h: c_int, flags: Uint32) -> *const SDL_Window  => sdl_createwindow_hw_direct {
-        std::ptr::null() // Once again this is a shim so I can run redhook::real on it
-    }
-}
-
-redhook::hook! {
     unsafe fn SDL_CreateWindow(title: *const c_char, x: c_int, y: c_int, w: c_int, h: c_int, flags: Uint32) -> *const SDL_Window  => sdl_createwindow_first {
         if HOST.config.debug_mode {
             println!("SDL_CreateWindow called");
@@ -86,8 +80,8 @@ redhook::hook! {
 }
 
 redhook::hook! {
-    unsafe fn SDL_GL_SwapBuffers_hw_direct() => sdl_gl_swapbuffers_hw_direct {
-        // shim so I can run redhook::real on it   
+    unsafe fn SDL_CreateWindow_hw_direct(title: *const c_char, x: c_int, y: c_int, w: c_int, h: c_int, flags: Uint32) -> *const SDL_Window  => sdl_createwindow_hw_direct {
+        std::ptr::null() // Once again this is a shim so I can run redhook::real on it
     }
 }
 
@@ -109,7 +103,7 @@ redhook::hook! {
 }
 
 redhook::hook! {
-    unsafe fn SDL_GL_SwapWindow_hw_direct(display: *mut SDL_Window) => sdl_gl_swapwindow_hw_direct {
+    unsafe fn SDL_GL_SwapBuffers_hw_direct() => sdl_gl_swapbuffers_hw_direct {
         // shim so I can run redhook::real on it   
     }
 }
@@ -129,13 +123,19 @@ redhook::hook! {
 }
 
 redhook::hook! {
+    unsafe fn SDL_GL_SwapWindow_hw_direct(display: *mut SDL_Window) => sdl_gl_swapwindow_hw_direct {
+        // shim so I can run redhook::real on it   
+    }
+}
+
+redhook::hook! {
     unsafe fn SDL_RenderPresent(renderer: *mut SDL_Renderer) -> *const c_void => sdl_renderpresent_first {
         if HOST.config.tracing_mode {
             println!("SDL_RenderPresent called");
         }
         if HOST.config.enable_sdl2 {
             HOST.onFrameSwapBegin();
-            let result = redhook::real!(SDL_RenderPresent)(renderer);
+            let result = redhook::real!(SDL_RenderPresent_hw_direct)(renderer);
             HOST.onFrameSwapEnd();
             result
         } else {
@@ -143,6 +143,13 @@ redhook::hook! {
         }
     }
 }
+
+redhook::hook! {
+    unsafe fn SDL_RenderPresent_hw_direct(renderer: *mut SDL_Renderer) -> *const c_void => sdl_renderpresent_hw_direct {
+        std::ptr::null()
+    }
+}
+
 redhook::hook! {
     unsafe fn SDL_SetWindowTitle(display: *mut SDL_Window, title: *const c_char) => sdl_setwindowtitle_first {
         if HOST.config.debug_mode {
@@ -185,6 +192,26 @@ redhook::hook! {
     }
 }
 
+redhook::hook! {
+    unsafe fn SDL_DestroyWindow(display: *mut SDL_Window) => sdl_destroywindow_first {
+        if HOST.config.debug_mode {
+            println!("SDL_DestroyWindow called");
+        }
+
+        if HOST.config.enable_sdl2 {
+            HOST.onWindowDestroy(display as usize);
+            let result = redhook::real!(SDL_DestroyWindow_hw_direct)(display);
+            result
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_DestroyWindow_hw_direct(display: *mut SDL_Window) => sdl_destroywindow_hw_direct {
+        // shim so I can run redhook::real on it   
+    }
+}
+
 pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
     match symbol_name {
         "SDL_Init" => Some(sdl_init_first as *mut c_void),
@@ -194,6 +221,7 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "SDL_RenderPresent" => Some(sdl_renderpresent_first as *mut c_void),
         "SDL_SetWindowTitle" => Some(sdl_setwindowtitle_first as *mut c_void),
         "SDL_GetKeyboardState" => Some(sdl_getkeyboardstate_first as *mut c_void),
+        "SDL_DestroyWindow" => Some(sdl_destroywindow_first as *mut c_void),
         _ => None
     }
 }

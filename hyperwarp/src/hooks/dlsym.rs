@@ -66,6 +66,9 @@ redhook::hook! {
             // this is only slow for the one lookup yk
             let symbol_string = CString::new(symbol_name.replace("_hw_direct","")).unwrap();
             let real_symbol_name = symbol_name.replace("_hw_direct","");
+            if LOG_DLSYM {
+                println!("indirect resolving {} pointer",symbol_name);
+            }
             let pointer = odlsym(handle, symbol_string.as_ptr() as *const c_char);
             if pointer.is_null() {
                 println!("impending null pointer for {}",symbol_name);

@@ -532,6 +532,11 @@ impl ApplicationHost {
         self.tick();
     }
 
+    pub fn onWindowDestroy(&self, win_id: usize) {
+        self.get_behavior().onWindowDestroy(win_id);
+        self.tick();
+    }
+
     pub fn onWindowResize(&self, win_id: usize, width: u32, height: u32) {
         self.get_behavior().onWindowResize(win_id, width, height);
         self.tick();

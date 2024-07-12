@@ -251,6 +251,35 @@ redhook::hook! {
     }
 }
 
+redhook::hook! {
+    unsafe fn XDestroyWindow(display: Display, window: Window) => x_destroy_window_first {
+        if HOST.config.enable_x11 {
+            // HOST.test();
+
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_x11();
+            }
+
+            redhook::real!(XDestroyWindow_hw_direct)(
+                display,
+                window,
+            );
+
+            HOST.onWindowDestroy(window as usize);
+        } else {
+            if HOST.config.debug_mode {
+                println!("Attempted to destroy window, denied by config");
+            }
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn XDestroyWindow_hw_direct(display: Display, window: Window) => x_destroy_window_hw_direct {
+    }
+}
+
 pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
     match symbol_name {
         "XOpenDisplay" => Some(x_open_display_first as *mut c_void),

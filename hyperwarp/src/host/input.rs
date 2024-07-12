@@ -212,6 +212,8 @@ impl InputManager {
                         let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
                         let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
 
+                        println!("constructing artifical event");
+
                         let mut event = sdl2_sys_lite::bindings::SDL_Event {
                             key: sdl2_sys_lite::bindings::SDL_KeyboardEvent { 
                                 type_: event_type as u32,
@@ -223,6 +225,9 @@ impl InputManager {
                                 padding3: 0,
                                 keysym: sdl2_sys_lite::bindings::SDL_Keysym { scancode: scancode_for_bindings, sym: key as i32, mod_: modifiers, unused: 0 } }
                         };
+
+                        let bt = Backtrace::new();
+                        println!("input kbd backtrace: {:?}", bt);
 
                         // TODO: remove this
                         unsafe {

@@ -5,6 +5,8 @@ use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::{host::hosting::HOST, utils::pointer::Pointer};
 
+use super::dlsym::{query_dlsym_cache, DLSYM_CACHE};
+
 // types
 type Display = *mut c_void;
 type GLXDrawable = *mut c_void;
@@ -75,7 +77,7 @@ redhook::hook! {
             }
 
             HOST.onFrameSwapBegin();            
-            let result = redhook::real!(glXSwapBuffersMscOML)(name, drawble, target_msc, divisor, remainder);
+            let result = redhook::real!(glXSwapBuffersMscOML_hw_direct)(name, drawble, target_msc, divisor, remainder);
             HOST.onFrameSwapEnd();
             result
         } else {
@@ -87,16 +89,23 @@ redhook::hook! {
     }
 }
 
+redhook::hook! {
+    unsafe fn glXSwapBuffersMscOML_hw_direct(name: Display, drawble: GLXDrawable, target_msc: c_long, divisor: c_long, remainder: c_long) => gl_x_swap_buffers_msc_oml_hw_direct {
+        // this is a shim so I can run redhook::real on it
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
+pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable) {
     // println!("Entered glXSwapBuffersPA");
     let func_pointers = HOST.func_pointers.lock().unwrap();
     // println!("Locked pointer map");
-    let func = func_pointers.get("glXSwapBuffers").unwrap();
+    let func = query_dlsym_cache("glXSwapBuffers").unwrap();
+    // func_pointers.get("glXSwapBuffers").unwrap();
     match func {
         Pointer(func_ref) => {
 
-            let func: extern "C" fn(name: Display, drawble: GLXDrawable) = unsafe { std::mem::transmute(*func_ref) };
+            let func: extern "C" fn(name: Display, drawble: GLXDrawable) = unsafe { std::mem::transmute(func_ref) };
             
             HOST.onFrameSwapBegin();
             func(name, drawble);
@@ -106,6 +115,12 @@ pub extern "C" fn glXSwapBuffersPA(name: Display, drawble: GLXDrawable){
         _ => {
             // println!("glXSwapBuffersPA: func is not a pointer");
         }
+    }
+}
+
+redhook::hook! {
+    unsafe fn glXSwapBuffersPA_hw_direct(name: Display, drawble: GLXDrawable) => gl_x_swap_buffers_pa_hw_direct {
+        // this is a shim so I can run redhook::real on it
     }
 }
 
@@ -120,7 +135,7 @@ fn glxGetProcAddrShim(name: String, origPointer: Pointer) -> Pointer{
             let mut features = HOST.features.lock().unwrap();
             features.enable_glx();
             // return our above shim
-            Pointer(glXSwapBuffersPA as *const c_void)
+            Pointer(gl_x_swap_buffers as *const c_void)
         },
         _ => origPointer
     }
@@ -138,10 +153,13 @@ redhook::hook! {
     unsafe fn glXGetProcAddress(name: *const c_char) -> c_func => gl_x_get_proc_address {
         let func = redhook::real!(glXGetProcAddress_hw_direct)(name);
         let func_name = std::ffi::CStr::from_ptr(name).to_str().unwrap();
-        // println!("glx get proc addr {}", func_name);
+        println!("glx get proc addr {}", func_name);
         let origPointer = Pointer(func);
         // insert orig pointer
         HOST.func_pointers.lock().unwrap().insert(func_name.to_owned(), Pointer(func));
+        {
+            DLSYM_CACHE.lock().unwrap().insert(func_name.to_owned(), Pointer(func));
+        }
         let pointer = glxGetProcAddrShim(func_name.to_owned(), origPointer);
 
         pointer.0
@@ -158,9 +176,12 @@ redhook::hook! {
     unsafe fn glXGetProcAddressARB(name: *const c_char) -> c_func => gl_x_get_proc_address_arb {
         let func = redhook::real!(glXGetProcAddressARB_hw_direct)(name);
         let func_name = std::ffi::CStr::from_ptr(name).to_str().unwrap();
-        // println!("glx get proc addr arb {}", func_name);
+        println!("glx get proc addr arb {}", func_name);
         // insert orig pointer
         HOST.func_pointers.lock().unwrap().insert(func_name.to_owned(), Pointer(func));
+        {
+            DLSYM_CACHE.lock().unwrap().insert(func_name.to_owned(), Pointer(func));
+        }
         let origPointer = Pointer(func);
         let pointer = glxGetProcAddrShim(func_name.to_owned(), origPointer); // we use the same since this func only switches funcs for stuff we're interested in
         pointer.0

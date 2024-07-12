@@ -117,6 +117,10 @@ impl DefaultHostBehavior {
     }
 
     pub fn onWindowDestroy(&mut self, win_id: usize) {
+        let matched_count = self.windows.iter().filter(|w| w.id == win_id).count();
+        if matched_count == 0 {
+            println!("warn: window of id {} not found", win_id);
+        }
         self.windows.retain(|w| w.id != win_id);
     }
 
