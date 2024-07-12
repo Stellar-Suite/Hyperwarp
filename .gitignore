@@ -2,3 +2,5 @@
 libhyperglue.so
 libhyperpreglue.so
 preglue
+# valgrind analysis
+vgcore.*

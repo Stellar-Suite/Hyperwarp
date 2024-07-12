@@ -32,6 +32,8 @@ pub const LOG_DLSYM: bool = true;
 #[cfg(not(feature = "log_dlsym"))]
 pub const LOG_DLSYM: bool = false;
 
+pub const USE_CACHE_WORKAROUND: bool = true;
+
 // #[cfg(crate_type="dylib")]
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
@@ -41,12 +43,19 @@ redhook::hook! {
         let should_cache = symbol_name.starts_with("SDL_") || symbol_name.starts_with("glX") || symbol_name.starts_with("X");
         if should_cache {
             // caching
+
+            init_if_needed();
+
             let symbol_cstring = CString::new(symbol_name).unwrap();
             let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
             if !symbol_pointer.is_null() {
                 println!("cache {} pointer {}",symbol_name,symbol_pointer as usize);
-                let mut cache = DLSYM_CACHE.lock().unwrap();
-                cache.insert(symbol_name.to_string(), Pointer(symbol_pointer));
+                {
+                    let mut cache = DLSYM_CACHE.lock().unwrap();
+                    // println!("locked cache");
+                    cache.insert(symbol_name.to_string(), Pointer(symbol_pointer));
+                }
+                // println!("unlocked cache");
             } else {
                 println!("caching {} pointer failed because we got a null pointer.", symbol_name);
             }
@@ -63,9 +72,11 @@ redhook::hook! {
                 let cache_hit = {
                     DLSYM_CACHE.lock().unwrap().contains_key(&real_symbol_name)
                 };
-                if cache_hit {
+                if cache_hit && USE_CACHE_WORKAROUND {
                     println!("luckily the cache contains the symbol");
-                    let pointer = DLSYM_CACHE.lock().unwrap().get(&real_symbol_name).unwrap().as_mut_func();
+                    let pointer = {
+                        DLSYM_CACHE.lock().unwrap().get(&real_symbol_name).unwrap().as_mut_func()
+                    };
                     // this shouldn't trigger
                     if pointer.is_null() {
                         println!("that pointer is also null :( it is {}", pointer as usize);
@@ -92,7 +103,7 @@ redhook::hook! {
             pointer
         } else if let Some(pointer) = sdl2::try_modify_symbol(symbol_name) {
             pointer
-        } else if symbol_name == "SDL_DYNAPI_entry" {
+        } else if symbol_name == "SDL_DYNAPI_entry_disabled" {
             if LOG_DLSYM {
                 println!("sent modified SDL_DYNAPI_entry");
             }
@@ -115,7 +126,7 @@ redhook::hook! {
             // println!("nothing exploded looking up {}",symbol_name);
             if LOG_DLSYM {
                 println!("dlsym({})",symbol_name);
-        }
+            }
             result
         }
     }

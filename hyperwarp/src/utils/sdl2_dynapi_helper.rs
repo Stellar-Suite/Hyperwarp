@@ -27,6 +27,9 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
     let mut dlsym_cache_locked = DLSYM_CACHE.lock().unwrap();
 
     let bytes_per_pointer = std::mem::size_of::<*mut libc::c_void>();
+    if LOG_DLSYM {
+        println!("SDL_DYNAPI_entry modified, tablesize: {}, pointer size in bytes: {}", tablesize, bytes_per_pointer);
+    }
 
     for (i, func) in DYNAPI_FUNCS.iter().enumerate() {
         if i > (tablesize as usize) {
@@ -41,16 +44,16 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
         if let Some(alt_ptr) = crate::hooks::sdl2::try_modify_symbol(func){
             // set offset to our new function pointer
             unsafe {
-                (jump_table.byte_offset((bytes_per_pointer * i) as isize) as *mut usize).write(alt_ptr as usize);
+                // (jump_table.byte_offset((bytes_per_pointer * i) as isize) as *mut usize).write(alt_ptr as usize);
             }
             if LOG_DLSYM {
-                println!("SDL_DYNAPI_entry_hw_direct modified {} to {}", func, alt_ptr as usize);
+                println!("SDL_DYNAPI_entry: modified {} to {}", func, alt_ptr as usize);
             }
         }
     }
 
     if result != 0 {
-        println!("SDL_DYNAPI_entry_hw_direct returned {}, which is not ok", result);
+        println!("orig SDL_DYNAPI_entry returned {}, which is not ok", result);
     }
     0 // ok
 }

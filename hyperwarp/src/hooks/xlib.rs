@@ -18,16 +18,25 @@ redhook::hook! {
         if HOST.config.enable_x11 {
             // HOST.test();
             
-            let mut features = HOST.features.lock().unwrap();
-            features.enable_x11();
+            {
+                let mut features = HOST.features.lock().unwrap();
+                features.enable_x11();
+            }
 
-            redhook::real!(XOpenDisplay)(name)
+            redhook::real!(XOpenDisplay_hw_direct)(name)
         } else {
             if HOST.config.debug_mode {
                 // println!("Attempted to open {}", CStr::from_ptr(name).to_str().unwrap());
             }
             std::ptr::null_mut()
         }
+    }
+}
+
+// hooking target
+redhook::hook! {
+    unsafe fn XOpenDisplay_hw_direct(name: *const c_char) -> *mut Display => x_open_display_hw_direct {
+        std::ptr::null_mut()
     }
 }
 
