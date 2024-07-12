@@ -46,6 +46,8 @@ redhook::hook! {
                 println!("cache {} pointer {}",symbol_name,symbol_pointer as usize);
                 let mut cache = DLSYM_CACHE.lock().unwrap();
                 cache.insert(symbol_name.to_string(), Pointer(symbol_pointer));
+            } else {
+                println!("caching {} pointer failed because we got a null pointer.", symbol_name);
             }
         }
         if symbol_name.ends_with("_hw_direct") {
