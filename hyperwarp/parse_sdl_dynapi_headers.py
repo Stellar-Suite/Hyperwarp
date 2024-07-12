@@ -5,16 +5,17 @@ SUFFIX = "\n];"
 
 seen = set()
 funcs = []
-for line in open("libTAS_sdlhooks.h"):
+for line in open("sdl2_dynapi.h"):
     line = line.strip()
-    if not line.startswith("SDL_") or not line.endswith(")") or not "(" in line:
+    if not line.startswith("SDL_DYNAPI_PROC(") or not line.endswith(")"):
         continue
-    func = line[line.index("(") + 1:-1]
+    func = line.split(",")[1]
     if func in seen:
         continue
     seen.add(func)
     funcs.append(func)
 
+# should say 601
 print("Found", len(funcs), "functions")
 # write to file
 with open("src/utils/sdl2_dynapi.rs", "w") as f:
@@ -22,3 +23,4 @@ with open("src/utils/sdl2_dynapi.rs", "w") as f:
     for func in funcs:
         f.write(FORMAT.format(func))
     f.write(SUFFIX)
+    
