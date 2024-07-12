@@ -17,6 +17,7 @@ pub mod pointer;
 pub mod redhook_modif;
 
 pub mod sdl2_dynapi;
+pub mod sdl2_dynapi_helper;
 
 pub fn format_window_title_prefix_cstr(c_string: *const c_char) -> *const c_char {
     if !HOST.config.retitle_windows {
