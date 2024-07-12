@@ -20,7 +20,7 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
     if LOG_DLSYM {
         println!("modded SDL_DYNAPI_entry called, api ver: {}, table size: {}", apiver, tablesize);
     }
-    let orig_func_ptr = query_dlsym_cache("SDL_DYNAPI_entry_hw_direct").expect("Grabbing original dlsym failed.").as_func();
+    let orig_func_ptr = query_dlsym_cache("SDL_DYNAPI_entry").expect("Grabbing original dlsym failed.").as_func();
     let orig_func: extern "C" fn(u32, *mut libc::c_void, u32) -> i32 = unsafe { std::mem::transmute(orig_func_ptr) };
     let result = orig_func(apiver, jump_table, tablesize);
 
