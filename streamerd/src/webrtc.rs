@@ -131,6 +131,7 @@ impl WebRTCPeer {
         let bin = gstreamer::Bin::new();
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin")
         .property_from_str("stun-server", "stun://stun.l.google.com:19302")
+        .property_from_str("latency", "0")
         // .property_from_str("bundle-policy", "max-bundle")
         .build().expect("could not create webrtcbin element");
         let queue = gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element");
@@ -663,6 +664,7 @@ impl WebRTCPreprocessor {
     pub fn set_default_settings(&mut self){
         self.payloader.set_property_from_str("config-interval", "-1");
         self.payloader.set_property_from_str("pt", "96");
+        self.payloader.set_property_from_str("aggregate-mode", "zero-latency");
 
         match self.preset {
             // TODO: fix this, but it defaults to 0 which is based off resolution
