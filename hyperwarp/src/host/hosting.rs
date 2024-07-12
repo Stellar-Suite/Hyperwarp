@@ -136,14 +136,19 @@ impl ApplicationHost {
             println!("tick()");
         }
 
+        if self.get_behavior().get_fb_size().is_none() {
+            return;
+        }
+
         // compute changes in state
         let mut state_changed = false;
         {
             let mut last_sent_state = self.last_sent_state.write().unwrap();
             let host_info = self.host_info.read().unwrap();
-            if last_sent_state.resolution != self.get_behavior().get_fb_size().unwrap() {
+            let fb_size = self.get_behavior().get_fb_size().unwrap();
+            if last_sent_state.resolution != fb_size {
                 state_changed = true;
-                last_sent_state.resolution = self.get_behavior().get_fb_size().unwrap();
+                last_sent_state.resolution = fb_size;
             }
 
             if last_sent_state.graphics_api != host_info.graphics_api {

@@ -3,9 +3,8 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 // tips: I mostly sourced this from https://github.com/GStreamer/gst-examples/blob/master/webrtc/multiparty-sendrecv/gst-rust/src/main.rs
 
 use anyhow::Ok;
-use gio::{glib, subclass::prelude::ObjectImpl};
-use gstreamer::{prelude::*, subclass::prelude::{ElementImpl, GstObjectImpl}, Buffer, BufferFlags, Element, ErrorMessage, GhostPad};
-use gstreamer_video::{prelude::*, VideoInfo};
+use gio::{glib::{self}, subclass::prelude::ObjectImpl};
+use gstreamer::{caps::NoFeature, prelude::*, subclass::prelude::{ElementImpl, GstObjectImpl}, GhostPad};
 use gstreamer_rtp::{prelude::RTPHeaderExtensionExt, subclass::prelude::RTPHeaderExtensionImpl, RTPHeaderExtensionFlags};
 use gstreamer_webrtc::{WebRTCDataChannel, WebRTCSessionDescription};
 use once_cell::sync::Lazy;
@@ -334,6 +333,7 @@ pub struct WebRTCPreprocessor {
     pub preset: EncodingPreset,
     settings: HashMap<String, serde_json::Value>, // this allows us to set the settings for the encoder and payloader regardless of format easily
     pub config: Option<Arc<StreamerConfig>>,
+    pub pt: u32,
 }
 
 lazy_static! {
@@ -356,6 +356,7 @@ impl WebRTCPreprocessor {
             extra_middle_elements: Vec::new(),
             extra_suffix_elements: Vec::new(),
             config: None,
+            pt: 96
         }
     }
 
@@ -441,6 +442,15 @@ impl WebRTCPreprocessor {
         Ok(())
     }
 
+    pub fn video_rtpcaps_partial_builder() -> gstreamer::caps::Builder<NoFeature> {
+        // caps optimizations from https://github.com/selkies-project/selkies-gstreamer/blob/4583cf287d342f10189e986b1df1745cd75bb1ed/src/selkies_gstreamer/gstwebrtc_app.py#L838
+        gstreamer::Caps::builder("application/x-rtp")
+            .field("media", &"video")
+            .field("rtcp-fb-nack-pli", &true)
+            .field("rtcp-fb-ccm-fir", &true)
+            .field("rtcp-fb-x-gstreamer-fir-as-repair", &true)
+    }
+
     // maybe a better name for this is encodertype not preset
     pub fn new_preset(preset: EncodingPreset, optimizations: PipelineOptimization) -> Self {
         let mut prefix: Vec<gstreamer::Element> = vec![];
@@ -465,6 +475,8 @@ impl WebRTCPreprocessor {
             }
         }
 
+        let mut profile = "constrained-baseline";
+
         match optimizations {
             PipelineOptimization::NVIDIA => {
 
@@ -478,6 +490,7 @@ impl WebRTCPreprocessor {
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                         // above is to use constrained baseline for compat
                         middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
+                        profile = "main";
                         middle.push(gstreamer::ElementFactory::make("h264parse").name("parser").build().expect("could not create h264parse element"));
                         // great reference: https://github.com/m1k1o/neko/blob/21a4b2b797bb91947ed3702b8d26a99fef4ca157/server/internal/capture/pipelines.go#L158C40-L158C283
                         // video/x-h264,stream-format=byte-stream,profile=constrained-baseline
@@ -487,6 +500,7 @@ impl WebRTCPreprocessor {
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                         // above is to use constrained baseline for compat
                         middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main").build()).expect("could not create special capsfilter"));
+                        profile = "main";
                         middle.push(gstreamer::ElementFactory::make("h265parse").name("parser").build().expect("could not create h265parse element"));
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h265").field("stream-format", "byte-stream").field("profile", "main-444").build()).expect("could not create special capsfilter"));
                     },
@@ -519,12 +533,24 @@ impl WebRTCPreprocessor {
             }
         }
 
+        let mut pt = 96;
+
         match preset {
+            // TODO: figure out more if I need to vary "payload"
+            // https://github.com/selkies-project/selkies-gstreamer/blob/4583cf287d342f10189e986b1df1745cd75bb1ed/src/selkies_gstreamer/gstwebrtc_app.py#L836
             EncodingPreset::H264 => {
-                suffix.push(build_capsfilter(gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H264,payload=96").expect("Could not use default H264 caps")).expect("Could not construct rtp capsfilter"));
+                let caps_builder = Self::video_rtpcaps_partial_builder();
+                let caps = caps_builder.field("encoding-name", &"H264").field("payload", 97).build();
+                pt = 97;
+                // old: gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H264,payload=96").expect("Could not use default H264 caps");
+                suffix.push(build_capsfilter(caps).expect("Could not construct rtp capsfilter"));
             },
             EncodingPreset::H265 => {
-                suffix.push(build_capsfilter(gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H265,payload=96").expect("Could not use default H265 caps")).expect("Could not construct rtp capsfilter"));
+                let caps_builder = Self::video_rtpcaps_partial_builder();
+                let caps = caps_builder.field("encoding-name", &"H265").field("payload", 100).build();
+                pt = 100;
+                // old: gstreamer::Caps::from_str("application/x-rtp,media=video,encoding-name=H265,payload=96").expect("Could not use default H265 caps");
+                suffix.push(build_capsfilter(caps).expect("Could not construct rtp capsfilter"));
             },
             _ => {
                 // don't put capsfilter yet
@@ -540,6 +566,7 @@ impl WebRTCPreprocessor {
             extra_middle_elements: middle,
             extra_suffix_elements: suffix,
             config: None,
+            pt,
         }
     }
 
@@ -550,7 +577,7 @@ impl WebRTCPreprocessor {
     pub fn get_optimizations(&self) -> PipelineOptimization {
         match &self.config {
             Some(config) => {
-                config.optimizations
+                config.optipt mizations
             },
             None => PipelineOptimization::None,
         }
@@ -636,7 +663,7 @@ impl WebRTCPreprocessor {
     pub fn set_default_settings(&mut self){
         self.payloader.set_property_from_str("config-interval", "-1");
         self.payloader.set_property_from_str("pt", "96");
-        
+
         match self.preset {
             // TODO: fix this, but it defaults to 0 which is based off resolution
             EncodingPreset::H264 => {

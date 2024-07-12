@@ -83,10 +83,7 @@ impl DefaultHostBehavior {
         self.fb = vec![0; (width * height * 4) as usize];
         self.fb_enabled = true;
     }
-}
-
-impl DefaultHostBehavior {
-
+    
     pub fn get_shimg_path(&self, config: &Config) -> PathBuf {
         let base_loc = Path::new("/dev/shm");
         let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
