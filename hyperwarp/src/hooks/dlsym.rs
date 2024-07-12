@@ -38,9 +38,10 @@ redhook::hook! {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
         // println!("dlsym: symbol name {}",symbol_name);
         // TODO: refactor the long if else into a map?
-        if symbol_name.starts_with("SDL_") || symbol_name.starts_with("glX") || symbol_name.starts_with("X") {
+        let should_cache = symbol_name.starts_with("SDL_") || symbol_name.starts_with("glX") || symbol_name.starts_with("X");
+        if should_cache {
             // caching
-            let symbol_cstring = CString::new(symbol_name.replace("SDL_","")).unwrap();
+            let symbol_cstring = CString::new(symbol_name).unwrap();
             let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
             if !symbol_pointer.is_null() {
                 println!("cache {} pointer {}",symbol_name,symbol_pointer as usize);
@@ -50,6 +51,7 @@ redhook::hook! {
                 println!("caching {} pointer failed because we got a null pointer.", symbol_name);
             }
         }
+
         if symbol_name.ends_with("_hw_direct") {
             init_if_needed();
             // this is only slow for the one lookup yk
@@ -91,6 +93,9 @@ redhook::hook! {
         } else if let Some(pointer) = sdl2::try_modify_symbol(symbol_name) {
             pointer
         } else if symbol_name == "SDL_DYNAPI_entry" {
+            if LOG_DLSYM {
+                println!("sent modified SDL_DYNAPI_entry");
+            }
             sdl2_dynapi_helper::SDL_DYNAPI_entry_modified as *mut c_void
         }else {
             /*if symbol_name.contains("udev") {
