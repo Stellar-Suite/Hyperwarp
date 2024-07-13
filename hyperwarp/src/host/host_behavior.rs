@@ -83,7 +83,7 @@ impl DefaultHostBehavior {
         self.fb = vec![0; (width * height * 4) as usize];
         self.fb_enabled = true;
     }
-    
+
     pub fn get_shimg_path(&self, config: &Config) -> PathBuf {
         let base_loc = Path::new("/dev/shm");
         let file_loc = base_loc.join(format!("{}{}", config.session_id, ".raw"));
@@ -230,6 +230,16 @@ impl DefaultHostBehavior {
             }
         }
         None
+    }
+
+    pub fn create_debug_output(&self) -> String {
+        let mut output = "Debug Info (b):\n".to_string();
+        output += &format!("FB Size: {:?}\n", self.get_fb_size());
+        output += &format!("Shimg Path: {:?}\n", self.get_shimg_path(&HOST.config));
+        for window in self.windows.iter() {
+            output += &format!("Window: {:?}\n", window);
+        }
+        output
     }
 }
 

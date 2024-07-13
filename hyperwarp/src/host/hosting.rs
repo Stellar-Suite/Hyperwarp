@@ -22,6 +22,7 @@ use std::{
 use std::thread; // for test func
 
 use crate::constants::BLACKLISTED_PROCESS_NAMES;
+use crate::hooks::dlsym::check_cache_integrity;
 use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
@@ -41,6 +42,7 @@ pub enum MainTickMessage {
     RequestResolutionBroadcast(Endpoint),
     RequestShImgPath(Endpoint),
     RequestHandshake(Endpoint),
+    RequestDebugInfoV2(Endpoint),
 }
 
 pub struct LastSentState {
@@ -189,7 +191,21 @@ impl ApplicationHost {
                     }
                     let handshake = self.get_handshake();
                     self.send_to(endpoint, &StellarMessage::HandshakeResponse(handshake));
-                }
+                },
+                MainTickMessage::RequestDebugInfoV2(endpoint) => {
+                    // prepare debug info that can be sent without waiting for tick
+                    let mut output = "Debug Info:\n".to_string();
+                    output += &format!("Features: {:#?}", HOST.features.lock().unwrap());
+
+                    check_cache_integrity();
+
+                    output += &HOST.get_behavior().create_debug_output();
+
+                    let debug_info_v2 = DebugInfo {
+                        message: output,
+                    };
+                    self.send_to(endpoint.clone(), &StellarMessage::DebugInfoResponseV2(debug_info_v2, "main".to_string()));
+                },
             },
             None => {}
         }
@@ -374,6 +390,16 @@ impl ApplicationHost {
                                                 let mut output = "Debug Info:\n".to_string();
                                                 output += &format!("Features: {:#?}", HOST.features.lock().unwrap());
                                                 handler_wrapper_instant_responses.lock().unwrap().network().send(endpoint, &stellar_protocol::serialize(&StellarMessage::DebugInfoResponse(DebugInfo { message: output })));
+                                            },
+                                            StellarMessage::DebugInfoRequestV2 => {
+                                                // prepare debug info that can be sent without waiting for tick
+                                                let mut output = "Debug Info:\n".to_string();
+                                                output += &format!("Features: {:#?}", HOST.features.lock().unwrap());
+                                                let debug_info_v2 = DebugInfo {
+                                                    message: output,
+                                                };
+                                                handler_wrapper_instant_responses.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::DebugInfoResponseV2(debug_info_v2, "networking".to_string())));
+                                                send_main_tick_request(MainTickMessage::RequestDebugInfoV2(endpoint.clone()));
                                             },
                                             _ => {
                                                 if config.debug_mode {
