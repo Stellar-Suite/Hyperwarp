@@ -1,6 +1,7 @@
 use std::ffi::c_short;
 
 use libc::{c_char, c_int, c_void};
+use sdl2_sys_lite::bindings::{SDL_Event, SDL_EventType, SDL_WindowEventID};
 use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::constants::sdl2::SDL_FALSE;
@@ -74,6 +75,8 @@ redhook::hook! {
         if HOST.config.debug_mode {
             println!("SDL_CreateWindow called with x: {}, y: {}, w: {}, h: {}", final_x, final_y, final_w, final_h);
         }
+
+        // TODO: maybe we should send a fake window focus here.
 
         result
     }
@@ -212,6 +215,53 @@ redhook::hook! {
     }
 }
 
+pub fn SDL_should_allow_event(event: &SDL_Event) -> bool {
+    unsafe {
+        if event.type_ == SDL_EventType::SDL_WINDOWEVENT as u32 {
+            let event_type_id = event.window.event;
+            if event_type_id == SDL_WindowEventID::SDL_WINDOWEVENT_MINIMIZED as u8 {
+                return false;
+            } else if event_type_id == SDL_WindowEventID::SDL_WINDOWEVENT_FOCUS_LOST as u8 {
+                return false;
+            } else if event_type_id == SDL_WindowEventID::SDL_WINDOWEVENT_SHOWN as u8 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+redhook::hook! {
+    unsafe fn SDL_PollEvent(event: *mut SDL_Event) -> c_int => sdl_pollevent_first {
+        if HOST.config.debug_mode {
+            println!("SDL_PollEvent called");
+        }
+
+        if HOST.config.enable_sdl2 {
+            let result = redhook::real!(SDL_PollEvent_hw_direct)(event);
+            if result != 0 {
+                let event_ref = event.as_ref().unwrap();
+                if !SDL_should_allow_event(event_ref) {
+                    // hopefully nothing notices the event changed even if we return 0
+                    // TODO: remove this print when stabilized.
+                    println!("canceled event hack");
+                    return 0;
+                }
+            }
+            result
+        } else {
+            0
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_PollEvent_hw_direct(event: *mut SDL_Event) -> c_int => sdl_pollevent_hw_direct {
+        // shim so I can run redhook::real on it   
+        0
+    }
+}
+
 pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
     match symbol_name {
         "SDL_Init" => Some(sdl_init_first as *mut c_void),
@@ -222,6 +272,7 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "SDL_SetWindowTitle" => Some(sdl_setwindowtitle_first as *mut c_void),
         "SDL_GetKeyboardState" => Some(sdl_getkeyboardstate_first as *mut c_void),
         "SDL_DestroyWindow" => Some(sdl_destroywindow_first as *mut c_void),
+        "SDL_PollEvent" => Some(sdl_pollevent_first as *mut c_void),
         _ => None
     }
 }
