@@ -142,6 +142,8 @@ pub enum StellarMessage {
     UnsubscribeChannel(StellarChannel),
     DebugInfoRequest,
     DebugInfoResponse(DebugInfo),
+    DebugInfoRequestV2,
+    DebugInfoResponseV2(DebugInfo, String),
     UserInputEvent(InputEvent)
 }
 
@@ -186,7 +188,14 @@ pub enum StellarFrontendMessage {
     DefineACL {
         acl: PrivligeDefinition,
         socket_id: String
-    }
+    },
+    HyperwarpDebugInfoRequest {
+        hyperwarp_debug_info_request: u64
+    },
+    HyperwarpDebugResponse {
+        hyperwarp_debug: String,
+        source: String
+    },
 }
 
 // js usable protocol

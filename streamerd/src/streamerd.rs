@@ -103,6 +103,8 @@ impl std::fmt::Display for OperationMode {
 pub enum StreamerSignal {
     DataChannelContent(Vec<u8>),   // apparently useless, will deprecated later
     ProcessInput(stellar_protocol::protocol::InputEvent),
+    DebugInfoRequest,
+    SocketCreated(Arc<Mutex<Client>>)
 }
 
 pub struct Streamer {
@@ -1084,6 +1086,8 @@ impl Streamer {
 
         let config = self.config.clone();
         
+        let local_message_handler = self.messaging_handler.clone().unwrap();
+
         socket_builder = socket_builder.on("hello", move |payload, client| {
             main_thread_cmd_queue_1.send(InternalMessage::SocketConnected);
             // now we need to elevate privs
@@ -1107,8 +1111,17 @@ impl Streamer {
                             match serde_json::from_value::<StellarFrontendMessage>(values.get(1).unwrap().to_owned()) {
                                 Ok(frontend_message) => {
                                     match frontend_message {
-                                        StellarFrontendMessage::Test { time } => todo!(),
-                                        StellarFrontendMessage::Ping { ping_payload } => todo!(),
+                                        StellarFrontendMessage::Test { time } => {
+
+                                        },
+                                        StellarFrontendMessage::Ping { ping_payload } => {
+                                            // TODO: 
+                                        },
+                                        StellarFrontendMessage::HyperwarpDebugInfoRequest { hyperwarp_debug_info_request } => {
+                                            // we forward this to hyperwarp
+                                            let handler = local_message_handler.lock().unwrap();
+                                            handler.signals().send(StreamerSignal::DebugInfoRequest);
+                                        },
                                         other => {
                                             if may_mutate_pipeline(&other) {
                                                 main_thread_cmd_queue_3.send(InternalMessage::SocketPeerFrontendMessageWithPipeline(src_socketid.clone(), other));
@@ -1143,6 +1156,10 @@ impl Streamer {
         let socket_arc = arc.clone();
 
         self.socketio_client = Some(arc);
+        // send to hyperwarp client thread via signal
+        let messaging_handler = self.messaging_handler.clone().unwrap();
+        let handler = messaging_handler.lock().unwrap();
+        let _ = handler.signals().send(StreamerSignal::SocketCreated(socket_arc));
 
         Ok(())
     }
@@ -1158,18 +1175,19 @@ impl Streamer {
         let _ = handler.network().connect_with(message_io::network::TransportConnect::UnixSocketDatagram(UnixSocketConnectConfig::new(temp_socket_path)), NetworkAddr::Path(socket_path));
         let handler_wrapper = Arc::new(Mutex::new(handler));
         let handler_wrapper_2 = handler_wrapper.clone();
-        self.messaging_handler = Some(handler_wrapper_2);
+        self.messaging_handler = Some(handler_wrapper_2); // this part runs before the thread is started so it always exists
         println!("Starting Hyperwarp client event thread");
 
         let streaming_cmd_queue = self.streaming_command_queue.clone();
         let frame = self.frame.clone();
-        
+
         std::thread::spawn(move || {
 
             let inner_run = || -> Result<()> {
                 println!("Enter Hyperwarp client event processing");
                 let mut shm_file: Option<std::fs::File> = None;
                 let mut current_endpoint: Option<Endpoint> = None;
+                let mut socket: Option<Arc<Mutex<Client>>> = None;
                 listener.for_each(move |event| {
                     match event {
                         NodeEvent::Network(netevent) => {
@@ -1233,6 +1251,15 @@ impl Streamer {
                                                     println!("recieving sync event on hyperwarp conn thread");
                                                     streaming_cmd_queue.send(InternalMessage::SynchornizationReceived(sync_details));
                                                 },
+                                                StellarMessage::DebugInfoResponseV2(debug_info, source) => {
+                                                    println!("Debug info response from hyperwarp ({}): {:?}", source, debug_info);
+                                                    if let Some(socket) = &socket {
+                                                        let _ = socket.lock().unwrap().emit("send_to", json!([source, StellarFrontendMessage::HyperwarpDebugResponse { 
+                                                            hyperwarp_debug: debug_info.message,
+                                                            source: source.clone()
+                                                         }]));
+                                                    }
+                                                },
                                                 _ => {
 
                                                 }
@@ -1263,6 +1290,18 @@ impl Streamer {
                                         network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
                                     }
                                 },
+                                StreamerSignal::DebugInfoRequest => {
+                                    let handler = handler_wrapper.lock().unwrap();
+                                    let network = handler.network();
+                                    let message = stellar_protocol::protocol::StellarMessage::DebugInfoRequestV2;
+                                    println!("sent debug info request to hyperwarp");
+                                    if let Some(endpoint) = &current_endpoint {
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
+                                    }
+                                },
+                                StreamerSignal::SocketCreated(sent_socket) => {
+                                    socket = Some(sent_socket);
+                                }
                             }
                         }
                     }
