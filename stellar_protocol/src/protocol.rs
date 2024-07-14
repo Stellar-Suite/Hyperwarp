@@ -239,6 +239,10 @@ pub enum StellarDirectControlMessage {
         state: bool,
         timestamp: u64,
     },
+    #[serde(rename = "mouse_lock")]
+    MouseLock {
+        state: bool
+    }
 }
 
 pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {
@@ -271,6 +275,7 @@ pub struct PrivligeDefinition {
     pub can_keyboard: bool,
     pub can_controller: bool,
     pub can_manage_controllers: bool,
+    pub can_admin: bool,
 }
 
 // TODO: adopt a strict by default model, for now it's full for debug
@@ -289,6 +294,7 @@ pub const fn create_default_acl() -> PrivligeDefinition {
         can_keyboard: true,
         can_controller: true,
         can_manage_controllers: true,
+        can_admin: true,
     }
 }
 
