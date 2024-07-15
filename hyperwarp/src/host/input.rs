@@ -107,6 +107,14 @@ impl Keyboard {
     }
 }
 
+pub struct Gamepad {
+
+}
+
+impl Gamepad {
+    
+}
+
 pub trait Timestampable {
     fn timestamp(&mut self);
 }
