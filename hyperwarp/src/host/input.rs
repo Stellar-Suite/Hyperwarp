@@ -13,7 +13,7 @@ use super::{feature_flags, hosting::HOST};
 pub struct Mouse {
     pub x: i32,
     pub y: i32,
-    pub buttons: i32,
+    pub buttons: u32,
 }
 
 impl Mouse {
@@ -154,7 +154,7 @@ pub trait WithInputManagerBuilder {
 }
 
 impl WithInputManagerBuilder for InputEvent {
-    fn with_input_manager(self, input_manager: &InputManager) -> Self {
+    fn with_input_manager(mut self, input_manager: &InputManager) -> Self {
         self.modify_with_input_manager(input_manager);
         self
     }
