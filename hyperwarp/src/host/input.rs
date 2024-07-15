@@ -485,7 +485,6 @@ impl InputManager {
 
     pub fn set_mouse_buttons(&mut self, buttons: u8) {
         let changed = self.mouse.buttons != buttons;
-        self.mouse.buttons = buttons;
         if changed {
             // we diff
             // we send release events for buttons that were released
@@ -502,7 +501,9 @@ impl InputManager {
                     self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: true }));
                 }
             }
+            // original impl
             // self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsSet { buttons }));
         }
+        self.mouse.buttons = buttons;
     }
 }
