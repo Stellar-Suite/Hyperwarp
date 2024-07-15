@@ -311,7 +311,9 @@ pub struct InputEvent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InputContext {
     pub modifiers: u16,
-    pub buttons: u32,
+    pub buttons: u8,
+    pub mouse_x: i32,
+    pub mouse_y: i32,
 }
 
 impl InputContext {
@@ -319,6 +321,8 @@ impl InputContext {
         InputContext {
             modifiers: 0,
             buttons: 0,
+            mouse_x: 0,
+            mouse_y: 0,
         }
     }
 }

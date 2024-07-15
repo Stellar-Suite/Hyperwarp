@@ -242,7 +242,11 @@ impl Streamer {
                                 // relative x,y not used, calculated manually in the input manager
                                 let input_event = InputEvent::new(InputEventPayload::MouseMoveAbsolute(x,y,0,0));
                                 handler.signals().send(StreamerSignal::ProcessInput(input_event));
-                            }
+                            },
+                            StellarDirectControlMessage::MouseButton { change, buttons, state, timestamp } => {
+                                let input_event = InputEvent::new(InputEventPayload::MouseButtonsSet { buttons: buttons });
+                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                            },
                             _ => {
                                 println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
                             }

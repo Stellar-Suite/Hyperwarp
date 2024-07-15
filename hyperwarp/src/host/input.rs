@@ -13,7 +13,7 @@ use super::{feature_flags, hosting::HOST};
 pub struct Mouse {
     pub x: i32,
     pub y: i32,
-    pub buttons: u32,
+    pub buttons: u8,
 }
 
 impl Mouse {
@@ -135,6 +135,8 @@ impl CreatableFromInputManager for InputContext {
         InputContext {
             modifiers: input_manager.keyboard.calc_modifiers(),
             buttons: input_manager.mouse.buttons,
+            mouse_x: input_manager.mouse.x,
+            mouse_y: input_manager.mouse.y,
         }
     }
 }
@@ -327,7 +329,7 @@ impl InputManager {
                                     timestamp: timestamp,
                                     windowID: wid,
                                     which: SDL_OUR_FAKE_MOUSEID,
-                                    state: context.buttons,
+                                    state: context.buttons as u32, // TODO: figure out whether we want to u32 or u8 this
                                     x: x_absolute,
                                     y: y_absolute,
                                     xrel: x,
@@ -364,7 +366,7 @@ impl InputManager {
                                     timestamp: timestamp,
                                     windowID: wid,
                                     which: SDL_OUR_FAKE_MOUSEID,
-                                    state: context.buttons,
+                                    state: context.buttons as u32, // TODO: figure out whether we want to u32 or u8 this
                                     x: x,
                                     y: y,
                                     xrel: rel_x,
@@ -389,6 +391,46 @@ impl InputManager {
                         }
                     }
 
+                },
+                InputEventPayload::MouseButtonsChange { change, state } => {
+                    if feature_flags.sdl2_enabled {
+                        if let Some(context) = event.context {
+                            let event_type = if state { sdl2_sys_lite::bindings::SDL_EventType::SDL_MOUSEBUTTONDOWN } else { sdl2_sys_lite::bindings::SDL_EventType::SDL_MOUSEBUTTONUP };
+                            let sdl_state = if state { sdl2_sys_lite::bindings::SDL_PRESSED } else { sdl2_sys_lite::bindings::SDL_RELEASED };
+                            // println!("ResolutionBroadcastResponse: {:?}", event);
+                            let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
+                            let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
+                            
+                            let mut event = sdl2_sys_lite::bindings::SDL_Event {
+                                button: sdl2_sys_lite::bindings::SDL_MouseButtonEvent {
+                                    type_: event_type as u32,
+                                    timestamp: timestamp,
+                                    windowID: wid,
+                                    which: SDL_OUR_FAKE_MOUSEID,
+                                    button: change.ilog2() as u8, // this can't error right?
+                                    state: sdl_state as u8, // 1 and 0 regardless
+                                    clicks: 1,
+                                    padding1: 0,
+                                    x: context.mouse_x,
+                                    y: context.mouse_y,
+                                }
+                            };
+                            unsafe {
+                                // TODO: handle errors
+                                // also maybe don't use unsafe directly?
+                                let result_ok = SDL_PushEvent_safe(&mut event);
+                                // println!("pushing event in {}ms", start_time.elapsed().as_millis());
+                                if result_ok != 1 {
+                                    let error_str = sdl2_safe::SDL_GetError_safe();
+                                    if HOST.config.debug_mode {
+                                        println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                                    }
+                                }
+                            }
+                        }else{
+                            println!("no context for mouse button set");
+                        }
+                    }
                 },
                 _ => {
                     println!("unhandled event: {:?}", event);
@@ -423,14 +465,44 @@ impl InputManager {
                 self.event_queue.push(new_event);
             },
             InputEventPayload::MouseButtonsSet { buttons } => {
-
+                self.set_mouse_buttons(buttons);
             },
             InputEventPayload::MouseButtonsChange { change, state } => {
-
+                let new_buttons = self.calculate_change(change, state);
+                self.set_mouse_buttons(new_buttons);
             }
         }
 
     }
 
-    fn calculate_change(&self, change: u)
+    fn calculate_change(&self, change: u8, state: bool) -> u8 {
+        if state {
+            self.mouse.buttons | change
+        } else {
+            self.mouse.buttons & !change
+        }
+    }
+
+    pub fn set_mouse_buttons(&mut self, buttons: u8) {
+        let changed = self.mouse.buttons != buttons;
+        self.mouse.buttons = buttons;
+        if changed {
+            // we diff
+            // we send release events for buttons that were released
+            // we send press events for buttons that were pressed
+            for i in 0..8 {
+                let mask = 1 << i;
+                if buttons & mask != self.mouse.buttons & mask && buttons & mask == 0  {
+                    self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: false }));
+                }
+            }
+            for i in 0..8 {
+                let mask = 1 << i;
+                if buttons & mask != self.mouse.buttons & mask && buttons & mask == mask {
+                    self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: true }));
+                }
+            }
+            // self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsSet { buttons }));
+        }
+    }
 }
