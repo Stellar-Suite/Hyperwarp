@@ -89,6 +89,8 @@ pub struct StreamerConfig {
     pub optimizations: PipelineOptimization,
     #[arg(short, long = "fps", default_value = "60", help = "fps to use in streaming pipeline")]
     fps: Option<u32>,
+    #[arg(long = "mtu", default_value = "1200", help = "fps to use in streaming pipeline")]
+    mtu: Option<u32>,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -367,6 +369,10 @@ impl Streamer {
             preprocessor.add_experimental_extension().expect("could not add experimental extension");
         }
         preprocessor.set_default_settings();
+        if let Some(mtu) = self.config.mtu {
+            println!("setting mtu to {}", mtu);
+            preprocessor.payloader.set_property("mtu", mtu);
+        }
         preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
 
         println!("setting up second tee element");
