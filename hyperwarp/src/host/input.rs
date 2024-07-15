@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Instant};
 
 use backtrace::Backtrace;
-use stellar_protocol::protocol::{InputEvent, InputEventPayload, InputMetadata};
+use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, InputMetadata};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
@@ -126,6 +126,40 @@ impl Timestampable for InputMetadata {
     }
 }
 
+pub trait CreatableFromInputManager {
+    fn from_input_manager(input_manager: &InputManager) -> Self;
+}
+
+impl CreatableFromInputManager for InputContext {
+    fn from_input_manager(input_manager: &InputManager) -> InputContext {
+        InputContext {
+            modifiers: input_manager.keyboard.calc_modifiers(),
+            buttons: input_manager.mouse.buttons,
+        }
+    }
+}
+
+pub trait CanModifyWithInputManager {
+    fn modify_with_input_manager(&mut self, input_manager: &InputManager);
+}
+
+impl CanModifyWithInputManager for InputEvent {
+    fn modify_with_input_manager(&mut self, input_manager: &InputManager) {
+        self.add_context(InputContext::from_input_manager(input_manager));
+    }
+}
+
+pub trait WithInputManagerBuilder {
+    fn with_input_manager(self, input_manager: &InputManager) -> Self;
+}
+
+impl WithInputManagerBuilder for InputEvent {
+    fn with_input_manager(self, input_manager: &InputManager) -> Self {
+        self.modify_with_input_manager(input_manager);
+        self
+    }
+}
+
 pub struct InputManager {
     pub mouse: Mouse,
     pub keyboard: Keyboard,
@@ -134,6 +168,10 @@ pub struct InputManager {
 }
 
 impl InputManager {
+
+    pub fn add_context_to(&self, input_event: &mut InputEvent) {
+        input_event.add_context(InputContext::from_input_manager(self));
+    }
 
     pub fn new_timestamped_input_event(payload: InputEventPayload) -> InputEvent {
         let mut input_event = InputEvent::new(payload);
@@ -149,7 +187,7 @@ impl InputManager {
             let relative_y = final_y - self.mouse.y;
             self.mouse.x = final_x;
             self.mouse.y = final_y;
-            self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseMoveAbsolute(final_x, final_y)));
+            self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseMoveAbsolute(final_x, final_y)).with_input_manager(self));
         }
         
     }
@@ -176,7 +214,7 @@ impl InputManager {
             y: real_dy,
             x_absolute: final_x,
             y_absolute: final_y,
-        }));
+        }).with_input_manager(self));
     }
 
     pub fn set_key(&mut self, key: u32, state: bool) {
@@ -189,7 +227,7 @@ impl InputManager {
                     scancode: 0, // not used for now
                     state,
                     modifiers: self.keyboard.calc_modifiers(),
-                }));
+                }).with_input_manager(self));
             }
         }
     }

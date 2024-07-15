@@ -303,6 +303,23 @@ pub const fn create_default_acl() -> PrivligeDefinition {
 pub struct InputEvent {
     pub payload: InputEventPayload,
     pub metadata: InputMetadata,
+    pub context: Option<InputContext>,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InputContext {
+    pub modifiers: u16,
+    pub buttons: i32,
+}
+
+impl InputContext {
+    pub fn new() -> InputContext {
+        InputContext {
+            modifiers: 0,
+            buttons: 0,
+        }
+    }
 }
 
 impl InputEvent {
@@ -311,8 +328,13 @@ impl InputEvent {
         let input_event = InputEvent {
             payload,
             metadata: InputMetadata::new(),
+            context: None,
         };
         input_event
+    }
+
+    pub fn add_context(&mut self, context: InputContext) {
+        self.context = Some(context);
     }
 }
 
