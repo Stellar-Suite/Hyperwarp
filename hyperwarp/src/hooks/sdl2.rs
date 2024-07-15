@@ -234,10 +234,13 @@ pub fn SDL_should_allow_event(event: &SDL_Event) -> bool {
 redhook::hook! {
     unsafe fn SDL_PollEvent(event: *mut SDL_Event) -> c_int => sdl_pollevent_first {
         if HOST.config.debug_mode {
-            println!("SDL_PollEvent called");
+            // println!("SDL_PollEvent called");
         }
 
         if HOST.config.enable_sdl2 {
+            // flush inputs here as well
+            HOST.input_manager.lock().unwrap().flush_queue();
+            
             let result = redhook::real!(SDL_PollEvent_hw_direct)(event);
             if result != 0 {
                 let event_ref = event.as_ref().unwrap();

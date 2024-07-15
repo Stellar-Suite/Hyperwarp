@@ -237,7 +237,8 @@ impl Streamer {
                                 handler.signals().send(StreamerSignal::ProcessInput(input_event));
                             },
                             StellarDirectControlMessage::MouseMoveAbsolute { x, y, timestamp } => {
-                                let input_event = InputEvent::new(InputEventPayload::MouseMoveAbsolute(x, y));
+                                // relative x,y not used, calculated manually in the input manager
+                                let input_event = InputEvent::new(InputEventPayload::MouseMoveAbsolute(x,y,0,0));
                                 handler.signals().send(StreamerSignal::ProcessInput(input_event));
                             }
                             _ => {

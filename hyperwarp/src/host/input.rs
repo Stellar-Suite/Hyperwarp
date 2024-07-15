@@ -187,7 +187,7 @@ impl InputManager {
             let relative_y = final_y - self.mouse.y;
             self.mouse.x = final_x;
             self.mouse.y = final_y;
-            self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseMoveAbsolute(final_x, final_y)).with_input_manager(self));
+            self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseMoveAbsolute(final_x, final_y, relative_x, relative_y)).with_input_manager(self));
         }
         
     }
@@ -210,11 +210,24 @@ impl InputManager {
         self.mouse.y = final_y;
         // synth an actual event
         self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseMoveRelative {
-            x: real_dx,
-            y: real_dy,
+            // https://wiki.libsdl.org/SDL2/SDL_SetRelativeMouseMode
+            // "SDL will report continuous relative mouse motion even if the mouse is at the edge of the window."
+            x: x,
+            y: y,
             x_absolute: final_x,
             y_absolute: final_y,
         }).with_input_manager(self));
+    }
+
+    pub fn drain_mouse_motion(&mut self){
+        // remove all mouse motion events
+        // for when you toggle relative mouse mode
+        self.event_queue.retain(|event| {
+            match event.payload {
+                InputEventPayload::MouseMoveRelative { .. } => false,
+                _ => true,
+            }
+        });
     }
 
     pub fn set_key(&mut self, key: u32, state: bool) {
@@ -292,7 +305,9 @@ impl InputManager {
                             // println!("pushing event in {}ms", start_time.elapsed().as_millis());
                             if result_ok != 1 {
                                 let error_str = sdl2_safe::SDL_GetError_safe();
-                                // println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                                if HOST.config.debug_mode {
+                                    println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                                }
                             }
                         }
 
@@ -319,8 +334,61 @@ impl InputManager {
                                     yrel: y,
                                 }
                             };
+                            unsafe {
+                                // TODO: handle errors
+                                // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
+                                // also maybe don't use unsafe directly?
+                                let result_ok = SDL_PushEvent_safe(&mut event);
+                                // println!("pushing event in {}ms", start_time.elapsed().as_millis());
+                                if result_ok != 1 {
+                                    let error_str = sdl2_safe::SDL_GetError_safe();
+                                    if HOST.config.debug_mode {
+                                        println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                                    }
+                                }
+                            }
+                        }else{
+                            println!("no context for mouse move relative");
                         }
                     }
+                },
+                InputEventPayload::MouseMoveAbsolute(x, y, rel_x, rel_y) => {
+                    // println!("mouse move absolute");
+                    if feature_flags.sdl2_enabled {
+                        if let Some(context) = event.context {
+                            let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
+                            let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
+                            let mut event = sdl2_sys_lite::bindings::SDL_Event {
+                                motion: sdl2_sys_lite::bindings::SDL_MouseMotionEvent {
+                                    type_: (sdl2_sys_lite::bindings::SDL_EventType::SDL_MOUSEMOTION as u32),
+                                    timestamp: timestamp,
+                                    windowID: wid,
+                                    which: SDL_OUR_FAKE_MOUSEID,
+                                    state: context.buttons,
+                                    x: x,
+                                    y: y,
+                                    xrel: rel_x,
+                                    yrel: rel_y,
+                                }
+                            };
+                            unsafe {
+                                // TODO: handle errors
+                                // https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2812
+                                // also maybe don't use unsafe directly?
+                                let result_ok = SDL_PushEvent_safe(&mut event);
+                                // println!("pushing event in {}ms", start_time.elapsed().as_millis());
+                                if result_ok != 1 {
+                                    let error_str = sdl2_safe::SDL_GetError_safe();
+                                    if HOST.config.debug_mode {
+                                        println!("uh oh event push error: {}, {} {}", error_str, wid, timestamp);
+                                    }
+                                }
+                            }
+                        }else{
+                            println!("no context for mouse move absolute");
+                        }
+                    }
+
                 },
                 _ => {
                     println!("unhandled event: {:?}", event);
@@ -345,10 +413,13 @@ impl InputManager {
             InputEventPayload::MouseMoveRelative { x, y, x_absolute, y_absolute } => {
                 self.move_mouse_relative(x, y);
             },
-            InputEventPayload::MouseMoveAbsolute(x, y) => {
+            InputEventPayload::MouseMoveAbsolute(x, y, _, _) => {
                 self.move_mouse_absolute(x, y);
             },
             _ => {
+                if HOST.config.debug_mode {
+                    println!("unhandled event: {:?}", event);
+                }
                 self.event_queue.push(new_event);
             }
         }

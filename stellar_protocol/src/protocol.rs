@@ -367,7 +367,7 @@ pub enum InputEventPayload {
         x_absolute: i32,
         y_absolute: i32,
     },
-    MouseMoveAbsolute(i32, i32),
+    MouseMoveAbsolute(i32, i32, i32, i32),
     KeyEvent {
         key: u32,
         scancode: u32,
