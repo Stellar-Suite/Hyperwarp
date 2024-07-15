@@ -433,7 +433,7 @@ impl InputManager {
                     }
                 },
                 _ => {
-                    println!("unhandled event: {:?}", event);
+                    println!("unhandled event in queue: {:?}", event);
                 }
             }
         }
@@ -458,19 +458,19 @@ impl InputManager {
             InputEventPayload::MouseMoveAbsolute(x, y, _, _) => {
                 self.move_mouse_absolute(x, y);
             },
-            _ => {
-                if HOST.config.debug_mode {
-                    println!("unhandled event: {:?}", event);
-                }
-                self.event_queue.push(new_event);
-            },
             InputEventPayload::MouseButtonsSet { buttons } => {
                 self.set_mouse_buttons(buttons);
             },
             InputEventPayload::MouseButtonsChange { change, state } => {
                 let new_buttons = self.calculate_change(change, state);
                 self.set_mouse_buttons(new_buttons);
-            }
+            },
+            _ => {
+                if HOST.config.debug_mode {
+                    println!("unhandled event in processing: {:?}", event);
+                }
+                self.event_queue.push(new_event);
+            },
         }
 
     }
