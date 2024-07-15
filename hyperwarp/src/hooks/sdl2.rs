@@ -300,6 +300,7 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "SDL_GetKeyboardState" => Some(sdl_getkeyboardstate_first as *mut c_void),
         "SDL_DestroyWindow" => Some(sdl_destroywindow_first as *mut c_void),
         "SDL_PollEvent" => Some(sdl_pollevent_first as *mut c_void),
+        "SDL_numjoysticks" => Some(sdl_numjoysticks_first as *mut c_void),
         _ => None
     }
 }
