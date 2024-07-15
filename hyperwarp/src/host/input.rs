@@ -492,13 +492,13 @@ impl InputManager {
             for i in 0..8 {
                 let mask = 1 << i;
                 if buttons & mask != self.mouse.buttons & mask && buttons & mask == 0  {
-                    self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: false }));
+                    self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: false }).with_input_manager(self));
                 }
             }
             for i in 0..8 {
                 let mask = 1 << i;
                 if buttons & mask != self.mouse.buttons & mask && buttons & mask == mask {
-                    self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: true }));
+                    self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseButtonsChange { change: mask, state: true }).with_input_manager(self));
                 }
             }
             // original impl
