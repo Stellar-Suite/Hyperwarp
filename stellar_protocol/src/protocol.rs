@@ -391,3 +391,27 @@ pub enum InputEventPayload {
         state: bool,
     }
 }
+
+
+// https://github.com/libsdl-org/SDL/blob/256269afb37cc6f0ac72ca0920721bcbf877d489/include/SDL_gamecontroller.h#L63
+// wtf supermaven suggestd I support a N64 here
+#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
+pub enum GameControllerType {
+    Unknown,
+    Xbox360,
+    XboxOne,
+    PS3,
+    PS4,
+    PS5,
+    SwitchPro,
+    SwitchJoyConLeft,
+    SwitchJoyConRight,
+    SwitchJoyConPair,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
+pub enum GameControllerBindType {
+    None = 0,
+    Button = 1,
+    Axis = 2
+}

@@ -112,7 +112,7 @@ pub struct Gamepad {
 }
 
 impl Gamepad {
-    
+
 }
 
 pub trait Timestampable {
@@ -173,7 +173,7 @@ impl WithInputManagerBuilder for InputEvent {
 pub struct InputManager {
     pub mouse: Mouse,
     pub keyboard: Keyboard,
-    // TODO: vec of gamepads
+    pub gamepads: Vec<Gamepad>,
     pub event_queue: Vec<InputEvent>,
 }
 
