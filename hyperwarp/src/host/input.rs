@@ -142,6 +142,15 @@ impl InputManager {
     }
 
     pub fn move_mouse_absolute(&mut self, x: i32, y: i32) {
+        if let Some((width, height)) = HOST.get_behavior().get_fb_size() {
+            let final_x = x.clamp(0, width as i32);
+            let final_y = y.clamp(0, height as i32);
+            let relative_x = final_x - self.mouse.x;
+            let relative_y = final_y - self.mouse.y;
+            self.mouse.x = final_x;
+            self.mouse.y = final_y;
+            self.event_queue.push(Self::new_timestamped_input_event(InputEventPayload::MouseMoveAbsolute(final_x, final_y)));
+        }
         
     }
 
@@ -252,7 +261,25 @@ impl InputManager {
                         println!("pushed event new kbd event");
                     }
                     // println!("pushed event new kbd event in {}ms", start_time.elapsed().as_millis());
-                }
+                },
+                InputEventPayload::MouseMoveRelative { x, y, x_absolute, y_absolute } => {
+                    // println!("mouse move relative");
+                    if feature_flags.sdl2_enabled {
+                        let mut event = sdl2_sys_lite::bindings::SDL_Event {
+                            motion: sdl2_sys_lite::bindings::SDL_MouseMotionEvent {
+                                type_: todo!(),
+                                timestamp: todo!(),
+                                windowID: todo!(),
+                                which: todo!(),
+                                state: todo!(),
+                                x,
+                                y,
+                                xrel: todo!(),
+                                yrel: todo!(),
+                            }
+                        };
+                    }
+                },
                 _ => {
                     println!("unhandled event: {:?}", event);
                 }
@@ -272,6 +299,12 @@ impl InputManager {
         match event.payload {
             InputEventPayload::KeyEvent { key, scancode, state, modifiers } => {
                 self.set_key(key, state);
+            },
+            InputEventPayload::MouseMoveRelative { x, y, x_absolute, y_absolute } => {
+                self.move_mouse_relative(x, y);
+            },
+            InputEventPayload::MouseMoveAbsolute(x, y) => {
+                self.move_mouse_absolute(x, y);
             },
             _ => {
                 self.event_queue.push(new_event);

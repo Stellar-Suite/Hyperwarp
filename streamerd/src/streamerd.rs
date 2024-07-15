@@ -231,6 +231,15 @@ impl Streamer {
                                 // send signal
                                 handler.signals().send(StreamerSignal::ProcessInput(input_event));
                             },
+                            StellarDirectControlMessage::MouseMoveRelative { x, y, timestamp } => {
+                                // x_absolute, y_absolute not used yet (ignored), it is calculated manually in the input manager
+                                let input_event = InputEvent::new(InputEventPayload::MouseMoveRelative { x: x, y: y, x_absolute: -1, y_absolute: -1 });
+                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                            },
+                            StellarDirectControlMessage::MouseMoveAbsolute { x, y, timestamp } => {
+                                let input_event = InputEvent::new(InputEventPayload::MouseMoveAbsolute(x, y));
+                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                            }
                             _ => {
                                 println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
                             }
@@ -551,6 +560,14 @@ impl Streamer {
                     MessageView::Error(err) => {
                         println!("Error: {} {:?}", err.error(), err.debug());
                         pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("errordump.dot"));
+                        if let Some(src) = err.src() {
+                            // enum webrtc peers
+                            for webrtc_peer in downstream_peers.values() {
+                                if src.has_ancestor(&webrtc_peer.bin) {
+                                    println!("traced error a webrtc component, stopping webrtc peer");
+                                }
+                            }
+                        };
                         pipeline.set_state(gstreamer::State::Null).expect("could not reset pipeline state");
                         running = false;
                         println!("Error (repeat): {} {:?}", err.error(), err.debug());
