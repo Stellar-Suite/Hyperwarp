@@ -235,8 +235,9 @@ pub enum StellarDirectControlMessage {
     },
     #[serde(alias = "mouse_btn")]
     MouseButton {
-        button: u8,
-        state: bool,
+        change: u8, // the button field in the js event
+        buttons: u8, // the buttons field in the js event
+        state: bool, // if it was an up or down event
         timestamp: u64,
     },
     #[serde(rename = "mouse_lock")]
@@ -376,6 +377,13 @@ pub enum InputEventPayload {
     },
     KeyEventLite {
         key: u32,
+        state: bool,
+    },
+    MouseButtonsSet {
+        buttons: u8,
+    },
+    MouseButtonsChange {
+        change: u8,
         state: bool,
     }
 }

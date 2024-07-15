@@ -421,8 +421,16 @@ impl InputManager {
                     println!("unhandled event: {:?}", event);
                 }
                 self.event_queue.push(new_event);
+            },
+            InputEventPayload::MouseButtonsSet { buttons } => {
+
+            },
+            InputEventPayload::MouseButtonsChange { change, state } => {
+
             }
         }
 
     }
+
+    fn calculate_change(&self, change: u)
 }
