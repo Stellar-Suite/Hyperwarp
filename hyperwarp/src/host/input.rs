@@ -259,8 +259,13 @@ impl InputManager {
         InputManager {
             mouse: Mouse::new(),
             keyboard: Keyboard::new(),
+            gamepads: Vec::new(),
             event_queue: Vec::new(),
         }
+    }
+
+    pub fn count_gamepads(&self) -> usize {
+        self.gamepads.len()
     }
 
     pub fn flush_queue(&mut self) {

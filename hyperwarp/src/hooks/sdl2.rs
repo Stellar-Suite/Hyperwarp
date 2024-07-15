@@ -265,6 +265,30 @@ redhook::hook! {
     }
 }
 
+redhook::hook! {
+    unsafe fn SDL_numjoysticks() -> c_int => sdl_numjoysticks_first {
+        if HOST.config.debug_mode {
+            println!("SDL_numjoysticks called");
+        }
+        if HOST.config.enable_sdl2 {
+            if HOST.config.virtual_gamecontrollers {
+                HOST.input_manager.lock().unwrap().count_gamepads() as i32 // this would never overflow lol
+            }else{
+                redhook::real!(SDL_numjoysticks_hw_direct)()
+            }
+        } else {
+            0
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_numjoysticks_hw_direct() -> c_int => sdl_numjoysticks_hw_direct {
+        // shim so I can run redhook::real on it   
+        0
+    }
+}
+
 pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
     match symbol_name {
         "SDL_Init" => Some(sdl_init_first as *mut c_void),

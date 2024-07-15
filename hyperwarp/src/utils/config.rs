@@ -29,6 +29,7 @@ pub struct Config {
     pub disable_control: bool,
     pub retitle_windows: bool,
     pub netural_mode: bool,
+    pub virtual_gamecontrollers: bool,
 }
 
 fn get<T: FromStr>(key: &str, default: T) -> T {
@@ -104,6 +105,7 @@ impl Config {
             bind_type: try_get::<String>("SOCKET_TYPE"),
             retitle_windows: booleanify("RETITLE_WINDOWS", false),
             netural_mode: booleanify("NETURAL_MODE", false),
+            virtual_gamecontrollers: booleanify("VIRTUAL_GAMECONTROLLERS", false),
         }
     }
 }
@@ -135,6 +137,7 @@ impl Default for Config {
             disable_control: false,
             retitle_windows: false,
             netural_mode: false,
+            virtual_gamecontrollers: true
         }
     }
 }
