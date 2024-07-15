@@ -31,3 +31,7 @@ pub const KMOD_ALT: u32 = KMOD_LALT | KMOD_RALT;
 pub const KMOD_GUI: u32 = KMOD_LGUI | KMOD_RGUI;
 
 pub const KMOD_RESERVED: u32 = KMOD_SCROLL; /* "This is for source-level compatibility with SDL 2.0.0."" */
+// the mouse id for touch isn't picked up by bindgen https://github.com/Rust-SDL2/rust-sdl2/blob/dba66e80b14e16de309df49df0c20fdaf35b8c67/src/sdl2/event.rs#L2357
+
+pub const SDL_TOUCH_MOUSEID: u32 = u32::MAX - 1;
+pub const SDL_OUR_FAKE_MOUSEID: u32 = u32::MAX - 2;

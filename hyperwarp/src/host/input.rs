@@ -5,7 +5,7 @@ use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, In
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}, hooks::dlsym::check_cache_integrity};
+use crate::{bind::sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -303,19 +303,23 @@ impl InputManager {
                 InputEventPayload::MouseMoveRelative { x, y, x_absolute, y_absolute } => {
                     // println!("mouse move relative");
                     if feature_flags.sdl2_enabled {
-                        let mut event = sdl2_sys_lite::bindings::SDL_Event {
-                            motion: sdl2_sys_lite::bindings::SDL_MouseMotionEvent {
-                                type_: todo!(),
-                                timestamp: todo!(),
-                                windowID: todo!(),
-                                which: todo!(),
-                                state: todo!(),
-                                x,
-                                y,
-                                xrel: todo!(),
-                                yrel: todo!(),
-                            }
-                        };
+                        if let Some(context) = event.context {
+                            let wid = HOST.get_behavior().get_largest_sdl2_window_id().unwrap_or(0);
+                            let timestamp = event.metadata.sdl2_timestamp_ticks.unwrap_or(0);
+                            let mut event = sdl2_sys_lite::bindings::SDL_Event {
+                                motion: sdl2_sys_lite::bindings::SDL_MouseMotionEvent {
+                                    type_: (sdl2_sys_lite::bindings::SDL_EventType::SDL_MOUSEMOTION as u32),
+                                    timestamp: timestamp,
+                                    windowID: wid,
+                                    which: SDL_OUR_FAKE_MOUSEID,
+                                    state: context.buttons,
+                                    x: x_absolute,
+                                    y: y_absolute,
+                                    xrel: x,
+                                    yrel: y,
+                                }
+                            };
+                        }
                     }
                 },
                 _ => {

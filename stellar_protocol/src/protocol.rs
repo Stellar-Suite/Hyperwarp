@@ -310,7 +310,7 @@ pub struct InputEvent {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InputContext {
     pub modifiers: u16,
-    pub buttons: i32,
+    pub buttons: u32,
 }
 
 impl InputContext {
