@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Instant};
 
 use backtrace::Backtrace;
+use sdl2_sys_lite::bindings::SDL_GameController;
 use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, InputMetadata};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
@@ -262,6 +263,11 @@ impl InputManager {
             gamepads: Vec::new(),
             event_queue: Vec::new(),
         }
+    }
+
+    pub fn find_gamepad(&self, id: *mut SDL_GameController) -> Option<&Gamepad> {
+        let id_usize = id as usize;
+        self.gamepads.iter().find(|gamepad| (*gamepad) as *const Gamepad as usize == id_usize)
     }
 
     pub fn count_gamepads(&self) -> usize {
