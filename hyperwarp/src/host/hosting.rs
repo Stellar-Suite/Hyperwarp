@@ -401,6 +401,16 @@ impl ApplicationHost {
                                                 handler_wrapper_instant_responses.lock().unwrap().network().send(endpoint.clone(), &stellar_protocol::serialize(&StellarMessage::DebugInfoResponseV2(debug_info_v2, "networking".to_string())));
                                                 send_main_tick_request(MainTickMessage::RequestDebugInfoV2(endpoint.clone()));
                                             },
+                                            StellarMessage::ForwardedDataChannelMessage(source_socket_id, message) => {
+                                                match message {
+                                                    stellar_protocol::protocol::StellarDirectControlMessage::AddGamepad { local_id, product_type } => {
+
+                                                    },
+                                                    _ => {
+                                                        println!("Unhandled forwarded data channel message {:?} from socket id {:?}", message, source_socket_id);
+                                                    }
+                                                }
+                                            },
                                             _ => {
                                                 if config.debug_mode {
                                                     println!("Unhandled message: {:?}", message);

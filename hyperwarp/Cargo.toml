@@ -27,6 +27,7 @@ dashmap = "6.0.1"
 # "bindgen" itself might be extraneous
 # TODO new SDL2
 sdl2-sys-lite = { git = "https://github.com/Stellar-Suite/sdl2-sys-lite", version = "0.1.0" }
+uuid = { version = "1.10.0", features = ["v4", "rng", "serde" ] }
 # stellar_core = { path = "../stellar_core" }
 
 [build-dependencies]

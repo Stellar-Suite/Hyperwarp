@@ -111,12 +111,30 @@ impl Keyboard {
 pub struct Gamepad {
     name: String,
     usb_id: UsbIdentification,
-    product_type: stellar_protocol::protocol::GameControllerType
+    product_type: stellar_protocol::protocol::GameControllerType,
+    id: String,
 }
 
 impl Gamepad {
     pub fn as_ptr(&self) -> *const Gamepad {
         self as *const Gamepad
+    }
+
+    pub fn generate_id() -> String {
+        uuid::Uuid::new_v4().to_string()
+    }
+
+    pub fn new(name: String, usb_id: UsbIdentification, product_type: stellar_protocol::protocol::GameControllerType) -> Gamepad {
+        Gamepad {
+            name: name,
+            usb_id,
+            product_type,
+            id: Gamepad::generate_id(),
+        }
+    }
+
+    pub fn from_product_type(name: String, product_type: stellar_protocol::protocol::GameControllerType) -> Gamepad {
+        Gamepad::new(name, UsbIdentification::from_product_type(product_type), product_type)
     }
 }
 
@@ -129,10 +147,8 @@ impl Timestampable for InputMetadata {
         {
             let feature_flags = HOST.features.lock().unwrap();
             if feature_flags.sdl2_enabled {
-                unsafe {
-                    self.sdl2_timestamp_ticks = Some(SDL_GetTicks_safe());
-                    self.sdl2_timestamp_ticks_u64 = Some(SDL_GetTicks_safe() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
-                }
+                self.sdl2_timestamp_ticks = Some(SDL_GetTicks_safe());
+                self.sdl2_timestamp_ticks_u64 = Some(SDL_GetTicks_safe() as u64); // GetTicks64 not avali in some versions of sdl2, this is sad
             }
             // TODO: sdl3
         }
@@ -271,6 +287,10 @@ impl InputManager {
             gamepads_locked: false,
             event_queue_joystick_metaops: Vec::new(),
         }
+    }
+
+    pub fn add_gamepad(&mut self, gamepad: Gamepad) {
+        self.gamepads.push(gamepad);
     }
 
     pub fn find_gamepad(&self, id: *mut SDL_GameController) -> Option<&Gamepad> {

@@ -438,6 +438,84 @@ impl UsbIdentification {
             product_id: 0x028e,
         }
     }
+
+    pub fn new_xboxone() -> UsbIdentification {
+        UsbIdentification { // 045e:028f
+            vendor_id: 0x045e,
+            product_id: 0x028f,
+        }
+    }
+
+    pub fn new_ps3() -> UsbIdentification {
+        UsbIdentification { // 054c:0268
+            vendor_id: 0x054c,
+            product_id: 0x0268,
+        }
+    }
+
+    pub fn new_ps4() -> UsbIdentification {
+        UsbIdentification { // 054c:05c4
+            vendor_id: 0x054c,
+            product_id: 0x05c4,
+        }
+    }
+
+    pub fn new_ps5() -> UsbIdentification {
+        UsbIdentification { // 054c:09cc
+            vendor_id: 0x054c,
+            product_id: 0x09cc,
+        }
+    }
+
+    pub fn new_switch_pro() -> UsbIdentification {
+        UsbIdentification { // 057e:2009
+            vendor_id: 0x057e,
+            product_id: 0x2009,
+        }
+    }    
+
+    pub fn new_switch_joycon_left() -> UsbIdentification {
+        UsbIdentification { // 057e:2006
+            vendor_id: 0x057e,
+            product_id: 0x2006,
+        }
+    }
+
+    pub fn new_switch_joycon_right() -> UsbIdentification {
+        UsbIdentification { // 057e:2007
+            vendor_id: 0x057e,
+            product_id: 0x2007,
+        }
+    }
+
+    pub fn new_switch_joycon_pair() -> UsbIdentification {
+        UsbIdentification { // 057e:2008
+            vendor_id: 0x057e,
+            product_id: 0x2008,
+        }
+    }
+
+    pub fn new_unknown() -> UsbIdentification {
+        UsbIdentification { // unknown
+            vendor_id: 0,
+            product_id: 0,
+        }
+    }
+
+    pub fn from_product_type(product_type: GameControllerType) -> UsbIdentification {
+        match product_type {
+            GameControllerType::Xbox360 => UsbIdentification::new_xbox360(),
+            GameControllerType::XboxOne => UsbIdentification::new_xboxone(),
+            GameControllerType::PS3 => UsbIdentification::new_ps3(),
+            GameControllerType::PS4 => UsbIdentification::new_ps4(),
+            GameControllerType::PS5 => UsbIdentification::new_ps5(),
+            GameControllerType::SwitchPro => UsbIdentification::new_switch_pro(),
+            GameControllerType::SwitchJoyConLeft => UsbIdentification::new_switch_joycon_left(),
+            GameControllerType::SwitchJoyConRight => UsbIdentification::new_switch_joycon_right(),
+            GameControllerType::SwitchJoyConPair => UsbIdentification::new_switch_joycon_pair(),
+            _ => UsbIdentification::new_xbox360(),
+        }
+    }
 }
 
 impl Default for UsbIdentification {
@@ -448,7 +526,7 @@ impl Default for UsbIdentification {
 
 
 // https://github.com/libsdl-org/SDL/blob/256269afb37cc6f0ac72ca0920721bcbf877d489/include/SDL_gamecontroller.h#L63
-// wtf supermaven suggestd I support a N64 here
+// wtf supermaven gamepad I support a N64 here
 #[derive(Serialize, Deserialize, PartialEq, Debug, EnumString, Display, EnumIter, VariantArray, Hash, Eq, Clone, Copy)]
 pub enum GameControllerType {
     Unknown,
