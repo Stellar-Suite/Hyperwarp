@@ -285,9 +285,12 @@ redhook::hook! {
 redhook::hook! {
     unsafe fn SDL_numjoysticks_hw_direct() -> c_int => sdl_numjoysticks_hw_direct {
         // shim so I can run redhook::real on it   
+        println!("WARN: unreachable code SDL_numjoysticks_hw_direct executed");
         0
     }
 }
+
+
 
 pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
     match symbol_name {
