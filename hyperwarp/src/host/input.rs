@@ -268,7 +268,7 @@ impl InputManager {
             keyboard: Keyboard::new(),
             gamepads: Vec::new(),
             event_queue: Vec::new(),
-            locked: false,
+            gamepads_locked: false,
             event_queue_joystick_metaops: Vec::new(),
         }
     }
