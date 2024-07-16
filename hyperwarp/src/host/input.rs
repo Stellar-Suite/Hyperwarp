@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Instant};
 
 use backtrace::Backtrace;
 use sdl2_sys_lite::bindings::SDL_GameController;
-use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, InputMetadata};
+use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, InputMetadata, UsbIdentification};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
@@ -109,11 +109,15 @@ impl Keyboard {
 }
 
 pub struct Gamepad {
-
+    name: String,
+    usb_id: UsbIdentification,
+    product_type: stellar_protocol::protocol::GameControllerType
 }
 
 impl Gamepad {
-
+    pub fn as_ptr(&self) -> *const Gamepad {
+        self as *const Gamepad
+    }
 }
 
 pub trait Timestampable {
@@ -175,7 +179,9 @@ pub struct InputManager {
     pub mouse: Mouse,
     pub keyboard: Keyboard,
     pub gamepads: Vec<Gamepad>,
+    pub gamepads_locked: bool,
     pub event_queue: Vec<InputEvent>,
+    pub event_queue_joystick_metaops: Vec<InputEvent>,
 }
 
 impl InputManager {
@@ -262,6 +268,8 @@ impl InputManager {
             keyboard: Keyboard::new(),
             gamepads: Vec::new(),
             event_queue: Vec::new(),
+            locked: false,
+            event_queue_joystick_metaops: Vec::new(),
         }
     }
 

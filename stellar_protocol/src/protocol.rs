@@ -392,6 +392,27 @@ pub enum InputEventPayload {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UsbIdentification {
+    pub vendor_id: u16,
+    pub product_id: u16,
+}
+
+impl UsbIdentification {
+    pub fn new_xbox360() -> UsbIdentification {
+        UsbIdentification { // 045e:028e
+            vendor_id: 0x045e,
+            product_id: 0x028e,
+        }
+    }
+}
+
+impl Default for UsbIdentification {
+    fn default() -> Self {
+        UsbIdentification::new_xbox360()
+    }
+}
+
 
 // https://github.com/libsdl-org/SDL/blob/256269afb37cc6f0ac72ca0920721bcbf877d489/include/SDL_gamecontroller.h#L63
 // wtf supermaven suggestd I support a N64 here
