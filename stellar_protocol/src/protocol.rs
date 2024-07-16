@@ -145,7 +145,11 @@ pub enum StellarMessage {
     DebugInfoResponse(DebugInfo),
     DebugInfoRequestV2,
     DebugInfoResponseV2(DebugInfo, String),
-    UserInputEvent(InputEvent)
+    UserInputEvent(InputEvent),
+    // sender, messahe
+    ForwardedDataChannelMessage(String, StellarDirectControlMessage),
+    // reciever, channel, message
+    ReplyDataChannelMessage(String, String, StellarDirectControlMessage),
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

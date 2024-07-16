@@ -106,7 +106,8 @@ pub enum StreamerSignal {
     DataChannelContent(Vec<u8>),   // apparently useless, will deprecated later
     ProcessInput(stellar_protocol::protocol::InputEvent),
     DebugInfoRequest,
-    SocketCreated(Arc<Mutex<Client>>)
+    SocketCreated(Arc<Mutex<Client>>),
+    ForwardedDataChannelMessage(String, stellar_protocol::protocol::StellarDirectControlMessage),
 }
 
 pub struct Streamer {
@@ -148,6 +149,25 @@ pub fn build_capsfilter(caps: gstreamer::Caps) -> anyhow::Result<gstreamer::Elem
 
 
 pub const DEFAULT_ACL: PrivligeDefinition = create_default_acl();
+
+pub fn should_forward_data_channel_message(message: &StellarDirectControlMessage) -> bool {
+    if matches!(message, StellarDirectControlMessage::AddGamepad { .. }) {
+        return true;
+    }
+    if matches!(message, StellarDirectControlMessage::AddGamepadReply { .. }) {
+        return true;
+    }
+    if matches!(message, StellarDirectControlMessage::UpdateGamepad { .. }) {
+        return true;
+    }
+    if matches!(message, StellarDirectControlMessage::RemoveGamepad { .. }) {
+        return true;
+    }
+    if matches!(message, StellarDirectControlMessage::MouseLock { .. }) || matches!(message, StellarDirectControlMessage::RequestTitle) {
+        return true;
+    }
+    false
+}
 
 impl Streamer {
     pub fn new(config: StreamerConfig) -> Self {
@@ -248,7 +268,12 @@ impl Streamer {
                                 handler.signals().send(StreamerSignal::ProcessInput(input_event));
                             },
                             _ => {
-                                println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
+                                // check if is forwardable
+                                if should_forward_data_channel_message(&message) {
+                                    handler.signals().send(StreamerSignal::ForwardedDataChannelMessage(source_socket_id.clone(), message));
+                                } else {
+                                    println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
+                                }
                             }
                         }
                     },
@@ -1329,6 +1354,15 @@ impl Streamer {
                                 },
                                 StreamerSignal::SocketCreated(sent_socket) => {
                                     socket = Some(sent_socket);
+                                },
+                                StreamerSignal::ForwardedDataChannelMessage(source_socket_id, message) => {
+                                    let handler = handler_wrapper.lock().unwrap();
+                                    let network = handler.network();
+                                    let message = stellar_protocol::protocol::StellarMessage::ForwardedDataChannelMessage(source_socket_id, message);
+                                    println!("sent forwarded data channel message to hyperwarp");
+                                    if let Some(endpoint) = &current_endpoint {
+                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
+                                    }
                                 }
                             }
                         }
