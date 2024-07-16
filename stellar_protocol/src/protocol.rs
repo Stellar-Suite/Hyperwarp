@@ -1,4 +1,5 @@
 
+use std::default;
 use std::path::PathBuf;
 
 use serde::{Serialize, Deserialize};
@@ -243,7 +244,35 @@ pub enum StellarDirectControlMessage {
     #[serde(rename = "mouse_lock")]
     MouseLock {
         state: bool
-    }
+    },
+    #[serde(rename = "request_title")]
+    RequestTitle,
+    #[serde(rename = "add_gamepad")]
+    AddGamepad {
+        local_id: String,
+        #[serde(default = "get_default_gamepad_type")]
+        product_type: GameControllerType,
+    },
+    #[serde(rename = "add_gamepad_reply")]
+    AddGamepadReply {
+        local_id: String,
+        remote_id: String,
+        success: bool,
+        message: String
+    },
+    #[serde(rename = "update_gamepad")]
+    UpdateGamepad {
+        gamepad_id: u32,
+        gamepad_name: String,
+    },
+    #[serde(rename = "remove_gamepad")]
+    RemoveGamepad {
+        remote_id: String,
+    },
+}
+
+pub fn get_default_gamepad_type() -> GameControllerType {
+    GameControllerType::Xbox360
 }
 
 pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {

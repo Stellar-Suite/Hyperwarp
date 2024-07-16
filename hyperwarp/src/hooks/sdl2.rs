@@ -265,6 +265,8 @@ redhook::hook! {
     }
 }
 
+// Joystick hooks
+
 redhook::hook! {
     unsafe fn SDL_numjoysticks() -> c_int => sdl_numjoysticks_first {
         if HOST.config.debug_mode {
@@ -289,6 +291,9 @@ redhook::hook! {
         0
     }
 }
+
+
+// Game Controller hooks
 
 
 
