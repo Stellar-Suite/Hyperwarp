@@ -111,6 +111,46 @@ pub enum StreamerSignal {
     ForwardedDataChannelMessage(String, stellar_protocol::protocol::StellarDirectControlMessage),
 }
 
+pub struct DataChannelTracker {
+    pub channel_id_to_socket_id: HashMap<i32, String>,
+    pub socket_id_to_channel_ids: HashMap<String, Vec<i32>>,
+}
+
+impl Default for DataChannelTracker {
+    fn default() -> Self {
+        Self {
+            channel_id_to_socket_id: HashMap::new(),
+            socket_id_to_channel_ids: HashMap::new(),
+        }
+    }
+}
+
+impl DataChannelTracker {
+    pub fn add_data_channel(&mut self, socket_id: &str, channel: &WebRTCDataChannel) {
+        let channel_id = channel.id();
+        self.channel_id_to_socket_id.insert(channel_id, socket_id.to_string());
+        if let Some(socket_id_list) = self.socket_id_to_channel_ids.get_mut(socket_id) {
+            socket_id_list.push(channel_id);
+        } else {
+            self.socket_id_to_channel_ids.insert(socket_id.to_string(), vec![channel_id]);
+        }
+    }
+
+    pub fn remove_data_channel(&mut self, channel_id: i32) {
+        let socket_id = self.channel_id_to_socket_id.remove(&channel_id).expect("Association between channel and socket id not found");
+        if let Some(socket_id_list) = self.socket_id_to_channel_ids.get_mut(&socket_id) {
+            socket_id_list.retain(|id| *id != channel_id);
+        }
+        if self.socket_id_to_channel_ids.get(&socket_id).unwrap().len() == 0 {
+            self.socket_id_to_channel_ids.remove(&socket_id);
+        }
+    }
+
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 pub struct Streamer {
     pub config: Arc<StreamerConfig>,
     pub stop: Arc<AtomicBool>,
@@ -123,7 +163,7 @@ pub struct Streamer {
     pub client_comms_command_recv: Receiver<InternalMessage>,
     pub frame: Arc<RwLock<Vec<u8>>>,
     pub socketio_client: Option<Arc<Mutex<Client>>>,
-    pub channel_id_to_socket_id: Arc<DashMap<i32, String>>,
+    pub data_channel_tracker: Arc<Mutex<DataChannelTracker>>,
     pub acls: DashMap<String, PrivligeDefinition>,
 }
 
@@ -186,7 +226,7 @@ impl Streamer {
             streaming_command_recv: receiver,
             frame: Arc::new(RwLock::new(vec![])),
             socketio_client: None,
-            channel_id_to_socket_id: Arc::new(DashMap::new()),
+            data_channel_tracker: Arc::new(Mutex::new(DataChannelTracker::new())),
             acls: DashMap::new(),
             client_comms_command_queue: sender_2,
             client_comms_command_recv: receiver_2,
@@ -756,7 +796,7 @@ impl Streamer {
 
                                 let streaming_cmd_queue_for_data_channel_adding = self.streaming_command_queue.clone();
                                 let origin_socketid_for_data_channel_adding = origin_socketid.clone();
-                                let channel_id_to_socket_id_for_data_channel_adding = self.channel_id_to_socket_id.clone();
+                                let data_channel_tracker_for_adding = self.data_channel_tracker.clone();
                                 
                                 // https://github.com/servo/media/blob/45756bef67037ade0f4f0125d579fdc3f3d457c8/backends/gstreamer/webrtc.rs#L584
                                 downstream_peer_el_group.webrtcbin.connect("on-data-channel", false, move |channel| {
@@ -765,8 +805,9 @@ impl Streamer {
                                         .get::<WebRTCDataChannel>()
                                         .map_err(|e| e.to_string())
                                         .expect("Invalid data channel");
-                                    let channel_id = channel.id();
-                                    channel_id_to_socket_id_for_data_channel_adding.insert(channel_id, origin_socketid_for_data_channel_adding.clone());
+                                    {
+                                        data_channel_tracker_for_adding.lock().unwrap().add_data_channel(&origin_socketid_for_data_channel_adding, &channel);
+                                    }
                                     streaming_cmd_queue_for_data_channel_adding.send(InternalMessage::AddDataChannelForSocket(origin_socketid_for_data_channel_adding.clone(), channel, true));
                                     None
                                 });
@@ -843,12 +884,11 @@ impl Streamer {
                                 
                                 for channel in downstream_peer_el_group.get_data_channels() {
                                     let channel_id = channel.id();
-                                    self.channel_id_to_socket_id.insert(channel_id, origin_socketid.clone());
                                     // TODO: attach handlers manually here
                                     channel.connect_on_message_data(|channel, data_opt| {
                                         if let Some(data) = data_opt {
                                             // TODO: another thread for data channel io!
-                                            
+                                            // not implemented yet for bytes
                                         }
                                     });
 
@@ -869,7 +909,9 @@ impl Streamer {
                                             let _ = message_handler_queue.send(InternalMessage::ProcessDirectMessage(socket_id_for_data_channels.clone(), message));
                                         }
                                     });
-
+                                    {
+                                        self.data_channel_tracker.lock().unwrap().add_data_channel(&origin_socketid, channel);
+                                    }
                                 }
 
                                 downstream_peers.insert(origin_socketid.clone(), downstream_peer_el_group);
@@ -1068,7 +1110,7 @@ impl Streamer {
                                     println!("{} data channels removed from peer", webrtc_peer.data_channels.len());
                                 }
                                 webrtc_peer.data_channels.iter().for_each(|channel| {
-                                    self.channel_id_to_socket_id.remove(&channel.id());
+                                    self.data_channel_tracker.lock().unwrap().remove_data_channel(channel.id());
                                 });
                                 downstream_peers.remove(&origin_socketid);// drop bye bye
                                 /*if let Err(err) = pipeline.set_state(gstreamer::State::Playing) {
