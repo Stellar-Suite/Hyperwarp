@@ -317,10 +317,7 @@ impl Streamer {
                                 }
                             }
                         }
-                    },
-                    InternalMessage::SendDirectMessage(source_socket_id, target_socket_id, message) => {
-                        // TODO: might not be the right place to handle this
-                    },
+                    }
                     _ => {
                         // overlap in unhandled messages
                     }
@@ -1159,6 +1156,24 @@ impl Streamer {
                             }
                         }
                     },
+                    InternalMessage::SendDirectMessage(socket_id, channel_label, message) => {
+                        if let Some(webrtc_peer) = downstream_peers.get_mut(&socket_id) {
+                            let channel_opt = webrtc_peer.data_channels.iter().find(|data_channel| {
+                                let label = data_channel.label();
+                                if let Some(label) = label {
+                                    label.as_str() == channel_label
+                                }else {
+                                    false
+                                }
+                            });
+                            if let Some(channel) = channel_opt {
+                                let message = serde_json::to_string(&message).expect("Could not serialize message");
+                                channel.send_string(Some(&message));
+                            } else {
+                                println!("No data channel found for label {} on socket id {}, did it disconnect?", channel_label, socket_id);
+                            }
+                        }
+                    },
                     _ => { // if thi warns about unreachable code, it's very good because we implemented everything
                         // TODO: print more descriptive
                         println!("BAD: Unimplemented message {:#?}", imsg.type_id());
@@ -1361,7 +1376,7 @@ impl Streamer {
                                                 },
                                                 StellarMessage::ReplyDataChannelMessage(source, channel, direct_message) => {
                                                     println!("Reply data channel message from hyperwarp ({}): {:?}", source, direct_message);
-
+                                                    streaming_cmd_queue.send(InternalMessage::SendDirectMessage(source, channel, direct_message));
                                                 }
                                                 _ => {
 
