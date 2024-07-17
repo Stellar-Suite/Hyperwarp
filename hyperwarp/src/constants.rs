@@ -2,6 +2,7 @@ pub mod sdl2;
 pub mod xlib;
 
 pub const LIBRARY_NAME: &str = "Hyperwarp";
+pub const GAMEPAD_NAME: &str = "Hyperwarp Virtual Gamepad";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Library {

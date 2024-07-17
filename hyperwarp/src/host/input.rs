@@ -109,10 +109,10 @@ impl Keyboard {
 }
 
 pub struct Gamepad {
-    name: String,
-    usb_id: UsbIdentification,
-    product_type: stellar_protocol::protocol::GameControllerType,
-    id: String,
+    pub name: String,
+    pub usb_id: UsbIdentification,
+    pub product_type: stellar_protocol::protocol::GameControllerType,
+    pub id: String,
 }
 
 impl Gamepad {
@@ -289,8 +289,15 @@ impl InputManager {
         }
     }
 
-    pub fn add_gamepad(&mut self, gamepad: Gamepad) {
+    pub fn add_gamepad(&mut self, gamepad: Gamepad) -> usize {
+        let index = self.gamepads.len();
         self.gamepads.push(gamepad);
+        // TODO: emit events
+        index
+    }
+
+    pub fn get_gamepad(&self, index: usize) -> Option<&Gamepad> {
+        self.gamepads.get(index)
     }
 
     pub fn find_gamepad(&self, id: *mut SDL_GameController) -> Option<&Gamepad> {
@@ -300,6 +307,11 @@ impl InputManager {
 
     pub fn count_gamepads(&self) -> usize {
         self.gamepads.len()
+    }
+
+    pub fn remove_gamepad(&mut self, index: usize) {
+        // TODO: emit events
+        self.gamepads.remove(index);
     }
 
     pub fn flush_queue(&mut self) {

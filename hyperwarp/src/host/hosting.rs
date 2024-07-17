@@ -4,7 +4,7 @@ use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
 use stellar_protocol::deserialize;
-use stellar_protocol::protocol::{get_all_channels, DebugInfo, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarMessage, Synchornization};
+use stellar_protocol::protocol::{get_all_channels, DebugInfo, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarDirectControlMessage, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
 
@@ -21,13 +21,13 @@ use std::{
 
 use std::thread; // for test func
 
-use crate::constants::BLACKLISTED_PROCESS_NAMES;
+use crate::constants::{BLACKLISTED_PROCESS_NAMES, GAMEPAD_NAME};
 use crate::hooks::dlsym::check_cache_integrity;
 use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
-use super::input::{InputManager, Timestampable};
+use super::input::{Gamepad, InputManager, Timestampable};
 use super::window::Window;
 use super::{
     feature_flags::FeatureFlags,
@@ -43,6 +43,7 @@ pub enum MainTickMessage {
     RequestShImgPath(Endpoint),
     RequestHandshake(Endpoint),
     RequestDebugInfoV2(Endpoint),
+    ProcessDirectMessage(Endpoint, String, StellarDirectControlMessage),
 }
 
 pub struct LastSentState {
@@ -206,6 +207,24 @@ impl ApplicationHost {
                     };
                     self.send_to(endpoint.clone(), &StellarMessage::DebugInfoResponseV2(debug_info_v2, "main".to_string()));
                 },
+                MainTickMessage::ProcessDirectMessage(endpoint, source, message) => {
+                    match message {
+                        StellarDirectControlMessage::AddGamepad { local_id, product_type } => {
+                            {
+                                let mut input_manager_locked = self.input_manager.lock().unwrap();
+                                let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type);
+                                let chosen_id = gamepad.id.clone();
+                                let index = input_manager_locked.add_gamepad(gamepad);
+                                let added_message = format!("Added gamepad {}", index + 1);
+                                let direct_message = StellarDirectControlMessage::AddGamepadReply { local_id, remote_id: chosen_id, success: true, message: added_message };
+                                self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
+                            }
+                        },
+                        _ => {
+                            println!("Unhandled direct control message (on main) {:?} from {:?}", message, endpoint.addr());
+                        }
+                    }
+                }
             },
             None => {}
         }
