@@ -52,6 +52,7 @@ pub enum InternalMessage {
     SocketRtcReady(String),
     AddDataChannelForSocket(String, WebRTCDataChannel, bool), // last bool is for if it originated from the client
     ProcessDirectMessage(String, stellar_protocol::protocol::StellarDirectControlMessage),
+    SendDirectMessage(String, String, stellar_protocol::protocol::StellarDirectControlMessage),
 }
 
 pub struct SystemHints {
@@ -276,6 +277,9 @@ impl Streamer {
                                 }
                             }
                         }
+                    },
+                    InternalMessage::SendDirectMessage(source_socket_id, target_socket_id, message) => {
+                        // TODO: might not be the right place to handle this
                     },
                     _ => {
                         // overlap in unhandled messages
@@ -1313,6 +1317,10 @@ impl Streamer {
                                                          }]));
                                                     }
                                                 },
+                                                StellarMessage::ReplyDataChannelMessage(source, channel, direct_message) => {
+                                                    println!("Reply data channel message from hyperwarp ({}): {:?}", source, direct_message);
+
+                                                }
                                                 _ => {
 
                                                 }
