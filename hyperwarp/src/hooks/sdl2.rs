@@ -1,7 +1,7 @@
 use std::ffi::c_short;
 
-use libc::{c_char, c_int, c_void};
-use sdl2_sys_lite::bindings::{SDL_Event, SDL_EventType, SDL_WindowEventID};
+use libc::{c_char, c_int, c_ushort, c_void};
+use sdl2_sys_lite::bindings::{SDL_Event, SDL_EventType, SDL_Joystick, SDL_WindowEventID};
 use stellar_protocol::protocol::GraphicsAPI;
 
 use crate::constants::sdl2::SDL_FALSE;
@@ -293,6 +293,55 @@ redhook::hook! {
     }
 }
 
+redhook::hook! {
+    unsafe fn SDL_JoystickGetProduct(joystick: *mut SDL_Joystick) -> c_ushort => sdl_joystickgetproduct_first {
+        if HOST.config.debug_mode {
+            println!("SDL_JoystickGetProduct called");
+        }
+
+        if HOST.config.enable_sdl2 {
+            if let Some(gamepad) = HOST.input_manager.lock().unwrap().find_by_sdl(joystick as usize) {
+                gamepad.usb_id.product_id
+            }else{
+                redhook::real!(SDL_JoystickGetProduct_hw_direct)(joystick)
+            }
+        } else {
+            0
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_JoystickGetProduct_hw_direct(joystick: *mut SDL_Joystick) -> c_ushort => sdl_joystickgetproduct_hw_direct {
+        // shim so I can run redhook::real on it   
+        0
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_JoystickGetVendor(joystick: *mut SDL_Joystick) -> c_ushort => sdl_joystickgetvendor_first {
+        if HOST.config.debug_mode {
+            println!("SDL_JoystickGetVendor called");
+        }
+        if HOST.config.enable_sdl2 {
+            if let Some(gamepad) = HOST.input_manager.lock().unwrap().find_by_sdl(joystick as usize) {
+                gamepad.usb_id.vendor_id
+            }else{
+                redhook::real!(SDL_JoystickGetVendor_hw_direct)(joystick)
+            }
+            
+        } else {
+            0
+        }
+    }
+}
+
+redhook::hook! {
+    unsafe fn SDL_JoystickGetVendor_hw_direct(joystick: *mut SDL_Joystick) -> c_ushort => sdl_joystickgetvendor_hw_direct {
+        // shim so I can run redhook::real on it   
+        0
+    }
+}
 
 // Game Controller hooks
 
@@ -310,6 +359,8 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "SDL_DestroyWindow" => Some(sdl_destroywindow_first as *mut c_void),
         "SDL_PollEvent" => Some(sdl_pollevent_first as *mut c_void),
         "SDL_NumJoysticks" => Some(sdl_numjoysticks_first as *mut c_void),
+        "SDL_JoystickGetProduct" => Some(sdl_joystickgetproduct_first as *mut c_void),
+        "SDL_JoystickGetVendor" => Some(sdl_joystickgetvendor_first as *mut c_void),
         _ => None
     }
 }

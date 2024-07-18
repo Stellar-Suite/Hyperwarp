@@ -343,6 +343,10 @@ impl InputManager {
         self.gamepads.get(index)
     }
 
+    pub fn find_by_sdl(&self, sdl_id: usize) -> Option<&Gamepad> {
+        self.gamepads.iter().find(|gamepad| gamepad.sdl_id == Some(sdl_id))
+    }
+
     pub fn update_gamepad(&mut self, id: String, axes: Vec<f64>, buttons: Vec<bool>, hats: Option<Vec<i32>>) {
         let mut pending_events: Vec<InputEvent> = Vec::new();
         {
