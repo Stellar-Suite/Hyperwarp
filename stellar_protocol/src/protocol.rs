@@ -269,8 +269,10 @@ pub enum StellarDirectControlMessage {
     },
     #[serde(rename = "update_gamepad")]
     UpdateGamepad {
-        gamepad_id: u32,
-        gamepad_name: String,
+        remote_id: String,
+        axes: Vec<f64>,
+        buttons: Vec<bool>,
+        hats: Option<Vec<i32>>,
     },
     #[serde(rename = "remove_gamepad")]
     RemoveGamepad {

@@ -119,7 +119,10 @@ pub struct Gamepad {
     pub usb_id: UsbIdentification,
     pub product_type: stellar_protocol::protocol::GameControllerType,
     pub id: String,
-    pub sdl_id: Option<usize>
+    pub sdl_id: Option<usize>,
+    pub axes: Vec<f64>,
+    pub buttons: Vec<bool>,
+    pub hats: Vec<i32>,
     // TODO: axes, buttons vec
 }
 
@@ -132,18 +135,21 @@ impl Gamepad {
         uuid::Uuid::new_v4().to_string()
     }
 
-    pub fn new(name: String, usb_id: UsbIdentification, product_type: stellar_protocol::protocol::GameControllerType) -> Gamepad {
+    pub fn new(name: String, usb_id: UsbIdentification, product_type: stellar_protocol::protocol::GameControllerType, init_specs: GamepadInitializationSpecs) -> Gamepad {
         Gamepad {
             name: name,
             usb_id,
             product_type,
             id: Gamepad::generate_id(),
-            sdl_id: None
+            sdl_id: None,
+            axes: vec![0.0; init_specs.axes as usize],
+            buttons: vec![false; init_specs.buttons as usize],
+            hats: vec![0; init_specs.hats as usize],
         }
     }
 
-    pub fn from_product_type(name: String, product_type: stellar_protocol::protocol::GameControllerType) -> Gamepad {
-        Gamepad::new(name, UsbIdentification::from_product_type(product_type), product_type)
+    pub fn from_product_type(name: String, product_type: stellar_protocol::protocol::GameControllerType, init_specs: GamepadInitializationSpecs) -> Gamepad {
+        Gamepad::new(name, UsbIdentification::from_product_type(product_type), product_type, init_specs)
     }
 }
 

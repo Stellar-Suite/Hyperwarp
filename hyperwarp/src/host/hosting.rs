@@ -27,7 +27,7 @@ use crate::shim;
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
-use super::input::{Gamepad, InputManager, Timestampable};
+use super::input::{Gamepad, GamepadInitializationSpecs, InputManager, Timestampable};
 use super::window::Window;
 use super::{
     feature_flags::FeatureFlags,
@@ -212,7 +212,7 @@ impl ApplicationHost {
                         StellarDirectControlMessage::AddGamepad { local_id, product_type, axes, buttons, hats } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
-                                let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type);
+                                let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type, GamepadInitializationSpecs { axes, buttons, hats });
                                 let chosen_id = gamepad.id.clone();
                                 let index = input_manager_locked.add_gamepad(gamepad);
                                 let added_message = format!("Added gamepad {}", index + 1);
