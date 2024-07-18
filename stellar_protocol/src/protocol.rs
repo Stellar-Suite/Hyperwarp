@@ -267,7 +267,7 @@ pub enum StellarDirectControlMessage {
         success: bool,
         message: String,
     },
-    #[serde(rename = "update_gamepad")]
+    #[serde(rename = "update_gamepad", alias = "gamepad_update")]
     UpdateGamepad {
         remote_id: String,
         axes: Vec<f64>,

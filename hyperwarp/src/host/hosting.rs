@@ -223,7 +223,7 @@ impl ApplicationHost {
                         StellarDirectControlMessage::UpdateGamepad { remote_id, axes, buttons, hats } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
-                                
+                                input_manager_locked.update_gamepad(remote_id, axes, buttons, hats);
                             }
                         },
                         StellarDirectControlMessage::RemoveGamepad { remote_id } => {
