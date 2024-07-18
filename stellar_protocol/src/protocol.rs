@@ -207,7 +207,6 @@ pub enum StellarFrontendMessage {
 // bypass stargate so faster
 // use rename for clientbound
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(tag = "type")]
 pub enum StellarDirectControlMessage {
     #[serde(rename = "update_window_title")]
     UpdateWindowTitle {
