@@ -1,12 +1,12 @@
 use std::{collections::HashMap, time::Instant};
 
 use backtrace::Backtrace;
-use sdl2_sys_lite::bindings::SDL_GameController;
+use sdl2_sys_lite::bindings::{SDL_GameController, SDL_Joystick, SDL_PRESSED, SDL_RELEASED};
 use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, InputMetadata, UsbIdentification};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity};
+use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::sdl2_translate_joystick_axis_value};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -335,13 +335,46 @@ impl InputManager {
     }
 
     pub fn update_gamepad(&mut self, id: String, axes: Vec<f64>, buttons: Vec<bool>, hats: Option<Vec<i32>>) {
-        let gamepad = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id).unwrap();
-        if axes.len() != gamepad.axes.len() || buttons.len() != gamepad.buttons.len() {
-            if HOST.config.debug_mode {
-                println!("uh oh, gamepad update axes/buttons length mismatch {} {} {} {}", axes.len(), gamepad.axes.len(), buttons.len(), gamepad.buttons.len());
+        let mut pending_events: Vec<InputEvent> = Vec::new();
+        {
+            let gamepad = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id).unwrap();
+            if axes.len() != gamepad.axes.len() || buttons.len() != gamepad.buttons.len() {
+                if HOST.config.debug_mode {
+                    println!("uh oh, gamepad update axes/buttons length mismatch {} {} {} {}", axes.len(), gamepad.axes.len(), buttons.len(), gamepad.buttons.len());
+                }
+                return;
             }
-            return;
+
+            for (i, axis) in axes.iter().enumerate() {
+                if gamepad.axes[i] != *axis {
+                    gamepad.axes[i] = *axis;
+                    let change_event = Self::new_timestamped_input_event(InputEventPayload::JoystickAxis {
+                        id: id.clone(),
+                        axis: i as u8,
+                        value: *axis,
+                    });
+                    pending_events.push(change_event);
+                }
+            }
+
+            for (i, button) in buttons.iter().enumerate() {
+                if gamepad.buttons[i] != *button {
+                    gamepad.buttons[i] = *button;
+                    let change_event = Self::new_timestamped_input_event(InputEventPayload::JoystickButton {
+                        id: id.clone(),
+                        button: i as u8,
+                        pressed: *button
+                    });
+                    pending_events.push(change_event);
+                }
+            }
         }
+
+        // buffer state
+        for event in pending_events {
+            self.event_queue.push(event.with_input_manager(self));
+        }
+
         // hats not implemented yet lol
     }
 
@@ -533,6 +566,25 @@ impl InputManager {
                             }
                         }else{
                             println!("no context for mouse button set");
+                        }
+                    }
+                },
+                InputEventPayload::JoystickAxis { id, axis, value } => {
+                    if let Some(gamepad) = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id) {
+                        if feature_flags.sdl2_enabled {
+                            unsafe {
+                                bind::sdl2::SDL_JoystickSetVirtualAxis(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, axis as i32, sdl2_translate_joystick_axis_value(value));
+                            }
+                        }
+                    }
+                },
+                InputEventPayload::JoystickButton { id, button, pressed } => {
+                    if let Some(gamepad) = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id) {
+                        if feature_flags.sdl2_enabled {
+                            unsafe {
+                                let pressed_sdl2 = if pressed { SDL_PRESSED } else { SDL_RELEASED };
+                                bind::sdl2::SDL_JoystickSetVirtualButton(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, button as i32, pressed_sdl2 as i8);
+                            }
                         }
                     }
                 },

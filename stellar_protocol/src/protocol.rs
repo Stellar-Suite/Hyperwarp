@@ -440,7 +440,7 @@ pub enum InputEventPayload {
     JoystickButton {
         id: String,
         button: u8,
-        pressed: f64
+        pressed: bool
     },
 }
 

@@ -13,6 +13,11 @@ pub fn sdl2_translate_mouse_state(state: u8) -> u8 {
     state // don't need to atm?
 }
 
+pub fn sdl2_translate_joystick_axis_value(value: f64) -> i16 {
+    let floated = (value * 32767.0).clamp(-32768.0, 32767.0);
+    floated as i16
+}
+
 /*struct SDLPlatform {
     joystick_vec: Vec<SDL_Joystick>,
     joystick_kv: HashMap<u32, String>
