@@ -220,6 +220,18 @@ impl ApplicationHost {
                                 self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
                             }
                         },
+                        StellarDirectControlMessage::UpdateGamepad { remote_id, axes, buttons, hats } => {
+                            {
+                                let mut input_manager_locked = self.input_manager.lock().unwrap();
+                                
+                            }
+                        },
+                        StellarDirectControlMessage::RemoveGamepad { remote_id } => {
+                            {
+                                let mut input_manager_locked = self.input_manager.lock().unwrap();
+                                
+                            }
+                        },
                         _ => {
                             println!("Unhandled direct control message (on main) {:?} from {:?}", message, endpoint.addr());
                         }

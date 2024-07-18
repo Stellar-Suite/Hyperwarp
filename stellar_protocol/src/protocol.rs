@@ -431,7 +431,17 @@ pub enum InputEventPayload {
     MouseButtonsChange {
         change: u8,
         state: bool,
-    }
+    },
+    JoystickAxis {
+        id: String,
+        axis: u8,
+        value: f64
+    },
+    JoystickButton {
+        id: String,
+        button: u8,
+        pressed: f64
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

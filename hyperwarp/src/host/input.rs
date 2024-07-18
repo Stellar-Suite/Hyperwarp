@@ -120,6 +120,7 @@ pub struct Gamepad {
     pub product_type: stellar_protocol::protocol::GameControllerType,
     pub id: String,
     pub sdl_id: Option<usize>,
+    pub sdl_instance_id: Option<i32>,
     pub axes: Vec<f64>,
     pub buttons: Vec<bool>,
     pub hats: Vec<i32>,
@@ -142,6 +143,7 @@ impl Gamepad {
             product_type,
             id: Gamepad::generate_id(),
             sdl_id: None,
+            sdl_instance_id: None,
             axes: vec![0.0; init_specs.axes as usize],
             buttons: vec![false; init_specs.buttons as usize],
             hats: vec![0; init_specs.hats as usize],
@@ -304,15 +306,23 @@ impl InputManager {
         }
     }
 
-    pub fn add_gamepad(&mut self, gamepad: Gamepad) -> usize {
+    pub fn add_gamepad(&mut self, mut gamepad: Gamepad) -> usize {
         let index = self.gamepads.len();
         let feature_flags = HOST.features.lock().unwrap();
         if feature_flags.sdl2_enabled {
             if gamepad.sdl_id.is_none() {
                 // Allocate virtual controller
-                let sdl_index = unsafe {
-                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, 0, 0, 0);
+                let sdl_device_index = unsafe {
+                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, 0, 0, 0)
                 };
+                let sdl_joystick_ref = unsafe {
+                    bind::sdl2::SDL_JoystickOpen(sdl_device_index)
+                };
+                gamepad.sdl_id = Some(sdl_joystick_ref as usize);
+                let sdl_joystick_id = unsafe {
+                    bind::sdl2::SDL_JoystickInstanceID(sdl_joystick_ref)
+                };
+                gamepad.sdl_instance_id = Some(sdl_joystick_id);
             }
         }
         self.gamepads.push(gamepad);
@@ -322,6 +332,17 @@ impl InputManager {
 
     pub fn get_gamepad(&self, index: usize) -> Option<&Gamepad> {
         self.gamepads.get(index)
+    }
+
+    pub fn update_gamepad(&mut self, id: String, axes: Vec<f64>, buttons: Vec<bool>, hats: Option<Vec<i32>>) {
+        let gamepad = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id).unwrap();
+        if axes.len() != gamepad.axes.len() || buttons.len() != gamepad.buttons.len() {
+            if HOST.config.debug_mode {
+                println!("uh oh, gamepad update axes/buttons length mismatch {} {} {} {}", axes.len(), gamepad.axes.len(), buttons.len(), gamepad.buttons.len());
+            }
+            return;
+        }
+        // hats not implemented yet lol
     }
 
     pub fn find_gamepad(&self, id: *mut SDL_GameController) -> Option<&Gamepad> {
