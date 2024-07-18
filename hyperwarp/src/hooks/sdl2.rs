@@ -268,7 +268,7 @@ redhook::hook! {
 // Joystick hooks
 
 redhook::hook! {
-    unsafe fn SDL_numjoysticks() -> c_int => sdl_numjoysticks_first {
+    unsafe fn SDL_NumJoysticks() -> c_int => sdl_numjoysticks_first {
         if HOST.config.debug_mode {
             println!("SDL_numjoysticks called");
         }
@@ -276,7 +276,7 @@ redhook::hook! {
             if HOST.config.virtual_gamecontrollers {
                 HOST.input_manager.lock().unwrap().count_gamepads() as i32 // this would never overflow lol
             }else{
-                redhook::real!(SDL_numjoysticks_hw_direct)()
+                redhook::real!(SDL_NumJoysticks_hw_direct)()
             }
         } else {
             0
@@ -285,7 +285,7 @@ redhook::hook! {
 }
 
 redhook::hook! {
-    unsafe fn SDL_numjoysticks_hw_direct() -> c_int => sdl_numjoysticks_hw_direct {
+    unsafe fn SDL_NumJoysticks_hw_direct() -> c_int => sdl_numjoysticks_hw_direct {
         // shim so I can run redhook::real on it   
         println!("WARN: unreachable code SDL_numjoysticks_hw_direct executed");
         0
@@ -308,7 +308,7 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "SDL_GetKeyboardState" => Some(sdl_getkeyboardstate_first as *mut c_void),
         "SDL_DestroyWindow" => Some(sdl_destroywindow_first as *mut c_void),
         "SDL_PollEvent" => Some(sdl_pollevent_first as *mut c_void),
-        "SDL_numjoysticks" => Some(sdl_numjoysticks_first as *mut c_void),
+        "SDL_NumJoysticks" => Some(sdl_numjoysticks_first as *mut c_void),
         _ => None
     }
 }
