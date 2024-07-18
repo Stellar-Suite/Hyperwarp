@@ -278,6 +278,12 @@ pub enum StellarDirectControlMessage {
     RemoveGamepad {
         remote_id: String,
     },
+    #[serde(rename = "remove_gamepad_reply")]
+    RemoveGamepadReply {
+        remote_id: String,
+        success: bool,
+        message: String,
+    },
 }
 
 pub fn get_default_gamepad_type() -> GameControllerType {
