@@ -421,9 +421,21 @@ impl ApplicationHost {
                                                 send_main_tick_request(MainTickMessage::RequestDebugInfoV2(endpoint.clone()));
                                             },
                                             StellarMessage::ForwardedDataChannelMessage(source_socket_id, message) => {
+                                                if HOST.config.debug_mode {
+                                                    println!("Forwarded data channel message {:?} from socket id {:?}", message, source_socket_id);
+                                                }
                                                 match message {
-                                                    stellar_protocol::protocol::StellarDirectControlMessage::AddGamepad { local_id, product_type } => {
-
+                                                    stellar_protocol::protocol::StellarDirectControlMessage::AddGamepad { .. } => {
+                                                        send_main_tick_request(MainTickMessage::ProcessDirectMessage(endpoint, source_socket_id, message));
+                                                    },
+                                                    stellar_protocol::protocol::StellarDirectControlMessage::RequestTitle => {
+                                                        
+                                                    },
+                                                    StellarDirectControlMessage::UpdateGamepad { .. } => {
+                                                        send_main_tick_request(MainTickMessage::ProcessDirectMessage(endpoint, source_socket_id, message));
+                                                    },
+                                                    StellarDirectControlMessage::RemoveGamepad { .. } => {
+                                                        send_main_tick_request(MainTickMessage::ProcessDirectMessage(endpoint, source_socket_id, message));
                                                     },
                                                     _ => {
                                                         println!("Unhandled forwarded data channel message {:?} from socket id {:?}", message, source_socket_id);
