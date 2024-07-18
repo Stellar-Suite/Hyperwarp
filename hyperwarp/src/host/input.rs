@@ -108,12 +108,19 @@ impl Keyboard {
     }
 }
 
+pub struct GamepadInitializationSpecs {
+    pub axes: i32,
+    pub buttons: i32,
+    pub hats: i32,
+}
+
 pub struct Gamepad {
     pub name: String,
     pub usb_id: UsbIdentification,
     pub product_type: stellar_protocol::protocol::GameControllerType,
     pub id: String,
     pub sdl_id: Option<usize>
+    // TODO: axes, buttons vec
 }
 
 impl Gamepad {

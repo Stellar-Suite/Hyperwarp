@@ -209,7 +209,7 @@ impl ApplicationHost {
                 },
                 MainTickMessage::ProcessDirectMessage(endpoint, source, message) => {
                     match message {
-                        StellarDirectControlMessage::AddGamepad { local_id, product_type } => {
+                        StellarDirectControlMessage::AddGamepad { local_id, product_type, axes, buttons, hats } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
                                 let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type);
