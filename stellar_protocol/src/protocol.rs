@@ -255,13 +255,17 @@ pub enum StellarDirectControlMessage {
         local_id: String,
         #[serde(default = "get_default_gamepad_type")]
         product_type: GameControllerType,
+        axes: i32,
+        buttons: i32,
+        #[serde(default = "get_default_hats")]
+        hats: i32
     },
     #[serde(rename = "add_gamepad_reply")]
     AddGamepadReply {
         local_id: String,
         remote_id: String,
         success: bool,
-        message: String
+        message: String,
     },
     #[serde(rename = "update_gamepad")]
     UpdateGamepad {
@@ -276,6 +280,10 @@ pub enum StellarDirectControlMessage {
 
 pub fn get_default_gamepad_type() -> GameControllerType {
     GameControllerType::Xbox360
+}
+
+pub fn get_default_hats() -> i32 {
+    0
 }
 
 pub fn may_mutate_pipeline(message: &StellarFrontendMessage) -> bool {

@@ -297,7 +297,9 @@ impl InputManager {
         if feature_flags.sdl2_enabled {
             if gamepad.sdl_id.is_none() {
                 // Allocate virtual controller
-                let sdl_index = bind::sdl2::SDL_JoystickAttachVirtual()
+                let sdl_index = unsafe {
+                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, 0, 0, 0);
+                };
             }
         }
         self.gamepads.push(gamepad);

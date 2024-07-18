@@ -273,11 +273,12 @@ redhook::hook! {
             println!("SDL_numjoysticks called");
         }
         if HOST.config.enable_sdl2 {
-            if HOST.config.virtual_gamecontrollers {
+            /*if HOST.config.virtual_gamecontrollers {
                 HOST.input_manager.lock().unwrap().count_gamepads() as i32 // this would never overflow lol
             }else{
                 redhook::real!(SDL_NumJoysticks_hw_direct)()
-            }
+            }*/
+            redhook::real!(SDL_NumJoysticks_hw_direct)()
         } else {
             0
         }
