@@ -23,10 +23,11 @@ use std::thread; // for test func
 
 use crate::constants::{BLACKLISTED_PROCESS_NAMES, GAMEPAD_NAME};
 use crate::hooks::dlsym::check_cache_integrity;
-use crate::shim;
+use crate::{bind, shim};
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
 
+use super::feature_flags;
 use super::input::{Gamepad, GamepadInitializationSpecs, InputManager, Timestampable};
 use super::window::Window;
 use super::{
@@ -223,6 +224,7 @@ impl ApplicationHost {
                         StellarDirectControlMessage::UpdateGamepad { remote_id, axes, buttons, hats } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
+                                println!("updating le gamepad");
                                 input_manager_locked.update_gamepad(remote_id, axes, buttons, hats);
                             }
                         },
@@ -242,6 +244,19 @@ impl ApplicationHost {
         }
 
         self.input_manager.lock().unwrap().flush_queue();
+
+        {
+            // let feature_flags = HOST.features.lock().unwrap();
+            // TODO: feature flag this
+            /*if feature_flags.sdl2_enabled {
+                unsafe {
+                    let error = bind::sdl2_safe::SDL_GetError_safe();
+                    if error.len() > 0 {
+                        println!("SDL error: {}", error);
+                    }
+                }
+            }*/
+        }
     }
 
     pub fn sync(&self){

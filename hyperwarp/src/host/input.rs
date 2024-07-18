@@ -153,6 +153,14 @@ impl Gamepad {
     pub fn from_product_type(name: String, product_type: stellar_protocol::protocol::GameControllerType, init_specs: GamepadInitializationSpecs) -> Gamepad {
         Gamepad::new(name, UsbIdentification::from_product_type(product_type), product_type, init_specs)
     }
+
+    pub fn get_init_specs(&self) -> GamepadInitializationSpecs {
+        GamepadInitializationSpecs {
+            axes: self.axes.len() as i32,
+            buttons: self.buttons.len() as i32,
+            hats: self.hats.len() as i32,
+        }
+    }
 }
 
 pub trait Timestampable {
@@ -309,11 +317,12 @@ impl InputManager {
     pub fn add_gamepad(&mut self, mut gamepad: Gamepad) -> usize {
         let index = self.gamepads.len();
         let feature_flags = HOST.features.lock().unwrap();
+        let init_specs = gamepad.get_init_specs();
         if feature_flags.sdl2_enabled {
             if gamepad.sdl_id.is_none() {
                 // Allocate virtual controller
                 let sdl_device_index = unsafe {
-                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, 0, 0, 0)
+                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, init_specs.axes, init_specs.buttons, init_specs.hats)
                 };
                 let sdl_joystick_ref = unsafe {
                     bind::sdl2::SDL_JoystickOpen(sdl_device_index)
@@ -574,8 +583,10 @@ impl InputManager {
                     if let Some(gamepad) = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id) {
                         if feature_flags.sdl2_enabled {
                             unsafe {
+                                println!("virtual axis {} set to {} which scales to {}", axis, value, sdl2_translate_joystick_axis_value(value));
                                 bind::sdl2::SDL_JoystickSetVirtualAxis(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, axis as i32, sdl2_translate_joystick_axis_value(value));
                             }
+                            // println!("setting joystick axis");
                         }
                     }
                 },
@@ -584,8 +595,10 @@ impl InputManager {
                         if feature_flags.sdl2_enabled {
                             unsafe {
                                 let pressed_sdl2 = if pressed { SDL_PRESSED } else { SDL_RELEASED };
+                                println!("virtual button {} set to {} which is {}", button, pressed, pressed_sdl2);
                                 bind::sdl2::SDL_JoystickSetVirtualButton(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, button as i32, pressed_sdl2 as i8);
                             }
+                            // println!("setting joystick button");
                         }
                     }
                 },
