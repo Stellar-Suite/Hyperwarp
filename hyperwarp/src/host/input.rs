@@ -6,7 +6,7 @@ use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, In
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity};
+use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -113,6 +113,7 @@ pub struct Gamepad {
     pub usb_id: UsbIdentification,
     pub product_type: stellar_protocol::protocol::GameControllerType,
     pub id: String,
+    pub sdl_id: Option<usize>
 }
 
 impl Gamepad {
@@ -130,6 +131,7 @@ impl Gamepad {
             usb_id,
             product_type,
             id: Gamepad::generate_id(),
+            sdl_id: None
         }
     }
 
@@ -291,6 +293,13 @@ impl InputManager {
 
     pub fn add_gamepad(&mut self, gamepad: Gamepad) -> usize {
         let index = self.gamepads.len();
+        let feature_flags = HOST.features.lock().unwrap();
+        if feature_flags.sdl2_enabled {
+            if gamepad.sdl_id.is_none() {
+                // Allocate virtual controller
+                let sdl_index = bind::sdl2::SDL_JoystickAttachVirtual()
+            }
+        }
         self.gamepads.push(gamepad);
         // TODO: emit events
         index
