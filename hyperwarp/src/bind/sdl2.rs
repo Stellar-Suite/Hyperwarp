@@ -3,7 +3,7 @@
 // this is fine to spam call since it accesses internal variables
 // https://github.com/libsdl-org/SDL/blob/e264bb517827a2c9cf16570fd89385c0f1f7f344/src/video/SDL_video.c#L2623
 
-use sdl2_sys_lite::bindings::{SDL_Event, SDL_Joystick, SDL_JoystickID, SDL_JoystickType};
+use sdl2_sys_lite::bindings::{SDL_Event, SDL_Joystick, SDL_JoystickID, SDL_JoystickType, SDL_VirtualJoystickDesc};
 use stellar_shared::vendor::sdl_bindings::{SDL_KeyCode, SDL_Scancode};
 
 use crate::utils::manual_types::sdl2::SDL_Window;
@@ -53,6 +53,12 @@ lazy_static::lazy_static! {
     // joystick
     pub static ref SDL_JoystickAttachVirtual: unsafe extern "C" fn(type_: SDL_JoystickType, naxes: libc::c_int, nbuttons: libc::c_int, nhats: libc::c_int) -> libc::c_int = unsafe {
         let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_JoystickAttachVirtual_hw_direct\0".as_ptr() as _);
+        assert!(!ptr.is_null());
+        std::mem::transmute(ptr)
+    };
+
+    pub static ref SDL_JoystickAttachVirtualEx: unsafe extern "C" fn(desc: *const SDL_VirtualJoystickDesc) -> libc::c_int = unsafe {
+        let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_JoystickAttachVirtualEx_hw_direct\0".as_ptr() as _);
         assert!(!ptr.is_null());
         std::mem::transmute(ptr)
     };

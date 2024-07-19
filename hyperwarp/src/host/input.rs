@@ -322,7 +322,29 @@ impl InputManager {
             if gamepad.sdl_id.is_none() {
                 // Allocate virtual controller
                 let sdl_device_index = unsafe {
-                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, init_specs.axes, init_specs.buttons, init_specs.hats)
+                    // bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, init_specs.axes, init_specs.buttons, init_specs.hats)
+                    let desc = sdl2_sys_lite::bindings::SDL_VirtualJoystickDesc {
+                        version: sdl2_sys_lite::bindings::SDL_VIRTUAL_JOYSTICK_DESC_VERSION as u16,
+                        type_: sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER as u16,
+                        naxes: gamepad.axes.len() as u16,
+                        nbuttons: gamepad.buttons.len() as u16,
+                        nhats: gamepad.hats.len() as u16,
+                        vendor_id: gamepad.usb_id.vendor_id as u16,
+                        product_id: gamepad.usb_id.product_id as u16,
+                        padding: 0,
+                        button_mask: u32::MAX,
+                        axis_mask: u32::MAX,
+                        name: "Hyperwarp Virtual Gamepad".as_ptr() as *const libc::c_char,
+                        userdata: (&gamepad as *const Gamepad) as *mut libc::c_void,
+                        // TODO: implement the following
+                        Update: None,
+                        SetPlayerIndex: None,
+                        Rumble: None,
+                        RumbleTriggers: None,
+                        SetLED: None,
+                        SendEffect: None,
+                    };
+                    bind::sdl2::SDL_JoystickAttachVirtualEx(&desc as *const sdl2_sys_lite::bindings::SDL_VirtualJoystickDesc)
                 };
                 let sdl_joystick_ref = unsafe {
                     bind::sdl2::SDL_JoystickOpen(sdl_device_index)
