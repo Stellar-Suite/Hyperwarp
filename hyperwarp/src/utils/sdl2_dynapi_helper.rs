@@ -16,6 +16,8 @@ lazy_static! {
     };
 }
 
+pub static mut INTERNAL_JUMP_TABLE: [usize; 601] = [0; 601];
+
 pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tablesize: u32) -> i32 {
     if LOG_DLSYM {
         println!("modded SDL_DYNAPI_entry called, api ver: {}, table size: {}", apiver, tablesize);
@@ -23,7 +25,7 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
     let orig_func_ptr = query_dlsym_cache("SDL_DYNAPI_entry").expect("Grabbing original dlsym failed.").as_func();
     let orig_func: extern "C" fn(u32, *mut libc::c_void, u32) -> i32 = unsafe { std::mem::transmute(orig_func_ptr) };
     let result = orig_func(apiver, jump_table, tablesize);
-
+    let result_extension = orig_func(apiver, jump_table, tablesize);
     
 
     let bytes_per_pointer = std::mem::size_of::<*mut libc::c_void>();
@@ -31,20 +33,42 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
         println!("SDL_DYNAPI_entry modified, tablesize: {}, pointer size in bytes: {}", tablesize, bytes_per_pointer);
     }
 
+    if result < 0 {
+        println!("orig SDL_DYNAPI_entry returned {}, which is not ok", result);
+        return result;
+    }
+
+    let modern_ok = result_extension >= 0;
+    if result_extension < 0 {
+        println!("requesting new funcs with orig SDL_DYNAPI_entry returned {}, may affect avalibility of new functions like joystick emu", result_extension);
+    }
+
     {
         let mut dlsym_cache_locked = DLSYM_CACHE.lock().unwrap();
 
         let jump_table_usized: *mut usize = jump_table as *mut usize;
 
+        let internal_len = unsafe {
+            INTERNAL_JUMP_TABLE.len()
+        };
+
         for (i, func) in DYNAPI_FUNCS.iter().enumerate() {
-            if i > (tablesize as usize) {
+            if i > (tablesize as usize) && i > internal_len {
                 if LOG_DLSYM {
                     println!("skipping table index {} which contains {}", i, func);
                 }
                 continue;
             }
             let ptr_to_orig_ptr = unsafe {
-                jump_table_usized.offset(i as isize)
+                if i > (tablesize as usize) {
+                    // use internal jump table
+                    if !modern_ok {
+                        continue;
+                    }
+                    INTERNAL_JUMP_TABLE.get_mut(i).unwrap() as *mut usize
+                } else {
+                    jump_table_usized.offset(i as isize)
+                }
             };
             let orig_ptr = unsafe {
                 *ptr_to_orig_ptr
