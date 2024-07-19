@@ -77,6 +77,7 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
             if !ptr_to_orig_ptr.is_null() {
                 dlsym_cache_locked.insert(format!("{}_hw_sdl_dynapi", func), Pointer(orig_ptr as *const libc::c_void));
                 dlsym_cache_locked.insert(format!("{}", func), Pointer(orig_ptr as *const libc::c_void));
+                dlsym_cache_locked.insert(format!("{}_hw_direct", func), Pointer(orig_ptr as *const libc::c_void));
             } else {
                 println!("{}'s pointer is null {}", func, ptr_to_orig_ptr as usize);
             }
