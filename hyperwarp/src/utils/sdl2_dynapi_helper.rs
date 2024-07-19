@@ -86,9 +86,9 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
                 println!("{}'s pointer is null {}", func, ptr_to_orig_ptr as usize);
             }
             if let Some(alt_ptr) = crate::hooks::sdl2::try_modify_symbol(func){
-                if func == &"SDL_DYNAPI_entry" || func.starts_with("SDL_Init") {
+                /*if func == &"SDL_DYNAPI_entry" || func.starts_with("SDL_Init") {
                     continue; // No!
-                }
+                }*/
                 // set offset to our new function pointer
                 unsafe {
                     (jump_table.byte_offset((bytes_per_pointer * i) as isize) as *mut usize).write(alt_ptr as usize);
