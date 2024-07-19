@@ -20,7 +20,9 @@ pub const SDL_DYNAPI_TABLE_MAX_SIZE: usize = 1024;
 redhook::hook! {
     unsafe fn SDL_Init(flags: Uint32) -> c_int => sdl_init_first {
         if HOST.config.debug_mode {
-            println!("SDL_Init called");
+            println!("SDL_Init called...");
+            let bt = backtrace::Backtrace::new();
+            println!("init backtrace {:?}", bt);
         }
         if HOST.config.enable_sdl2 {
             redhook::real!(SDL_Init_hw_direct)(flags)

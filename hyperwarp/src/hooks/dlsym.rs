@@ -47,10 +47,10 @@ pub fn check_cache_integrity() {
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
-        // println!("dlsym: symbol name {}",symbol_name);
+        println!("dlsym: symbol name {}",symbol_name);
         // TODO: refactor the long if else into a map?
         let should_cache = symbol_name.starts_with("SDL_") || symbol_name.starts_with("glX") || symbol_name.starts_with("X");
-        if should_cache {
+        if should_cache && !symbol_name.ends_with("_hw_direct")  {
             // caching
 
             init_if_needed();
@@ -58,7 +58,7 @@ redhook::hook! {
             let symbol_cstring = CString::new(symbol_name).unwrap();
             let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
             if !symbol_pointer.is_null() {
-                println!("cache {} pointer {}",symbol_name,symbol_pointer as usize);
+                println!("cache real {} pointer {}",symbol_name,symbol_pointer as usize);
                 {
                     let mut cache = DLSYM_CACHE.lock().unwrap();
                     // println!("locked cache");
@@ -96,7 +96,7 @@ redhook::hook! {
                     return pointer;
                 }
             }
-            println!("direct resolving {} pointer {}",symbol_name,pointer as usize);
+            println!("direct resolving {} pointer to {}",symbol_name,pointer as usize);
             pointer
         // TODO: the transmute is not actually needed you can just cast to *mut c_void
         } else if symbol_name == "_internal_rust_launch" {

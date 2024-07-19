@@ -76,12 +76,19 @@ pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tab
             println!("SDL_dynapi helper: read the orig ptr as {} for {}", orig_ptr, func);
             if !ptr_to_orig_ptr.is_null() {
                 dlsym_cache_locked.insert(format!("{}_hw_sdl_dynapi", func), Pointer(orig_ptr as *const libc::c_void));
-                dlsym_cache_locked.insert(format!("{}", func), Pointer(orig_ptr as *const libc::c_void));
+                if !dlsym_cache_locked.contains_key(&format!("{}", func)) {
+                    dlsym_cache_locked.insert(format!("{}", func), Pointer(orig_ptr as *const libc::c_void));
+                }
+                // if !dlsym_cache_locked.contains_key(&format!("{}_hw_direct", func)) {
                 dlsym_cache_locked.insert(format!("{}_hw_direct", func), Pointer(orig_ptr as *const libc::c_void));
+                // }
             } else {
                 println!("{}'s pointer is null {}", func, ptr_to_orig_ptr as usize);
             }
             if let Some(alt_ptr) = crate::hooks::sdl2::try_modify_symbol(func){
+                if func == &"SDL_DYNAPI_entry" || func.starts_with("SDL_Init") {
+                    continue; // No!
+                }
                 // set offset to our new function pointer
                 unsafe {
                     (jump_table.byte_offset((bytes_per_pointer * i) as isize) as *mut usize).write(alt_ptr as usize);
