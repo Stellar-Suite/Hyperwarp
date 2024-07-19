@@ -1,7 +1,7 @@
 cd hyperwarp
-make all
+make all || exit 1
 echo Built hyperwarp
 cd ..
 cd streamerd
-cargo build
+cargo build || exit 1
 echo Built streamerd

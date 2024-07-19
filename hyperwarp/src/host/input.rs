@@ -327,6 +327,17 @@ impl InputManager {
                 let sdl_joystick_ref = unsafe {
                     bind::sdl2::SDL_JoystickOpen(sdl_device_index)
                 };
+                // reset everything
+                unsafe {
+                    for i in 0..gamepad.axes.len() {
+                        bind::sdl2::SDL_JoystickSetVirtualAxis(sdl_joystick_ref, i as i32, 0);
+                    }
+
+                    for i in 0..gamepad.buttons.len() {
+                        bind::sdl2::SDL_JoystickSetVirtualButton(sdl_joystick_ref, i as i32, SDL_RELEASED as i8);
+                    }
+                }
+
                 gamepad.sdl_id = Some(sdl_joystick_ref as usize);
                 let sdl_joystick_id = unsafe {
                     bind::sdl2::SDL_JoystickInstanceID(sdl_joystick_ref)
