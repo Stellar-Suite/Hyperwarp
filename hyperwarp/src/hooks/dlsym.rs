@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 
 use libc::{c_void, c_char};
 
-use crate::{shim, utils::{pointer::Pointer, sdl2_dynapi_helper}};
+use crate::{shim, utils::{pointer::Pointer, sdl2_dynapi::DYNAPI_FUNCS, sdl2_dynapi_helper}};
 
 use super::{glx, sdl2, xlib};
 
@@ -70,6 +70,24 @@ redhook::hook! {
             }
         }
 
+        if symbol_name == "SDL_Init" {
+            // cache hack of all time
+            for symbol in DYNAPI_FUNCS {
+                let symbol_cstring = CString::new(symbol_name).unwrap();
+                let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
+                if !symbol_pointer.is_null() {
+                    println!("sdl force cache cache real {} pointer {}",symbol_name,symbol_pointer as usize);
+                    {
+                        let mut cache = DLSYM_CACHE.lock().unwrap();
+                        cache.insert(format!("{}_hw_direct", symbol), Pointer(symbol_pointer));
+                    }
+                    // println!("unlocked cache");
+                } else {
+                    println!("sdl force cache caching {} pointer failed because we got a null pointer.", symbol_name);
+                }
+            }
+        }
+
         if symbol_name.ends_with("_hw_direct") {
             init_if_needed();
             // this is only slow for the one lookup yk
@@ -85,6 +103,7 @@ redhook::hook! {
                 if LOG_DLSYM {
                     println!("using dynapi bypass for {}", symbol_name);
                     let ptr = DLSYM_CACHE.lock().unwrap().get(&format!("{}_hw_sdl_dynapi", real_symbol_name)).unwrap().as_mut_func();
+                    println!("dynapi bypass gave {}", ptr as usize);
                     return ptr;
                 }
             }

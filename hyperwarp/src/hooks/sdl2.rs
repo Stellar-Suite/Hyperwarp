@@ -113,7 +113,7 @@ redhook::hook! {
     }
 }
 
-redhook::hook! {
+/*redhook::hook! {
     unsafe fn SDL_GL_SwapWindow(display: *mut SDL_Window) => sdl_gl_swapwindow_first {
         if HOST.config.tracing_mode {
             println!("SDL_GL_SwapWindow called");
@@ -131,7 +131,7 @@ redhook::hook! {
     unsafe fn SDL_GL_SwapWindow_hw_direct(display: *mut SDL_Window) => sdl_gl_swapwindow_hw_direct {
         // shim so I can run redhook::real on it   
     }
-}
+}*/
 
 redhook::hook! {
     unsafe fn SDL_RenderPresent(renderer: *mut SDL_Renderer) -> *const c_void => sdl_renderpresent_first {
@@ -354,7 +354,7 @@ pub fn try_modify_symbol(symbol_name: &str) -> Option<*mut c_void> {
         "SDL_Init" => Some(sdl_init_first as *mut c_void),
         "SDL_CreateWindow" => Some(sdl_createwindow_first as *mut c_void),
         "SDL_GL_SwapBuffers" => Some(sdl_gl_swapbuffers_first as *mut c_void),
-        "SDL_GL_SwapWindow" => Some(sdl_gl_swapwindow_first as *mut c_void),
+        // "SDL_GL_SwapWindow" => Some(sdl_gl_swapwindow_first as *mut c_void),
         "SDL_RenderPresent" => Some(sdl_renderpresent_first as *mut c_void),
         "SDL_SetWindowTitle" => Some(sdl_setwindowtitle_first as *mut c_void),
         "SDL_GetKeyboardState" => Some(sdl_getkeyboardstate_first as *mut c_void),
