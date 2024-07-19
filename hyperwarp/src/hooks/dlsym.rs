@@ -73,17 +73,20 @@ redhook::hook! {
         if symbol_name == "SDL_Init" {
             // cache hack of all time
             for symbol in DYNAPI_FUNCS {
-                let symbol_cstring = CString::new(symbol_name).unwrap();
+                let symbol_cstring = CString::new(symbol).unwrap();
                 let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
                 if !symbol_pointer.is_null() {
-                    println!("sdl force cache cache real {} pointer {}",symbol_name,symbol_pointer as usize);
+                    println!("sdl force cache cache real {} pointer {}",symbol,symbol_pointer as usize);
                     {
                         let mut cache = DLSYM_CACHE.lock().unwrap();
+                        if !cache.contains_key(symbol) {
+                            cache.insert(symbol.to_string(), Pointer(symbol_pointer));
+                        }
                         cache.insert(format!("{}_hw_direct", symbol), Pointer(symbol_pointer));
                     }
                     // println!("unlocked cache");
                 } else {
-                    println!("sdl force cache caching {} pointer failed because we got a null pointer.", symbol_name);
+                    println!("sdl force cache caching {} pointer failed because we got a null pointer.", symbol);
                 }
             }
         }
