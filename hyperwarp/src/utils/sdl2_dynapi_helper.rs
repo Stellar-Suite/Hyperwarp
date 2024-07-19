@@ -16,7 +16,7 @@ lazy_static! {
     };
 }
 
-pub static mut INTERNAL_JUMP_TABLE: [usize; 601] = [0; 601];
+pub static mut INTERNAL_JUMP_TABLE: [usize; 838] = [0; 838];
 
 pub fn SDL_DYNAPI_entry_modified(apiver: u32, jump_table: *mut libc::c_void, tablesize: u32) -> i32 {
     if LOG_DLSYM {
