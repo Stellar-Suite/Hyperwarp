@@ -78,6 +78,16 @@ redhook::hook! {
             if LOG_DLSYM {
                 println!("indirect resolving {} pointer",symbol_name);
             }
+            let cache_hit_dynapi = {
+                DLSYM_CACHE.lock().unwrap().contains_key(&format!("{}_hw_sdl_dynapi", real_symbol_name))
+            };
+            if cache_hit_dynapi {
+                if LOG_DLSYM {
+                    println!("using dynapi bypass for {}", symbol_name);
+                    let ptr = DLSYM_CACHE.lock().unwrap().get(&format!("{}_hw_sdl_dynapi", real_symbol_name)).unwrap().as_mut_func();
+                    return ptr;
+                }
+            }
             let pointer = odlsym(handle, symbol_string.as_ptr() as *const c_char);
             if pointer.is_null() {
                 println!("impending null pointer for {}",symbol_name);
