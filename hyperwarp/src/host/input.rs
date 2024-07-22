@@ -654,7 +654,7 @@ impl InputManager {
                         if feature_flags.sdl2_enabled {
                             let sdl_value = sdl2_translate_joystick_axis_value(value);
                             unsafe {
-                                println!("virtual axis {} set to {} which scales to {}", axis, value, sdl_value);
+                                // println!("virtual axis {} set to {} which scales to {}", axis, value, sdl_value);
                                 bind::sdl2::SDL_JoystickSetVirtualAxis(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, axis as i32, sdl_value);
                             }
                             // println!("setting joystick axis");
@@ -666,7 +666,7 @@ impl InputManager {
                         if feature_flags.sdl2_enabled {
                             unsafe {
                                 let pressed_sdl2 = if pressed { SDL_PRESSED } else { SDL_RELEASED };
-                                println!("virtual button {} set to {} which is {}", button, pressed, pressed_sdl2);
+                                // println!("virtual button {} set to {} which is {}", button, pressed, pressed_sdl2);
                                 bind::sdl2::SDL_JoystickSetVirtualButton(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, button as i32, pressed_sdl2 as i8);
                             }
                             // println!("setting joystick button");
