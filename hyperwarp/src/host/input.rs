@@ -166,7 +166,7 @@ impl Gamepad {
             id: Gamepad::generate_id(),
             sdl_id: None,
             sdl_instance_id: None,
-            state: GamepadState::new(init_specs.axes, init_specs.buttons, init_specs.hats),
+            state: GamepadState::new(init_specs.axes as usize, init_specs.buttons as usize, init_specs.hats as usize),
         }
     }
 
@@ -373,11 +373,11 @@ impl InputManager {
                 };
                 // reset everything
                 unsafe {
-                    for i in 0..gamepad.axes.len() {
+                    for i in 0..gamepad.state.axes.len() {
                         bind::sdl2::SDL_JoystickSetVirtualAxis(sdl_joystick_ref, i as i32, 0);
                     }
 
-                    for i in 0..gamepad.buttons.len() {
+                    for i in 0..gamepad.state.buttons.len() {
                         bind::sdl2::SDL_JoystickSetVirtualButton(sdl_joystick_ref, i as i32, SDL_RELEASED as i8);
                     }
                 }
@@ -406,16 +406,16 @@ impl InputManager {
         let mut pending_events: Vec<InputEvent> = Vec::new();
         {
             if let Some(gamepad) = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id) {
-                if axes.len() != gamepad.axes.len() || buttons.len() != gamepad.buttons.len() {
+                if axes.len() != gamepad.state.axes.len() || buttons.len() != gamepad.state.buttons.len() {
                     if HOST.config.debug_mode {
-                        println!("uh oh, gamepad update axes/buttons length mismatch {} {} {} {}", axes.len(), gamepad.axes.len(), buttons.len(), gamepad.buttons.len());
+                        println!("uh oh, gamepad update axes/buttons length mismatch {} {} {} {}", axes.len(), gamepad.state.axes.len(), buttons.len(), gamepad.state.buttons.len());
                     }
                     return;
                 }
 
                 for (i, axis) in axes.iter().enumerate() {
-                    if gamepad.axes[i] != *axis {
-                        gamepad.axes[i] = *axis;
+                    if gamepad.state.axes[i] != *axis {
+                        gamepad.state.axes[i] = *axis;
                         let change_event = Self::new_timestamped_input_event(InputEventPayload::JoystickAxis {
                             id: id.clone(),
                             axis: i as u8,
@@ -426,8 +426,8 @@ impl InputManager {
                 }
 
                 for (i, button) in buttons.iter().enumerate() {
-                    if gamepad.buttons[i] != *button {
-                        gamepad.buttons[i] = *button;
+                    if gamepad.state.buttons[i] != *button {
+                        gamepad.state.buttons[i] = *button;
                         let change_event = Self::new_timestamped_input_event(InputEventPayload::JoystickButton {
                             id: id.clone(),
                             button: i as u8,
