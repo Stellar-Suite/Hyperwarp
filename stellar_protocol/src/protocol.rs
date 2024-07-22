@@ -150,6 +150,7 @@ pub enum StellarMessage {
     ForwardedDataChannelMessage(String, StellarDirectControlMessage),
     // reciever, channel, message
     ReplyDataChannelMessage(String, String, StellarDirectControlMessage),
+    BroadcastDataChannelMessage(String, StellarDirectControlMessage),
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

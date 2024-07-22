@@ -53,6 +53,7 @@ pub enum InternalMessage {
     AddDataChannelForSocket(String, WebRTCDataChannel, bool), // last bool is for if it originated from the client
     ProcessDirectMessage(String, stellar_protocol::protocol::StellarDirectControlMessage),
     SendDirectMessage(String, String, stellar_protocol::protocol::StellarDirectControlMessage),
+    BroadcastDirectMessage(String, stellar_protocol::protocol::StellarDirectControlMessage),
 }
 
 pub struct SystemHints {
@@ -1174,6 +1175,14 @@ impl Streamer {
                             }
                         }
                     },
+                    InternalMessage::BroadcastDirectMessage(channel_label, message) => {
+                        for (socket_id, rtc_peer) in downstream_peers.iter() {
+                            rtc_peer.get_data_channels().iter().for_each(|channel| {
+                                let serialized_message = serde_json::to_string(&message).expect("Could not serialize message");
+                                channel.send_string(Some(&serialized_message))
+                            })
+                        }
+                    }
                     _ => { // if thi warns about unreachable code, it's very good because we implemented everything
                         // TODO: print more descriptive
                         println!("BAD: Unimplemented message {:#?}", imsg.type_id());
@@ -1377,7 +1386,11 @@ impl Streamer {
                                                 StellarMessage::ReplyDataChannelMessage(source, channel, direct_message) => {
                                                     println!("Reply data channel message from hyperwarp ({}): {:?}", source, direct_message);
                                                     streaming_cmd_queue.send(InternalMessage::SendDirectMessage(source, channel, direct_message));
-                                                }
+                                                },
+                                                StellarMessage::BroadcastDataChannelMessage(channel, direct_message) => {
+                                                    println!("Broadcast data channel message from hyperwarp: {:?}", direct_message);
+                                                    streaming_cmd_queue.send(InternalMessage::BroadcastDirectMessage(channel, direct_message));
+                                                },
                                                 _ => {
 
                                                 }

@@ -212,7 +212,7 @@ impl ApplicationHost {
                 MainTickMessage::ProcessDirectMessage(endpoint, source, message) => {
                     match message {
                         StellarDirectControlMessage::AddGamepad { local_id, product_type, axes, buttons, hats } => {
-                            {
+                            if axes < 16 && buttons < 32 && hats == 0{
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
                                 // TODO; fail when we have unreasonable amount of axes/buttons
                                 let internal_axes = calc_axes_for_virtual_gamepad(axes as u8);
@@ -223,6 +223,9 @@ impl ApplicationHost {
                                 let added_message = format!("Added gamepad {}", index + 1);
                                 let direct_message = StellarDirectControlMessage::AddGamepadReply { local_id, remote_id: chosen_id, success: true, message: added_message };
                                 self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
+                            } else {
+                                let direct_message = StellarDirectControlMessage::AddGamepadReply { local_id, remote_id: "".to_string(), success: false, message: format!("Could not add gamepad, too many axes/buttons/hats") };
+                                self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
                             }
                         }
                         StellarDirectControlMessage::RemoveGamepad { remote_id } => {
@@ -230,7 +233,7 @@ impl ApplicationHost {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
                                 if let Some(gamepad) = input_manager_locked.remove_gamepad(&remote_id) {
                                     let direct_message = StellarDirectControlMessage::RemoveGamepadReply { remote_id, success: true, message: format!("Removed gamepad {}", gamepad.id) };
-                                    // TODO: impl broadcast
+                                    self.send_to(endpoint, &StellarMessage::BroadcastDataChannelMessage("reliable".to_string(), direct_message));
                                 } else {
                                     let direct_message = StellarDirectControlMessage::RemoveGamepadReply { remote_id: remote_id.clone(), success: false, message: format!("Could not find gamepad {}, perhaps it was removed earlier?", &remote_id) };
                                     self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
