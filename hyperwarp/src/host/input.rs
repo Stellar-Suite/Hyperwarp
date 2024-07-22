@@ -6,7 +6,7 @@ use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, In
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, sdl2_translate_joystick_axis_value}};
+use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, convert_update_to_sdl_form, sdl2_translate_joystick_axis_value}};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -404,7 +404,7 @@ impl InputManager {
         self.gamepads.iter().find(|gamepad| gamepad.sdl_id == Some(sdl_id))
     }
 
-    pub fn update_gamepad(&mut self, id: String, axes: Vec<f64>, buttons: Vec<bool>, hats: Option<Vec<i32>>) {
+    pub fn update_gamepad(&mut self, id: &str, axes: Vec<f64>, buttons: Vec<bool>, hats: Option<Vec<i32>>) {
         let mut pending_events: Vec<InputEvent> = Vec::new();
         {
             if let Some(gamepad) = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id) {
@@ -419,7 +419,7 @@ impl InputManager {
                     if gamepad.state.axes[i] != *axis {
                         gamepad.state.axes[i] = *axis;
                         let change_event = Self::new_timestamped_input_event(InputEventPayload::JoystickAxis {
-                            id: id.clone(),
+                            id: id.to_string(),
                             axis: i as u8,
                             value: *axis,
                         });
@@ -431,7 +431,7 @@ impl InputManager {
                     if gamepad.state.buttons[i] != *button {
                         gamepad.state.buttons[i] = *button;
                         let change_event = Self::new_timestamped_input_event(InputEventPayload::JoystickButton {
-                            id: id.clone(),
+                            id: id.to_string(),
                             button: i as u8,
                             pressed: *button
                         });
@@ -447,6 +447,10 @@ impl InputManager {
         }
 
         // hats not implemented yet lol
+    }
+
+    pub fn update_gamepad_state(&mut self, id: &str, state: GamepadState) {
+        self.update_gamepad(id, state.axes,state.buttons, Some(state.hats));
     }
 
     pub fn find_gamepad(&self, id: *mut SDL_GameController) -> Option<&Gamepad> {
@@ -695,6 +699,10 @@ impl InputManager {
             InputEventPayload::MouseButtonsChange { change, state } => {
                 let new_buttons = self.calculate_change(change, state);
                 self.set_mouse_buttons(new_buttons);
+            },
+            InputEventPayload::JoystickBrowserUpdate { .. } => {
+                let (id, updated_state) = convert_update_to_sdl_form(&event); 
+                self.update_gamepad_state(id, updated_state);
             },
             _ => {
                 if HOST.config.debug_mode {

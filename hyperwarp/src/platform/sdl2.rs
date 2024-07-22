@@ -29,7 +29,7 @@ pub fn calc_axes_for_virtual_gamepad(axes_count: u8) -> u8 {
 
 // https://stackoverflow.com/questions/76296734/game-controller-button-number-incompability-between-sdl2-and-other-tools-window
 // https://stackoverflow.com/a/76310551
-pub fn convert_update_to_sdl_form(event: &InputEvent) -> GamepadState {
+pub fn convert_update_to_sdl_form(event: &InputEvent) -> (&String, GamepadState) {
     // TODO: clean this code up
     match &event.payload {
         InputEventPayload::JoystickBrowserUpdate { id, axis: axes, buttons } => {
@@ -115,7 +115,7 @@ pub fn convert_update_to_sdl_form(event: &InputEvent) -> GamepadState {
                 state.axes[SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_RIGHTY as usize] = axes[3];
             }
 
-            state
+            (&id, state)
         },
         _ => {
             panic!("convert_update_to_sdl_form does not handle this event {:?}", event.payload);
