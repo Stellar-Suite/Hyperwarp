@@ -47,7 +47,9 @@ pub fn check_cache_integrity() {
 redhook::hook! {
     unsafe fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void => dlsym_first {
         let symbol_name = std::ffi::CStr::from_ptr(symbol).to_str().unwrap();
-        println!("dlsym: symbol name {}",symbol_name);
+        if LOG_DLSYM {
+            println!("dlsym: symbol name {}",symbol_name);
+        }
         // TODO: refactor the long if else into a map?
         let should_cache = symbol_name.starts_with("SDL_") || symbol_name.starts_with("glX") || symbol_name.starts_with("X");
         if should_cache && !symbol_name.ends_with("_hw_direct")  {
@@ -58,7 +60,9 @@ redhook::hook! {
             let symbol_cstring = CString::new(symbol_name).unwrap();
             let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
             if !symbol_pointer.is_null() {
-                println!("cache real {} pointer {}",symbol_name,symbol_pointer as usize);
+                if LOG_DLSYM {
+                    println!("cache real {} pointer {}",symbol_name,symbol_pointer as usize);
+                }
                 {
                     let mut cache = DLSYM_CACHE.lock().unwrap();
                     // println!("locked cache");
@@ -66,7 +70,9 @@ redhook::hook! {
                 }
                 // println!("unlocked cache");
             } else {
-                println!("caching {} pointer failed because we got a null pointer.", symbol_name);
+                if LOG_DLSYM {
+                    println!("caching {} pointer failed because we got a null pointer.", symbol_name);
+                }
             }
         }
 
@@ -76,7 +82,9 @@ redhook::hook! {
                 let symbol_cstring = CString::new(symbol).unwrap();
                 let symbol_pointer = odlsym(handle, symbol_cstring.as_ptr() as *const c_char);
                 if !symbol_pointer.is_null() {
-                    println!("sdl force cache cache real {} pointer {}",symbol,symbol_pointer as usize);
+                    if LOG_DLSYM {
+                        println!("sdl force cache cache real {} pointer {}",symbol,symbol_pointer as usize);
+                    }
                     {
                         let mut cache = DLSYM_CACHE.lock().unwrap();
                         if !cache.contains_key(symbol) {
@@ -86,7 +94,9 @@ redhook::hook! {
                     }
                     // println!("unlocked cache");
                 } else {
-                    println!("sdl force cache caching {} pointer failed because we got a null pointer.", symbol);
+                    if LOG_DLSYM {
+                        println!("sdl force cache caching {} pointer failed because we got a null pointer.", symbol);
+                    }
                 }
             }
         }
@@ -112,18 +122,24 @@ redhook::hook! {
             }
             let pointer = odlsym(handle, symbol_string.as_ptr() as *const c_char);
             if pointer.is_null() {
-                println!("impending null pointer for {}",symbol_name);
+                if LOG_DLSYM {
+                    println!("impending null pointer for {}",symbol_name);
+                }
                 let cache_hit = {
                     DLSYM_CACHE.lock().unwrap().contains_key(&real_symbol_name)
                 };
                 if cache_hit && USE_CACHE_WORKAROUND {
-                    println!("luckily the cache contains the symbol");
+                    if LOG_DLSYM {
+                        println!("luckily the cache contains the symbol");
+                    }
                     let pointer = {
                         DLSYM_CACHE.lock().unwrap().get(&real_symbol_name).unwrap().as_mut_func()
                     };
                     // this shouldn't trigger
                     if pointer.is_null() {
-                        println!("that pointer is also null :( it is {}", pointer as usize);
+                        if LOG_DLSYM {
+                            println!("that pointer is also null :( it is {}", pointer as usize);
+                        }
                     }
                     return pointer;
                 }
