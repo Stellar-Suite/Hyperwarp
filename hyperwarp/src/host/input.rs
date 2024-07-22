@@ -369,7 +369,7 @@ impl InputManager {
                     println!("attach begin");
                     bind::sdl2::SDL_JoystickAttachVirtualEx(&desc as *const sdl2_sys_lite::bindings::SDL_VirtualJoystickDesc)*/
                 };
-                println!("didn't die after attaching");
+                // println!("didn't die after attaching");
                 let sdl_joystick_ref = unsafe {
                     bind::sdl2::SDL_JoystickOpen(sdl_device_index)
                 };
@@ -530,7 +530,7 @@ impl InputManager {
                             }
                         }
 
-                        println!("pushed event new kbd event");
+                        // println!("pushed event new kbd event");
                     }
                     // println!("pushed event new kbd event in {}ms", start_time.elapsed().as_millis());
                 },
