@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 
-use sdl2_sys_lite::bindings::SDL_Event;
+use sdl2_sys_lite::bindings::{SDL_Event, SDL_JoystickID};
 use stellar_shared::vendor::sdl_bindings::{SDL_KeyCode, SDL_Scancode};
 
 use crate::utils::manual_types::sdl2::SDL_Window;
@@ -48,4 +48,15 @@ pub fn SDL_GetScancodeFromKey_safe(key: SDL_KeyCode) -> SDL_Scancode {
     unsafe {
         super::sdl2::SDL_GetScancodeFromKey(key)
     }
+}
+
+pub fn find_device_index_by_instance_id(inst: SDL_JoystickID) -> Option<i32> {
+    let count = unsafe { super::sdl2::SDL_NumJoysticks() };
+    for i in 0..count {
+        let id = unsafe { super::sdl2::SDL_JoystickGetDeviceInstanceID(i) };
+        if id == inst {
+            return Some(i);
+        }
+    }
+    None
 }

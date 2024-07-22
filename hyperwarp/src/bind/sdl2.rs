@@ -96,6 +96,13 @@ lazy_static::lazy_static! {
         std::mem::transmute(ptr)
     };
 
+    // int SDL_NumJoysticks(void);
+    pub static ref SDL_NumJoysticks: unsafe extern "C" fn() -> libc::c_int = unsafe {
+        let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_NumJoysticks_hw_direct\0".as_ptr() as _);
+        assert!(!ptr.is_null());
+        std::mem::transmute(ptr)
+    };
+
     pub static ref SDL_JoystickOpen: unsafe extern "C" fn(device_index: libc::c_int) -> *mut SDL_Joystick = unsafe {
         let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_JoystickOpen_hw_direct\0".as_ptr() as _);
         assert!(!ptr.is_null());
@@ -110,6 +117,14 @@ lazy_static::lazy_static! {
 
     pub static ref SDL_JoystickInstanceID: unsafe extern "C" fn(joystick: *mut SDL_Joystick) -> SDL_JoystickID = unsafe {
         let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_JoystickInstanceID_hw_direct\0".as_ptr() as _);
+        assert!(!ptr.is_null());
+        std::mem::transmute(ptr)
+    };
+
+    // we need this from bruteforcing the device index
+    // SDL_JoystickID SDL_JoystickGetDeviceInstanceID(int device_index);
+    pub static ref SDL_JoystickGetDeviceInstanceID: unsafe extern "C" fn(device_index: libc::c_int) -> SDL_JoystickID = unsafe {
+        let ptr = libc::dlsym(libc::RTLD_NEXT, b"SDL_JoystickGetDeviceInstanceID_hw_direct\0".as_ptr() as _);
         assert!(!ptr.is_null());
         std::mem::transmute(ptr)
     };

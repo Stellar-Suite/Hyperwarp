@@ -1,12 +1,12 @@
 use std::{collections::HashMap, time::Instant};
 
 use backtrace::Backtrace;
-use sdl2_sys_lite::bindings::{SDL_GameController, SDL_Joystick, SDL_PRESSED, SDL_RELEASED};
+use sdl2_sys_lite::bindings::{SDL_GameController, SDL_Joystick, SDL_JoystickID, SDL_PRESSED, SDL_RELEASED};
 use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, InputMetadata, UsbIdentification};
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, convert_update_to_sdl_form, sdl2_translate_gamecontroller_axis_value_for_trigger, sdl2_translate_joystick_axis_value, SDL_JOYSTICK_MIN_AXIS_VALUE}};
+use crate::{bind::{self, sdl2::SDL_JoystickClose, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, convert_update_to_sdl_form, sdl2_translate_gamecontroller_axis_value_for_trigger, sdl2_translate_joystick_axis_value, SDL_JOYSTICK_MIN_AXIS_VALUE}};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -467,9 +467,33 @@ impl InputManager {
         self.gamepads.len()
     }
 
-    pub fn remove_gamepad(&mut self, index: usize) {
+    pub fn remove_gamepad(&mut self, id: &str) -> Option<Gamepad> {
         // TODO: emit events
-        self.gamepads.remove(index);
+        let features = HOST.features.lock().unwrap();
+        match self.gamepads.iter().position(|gamepad| gamepad.id == id) {
+            Some(index) => {
+                let mut gamepad = self.gamepads.remove(index);
+                if features.sdl2_enabled {
+                    if let Some(sdl_inst_id) = gamepad.sdl_instance_id {
+                        let joystick_id = sdl_inst_id as SDL_JoystickID;
+                        if let Some(joystick_index) = bind::sdl2_safe::find_device_index_by_instance_id(joystick_id) {
+                            unsafe {
+                                bind::sdl2::SDL_JoystickClose(gamepad.sdl_id.unwrap() as *mut SDL_Joystick);
+                                bind::sdl2::SDL_JoystickDetachVirtual(joystick_index);
+                            }
+                        } else {
+                            println!("uh oh, couldn't find joystick index for joystick instance id {} to close", joystick_id);
+                        }
+                    }
+                    gamepad.sdl_id = None;
+                    gamepad.sdl_instance_id = None;
+                }
+                Some(gamepad)
+            },
+            None => {
+                None
+            }
+        }
     }
 
     pub fn flush_queue(&mut self) {
