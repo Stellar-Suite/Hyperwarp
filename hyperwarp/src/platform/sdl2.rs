@@ -13,13 +13,23 @@ pub fn sdl2_translate_mouse_state(state: u8) -> u8 {
     state // don't need to atm?
 }
 
+pub const SDL_JOYSTICK_MIN_AXIS_VALUE: i16 = -32768;
+pub const SDL_JOYSTICK_MAX_AXIS_VALUE: i16 = 32767;
+pub const SDL_JOYSTICK_MIN_AXIS_VALUE_F64: f64 = -32768f64;
+pub const SDL_JOYSTICK_MAX_AXIS_VALUE_F64: f64 = 32767f64;
+
 pub fn sdl2_translate_joystick_axis_value(value: f64) -> i16 {
-    let floated = (value * 32767.0).clamp(-32768.0, 32767.0);
+    let multiplier = if value > 0.0 {
+        32767.0
+    } else {
+        32768.0
+    };
+    let floated = (value * multiplier).clamp(SDL_JOYSTICK_MIN_AXIS_VALUE_F64, SDL_JOYSTICK_MAX_AXIS_VALUE_F64);
     floated as i16
 }
 
 // firefox inits at 0, off is -1, on is 1
-pub fn sdl2_translate_joystick_axis_value_for_trigger(value: f64) -> i16 {
+pub fn sdl2_translate_gamecontroller_axis_value_for_trigger(value: f64) -> i16 {
     let floated = value.clamp(0.0, 1.0) * 32767.0;
     floated as i16
 }
