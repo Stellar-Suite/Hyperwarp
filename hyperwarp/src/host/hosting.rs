@@ -228,7 +228,13 @@ impl ApplicationHost {
                         StellarDirectControlMessage::RemoveGamepad { remote_id } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
-                                
+                                if let Some(gamepad) = input_manager_locked.remove_gamepad(&remote_id) {
+                                    let direct_message = StellarDirectControlMessage::RemoveGamepadReply { remote_id, success: true, message: format!("Removed gamepad {}", gamepad.id) };
+                                    // TODO: impl broadcast
+                                } else {
+                                    let direct_message = StellarDirectControlMessage::RemoveGamepadReply { remote_id: remote_id.clone(), success: false, message: format!("Could not find gamepad {}, perhaps it was removed earlier?", &remote_id) };
+                                    self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
+                                }
                             }
                         },
                         _ => {

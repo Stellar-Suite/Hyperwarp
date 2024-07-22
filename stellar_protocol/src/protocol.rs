@@ -279,6 +279,7 @@ pub enum StellarDirectControlMessage {
         remote_id: String,
     },
     #[serde(rename = "remove_gamepad_reply")]
+    // for consistency this will be broadcasted to all clients on success ONLY
     RemoveGamepadReply {
         remote_id: String,
         success: bool,
