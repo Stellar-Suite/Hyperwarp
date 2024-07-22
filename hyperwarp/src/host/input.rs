@@ -114,6 +114,30 @@ pub struct GamepadInitializationSpecs {
     pub hats: i32,
 }
 
+pub struct GamepadState {
+    pub axes: Vec<f64>,
+    pub buttons: Vec<bool>,
+    pub hats: Vec<i32>,
+}
+
+impl GamepadState {
+    pub fn from_gamepad_init_specs(init_specs: GamepadInitializationSpecs) -> GamepadState {
+        GamepadState {
+            axes: vec![0.0; init_specs.axes as usize],
+            buttons: vec![false; init_specs.buttons as usize],
+            hats: vec![0; init_specs.hats as usize],
+        }
+    }
+
+    pub fn new(axes: usize, buttons: usize, hats: usize) -> GamepadState {
+        GamepadState {
+            axes: vec![0.0; axes],
+            buttons: vec![false; buttons],
+            hats: vec![0; hats],
+        }
+    }
+}
+
 pub struct Gamepad {
     pub name: String,
     pub usb_id: UsbIdentification,
@@ -121,9 +145,7 @@ pub struct Gamepad {
     pub id: String,
     pub sdl_id: Option<usize>,
     pub sdl_instance_id: Option<i32>,
-    pub axes: Vec<f64>,
-    pub buttons: Vec<bool>,
-    pub hats: Vec<i32>,
+    pub state: GamepadState,
     // TODO: axes, buttons vec
 }
 
@@ -144,9 +166,7 @@ impl Gamepad {
             id: Gamepad::generate_id(),
             sdl_id: None,
             sdl_instance_id: None,
-            axes: vec![0.0; init_specs.axes as usize],
-            buttons: vec![false; init_specs.buttons as usize],
-            hats: vec![0; init_specs.hats as usize],
+            state: GamepadState::new(init_specs.axes, init_specs.buttons, init_specs.hats),
         }
     }
 
@@ -156,9 +176,9 @@ impl Gamepad {
 
     pub fn get_init_specs(&self) -> GamepadInitializationSpecs {
         GamepadInitializationSpecs {
-            axes: self.axes.len() as i32,
-            buttons: self.buttons.len() as i32,
-            hats: self.hats.len() as i32,
+            axes: self.state.axes.len() as i32,
+            buttons: self.state.buttons.len() as i32,
+            hats: self.state.hats.len() as i32,
         }
     }
 }

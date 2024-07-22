@@ -438,6 +438,11 @@ pub enum InputEventPayload {
         change: u8,
         state: bool,
     },
+    JoystickBrowserUpdate {
+        id: String,
+        axis: Vec<f64>,
+        buttons: Vec<bool>,
+    },
     JoystickAxis {
         id: String,
         axis: u8,

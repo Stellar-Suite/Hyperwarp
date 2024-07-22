@@ -220,14 +220,7 @@ impl ApplicationHost {
                                 let direct_message = StellarDirectControlMessage::AddGamepadReply { local_id, remote_id: chosen_id, success: true, message: added_message };
                                 self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
                             }
-                        },
-                        StellarDirectControlMessage::UpdateGamepad { remote_id, axes, buttons, hats } => {
-                            {
-                                let mut input_manager_locked = self.input_manager.lock().unwrap();
-                                println!("updating le gamepad");
-                                input_manager_locked.update_gamepad(remote_id, axes, buttons, hats);
-                            }
-                        },
+                        }
                         StellarDirectControlMessage::RemoveGamepad { remote_id } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
@@ -459,7 +452,10 @@ impl ApplicationHost {
                                                         
                                                     },
                                                     StellarDirectControlMessage::UpdateGamepad { .. } => {
-                                                        send_main_tick_request(MainTickMessage::ProcessDirectMessage(endpoint, source_socket_id, message));
+                                                        {
+                                                            let mut input_manager_locked = input_manager.lock().unwrap();
+                                                            input_manager_locked.update_gamepad(remote_id, axes, buttons, hats);
+                                                        }
                                                     },
                                                     StellarDirectControlMessage::RemoveGamepad { .. } => {
                                                         send_main_tick_request(MainTickMessage::ProcessDirectMessage(endpoint, source_socket_id, message));
