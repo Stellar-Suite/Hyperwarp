@@ -6,7 +6,7 @@ use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, In
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, convert_update_to_sdl_form, sdl2_translate_joystick_axis_value}};
+use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, convert_update_to_sdl_form, sdl2_translate_joystick_axis_value, sdl2_translate_joystick_axis_value_for_trigger}};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -647,9 +647,14 @@ impl InputManager {
                 InputEventPayload::JoystickAxis { id, axis, value } => {
                     if let Some(gamepad) = self.gamepads.iter_mut().find(|gamepad| gamepad.id == id) {
                         if feature_flags.sdl2_enabled {
+                            let sdl_value = if axis < 4 {
+                                sdl2_translate_joystick_axis_value(value)
+                            } else {
+                                sdl2_translate_joystick_axis_value_for_trigger(value)
+                            };
                             unsafe {
-                                println!("virtual axis {} set to {} which scales to {}", axis, value, sdl2_translate_joystick_axis_value(value));
-                                bind::sdl2::SDL_JoystickSetVirtualAxis(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, axis as i32, sdl2_translate_joystick_axis_value(value));
+                                println!("virtual axis {} set to {} which scales to {}", axis, value, sdl_value);
+                                bind::sdl2::SDL_JoystickSetVirtualAxis(gamepad.sdl_id.unwrap() as *mut SDL_Joystick, axis as i32, sdl_value);
                             }
                             // println!("setting joystick axis");
                         }

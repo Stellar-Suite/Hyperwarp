@@ -18,6 +18,12 @@ pub fn sdl2_translate_joystick_axis_value(value: f64) -> i16 {
     floated as i16
 }
 
+// firefox inits at 0, off is -1, on is 1
+pub fn sdl2_translate_joystick_axis_value_for_trigger(value: f64) -> i16 {
+    let floated = value.clamp(0.0, 1.0) * 32767.0;
+    floated as i16
+}
+
 // apparently a little lying needs to be done
 pub fn calc_btns_for_virtual_gamepad(buttons_count: u8) -> u8 {
     max(21, buttons_count)
@@ -113,6 +119,15 @@ pub fn convert_update_to_sdl_form(event: &InputEvent) -> (&String, GamepadState)
 
             if axes.len() > 3 {
                 state.axes[SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_RIGHTY as usize] = axes[3];
+            }
+
+            if axes.len() > 4 {
+                // firefox actually gives trigger status
+                state.axes[SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_TRIGGERLEFT as usize] = axes[4];
+            }
+
+            if axes.len() > 5 {
+                state.axes[SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_TRIGGERRIGHT as usize] = axes[5];
             }
 
             (&id, state)
