@@ -48,4 +48,5 @@ debug = false
 
 [features]
 log_dlsym = []
+deep_gamepads = []
 default = []
