@@ -62,12 +62,14 @@ pub fn convert_update_to_sdl_form(event: &InputEvent) -> (&String, GamepadState)
             }
             // next two correspond to axis so we ignore their button positioning
             // we rescale later
-            if axes.len() > 4 {
+            /*if axes.len() > 4 {
                 state.axes[SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_TRIGGERLEFT as usize] = axes[4];
             }
             if axes.len() > 5 {
                 state.axes[SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_TRIGGERRIGHT as usize] = axes[5];
-            }
+            }*/
+
+            // code moved to bottom
             
             if buttons.len() > 8 {
                 state.buttons[SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_BACK as usize] = buttons[8];
