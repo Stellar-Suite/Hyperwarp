@@ -6,7 +6,7 @@ use stellar_protocol::protocol::{InputContext, InputEvent, InputEventPayload, In
 use stellar_shared::constants::sdl2::*;
 use stellar_shared::vendor::sdl_bindings::SDL_KeyCode;
 
-use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::sdl2_translate_joystick_axis_value};
+use crate::{bind::{self, sdl2_safe::{self, SDL_GetScancodeFromKey_safe, SDL_GetTicks_safe, SDL_PushEvent_safe}}, constants::sdl2::SDL_OUR_FAKE_MOUSEID, hooks::dlsym::check_cache_integrity, platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad, sdl2_translate_joystick_axis_value}};
 
 use super::{feature_flags, hosting::HOST};
 
@@ -342,7 +342,9 @@ impl InputManager {
             if gamepad.sdl_id.is_none() {
                 // Allocate virtual controller
                 let sdl_device_index = unsafe {
-                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, init_specs.axes, init_specs.buttons, init_specs.hats)
+                    let btns_count = calc_btns_for_virtual_gamepad(init_specs.buttons as u8);
+                    let axes_count = calc_axes_for_virtual_gamepad(init_specs.axes as u8);
+                    bind::sdl2::SDL_JoystickAttachVirtual(sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER, axes_count as i32, btns_count as i32, init_specs.hats)
                     /*let desc = sdl2_sys_lite::bindings::SDL_VirtualJoystickDesc {
                         version: sdl2_sys_lite::bindings::SDL_VIRTUAL_JOYSTICK_DESC_VERSION as u16,
                         type_: sdl2_sys_lite::bindings::SDL_JoystickType::SDL_JOYSTICK_TYPE_GAMECONTROLLER as u16,

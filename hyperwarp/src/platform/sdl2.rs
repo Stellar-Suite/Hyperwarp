@@ -19,11 +19,11 @@ pub fn sdl2_translate_joystick_axis_value(value: f64) -> i16 {
 }
 
 // apparently a little lying needs to be done
-pub fn get_btns_for_virtual_gamepad(buttons_count: u8) -> u8 {
+pub fn calc_btns_for_virtual_gamepad(buttons_count: u8) -> u8 {
     max(21, buttons_count)
 }
 
-pub fn get_axes_for_virtual_gamepad(axes_count: u8) -> u8 {
+pub fn calc_axes_for_virtual_gamepad(axes_count: u8) -> u8 {
     max(6, axes_count)
 }
 
@@ -33,7 +33,7 @@ pub fn convert_update_to_sdl_form(event: &InputEvent) -> GamepadState {
     // TODO: clean this code up
     match &event.payload {
         InputEventPayload::JoystickBrowserUpdate { id, axis: axes, buttons } => {
-            let mut state = GamepadState::from_gamepad_init_specs(GamepadInitializationSpecs { axes: get_axes_for_virtual_gamepad(axes.len() as u8) as i32, buttons: get_btns_for_virtual_gamepad(buttons.len() as u8) as i32, hats: 0 });
+            let mut state = GamepadState::from_gamepad_init_specs(GamepadInitializationSpecs { axes: calc_axes_for_virtual_gamepad(axes.len() as u8) as i32, buttons: calc_btns_for_virtual_gamepad(buttons.len() as u8) as i32, hats: 0 });
             // here is a long if
             // technically written in HTML5 gamepad api button order
             if buttons.len() > 0 {

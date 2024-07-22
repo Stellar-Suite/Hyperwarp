@@ -4,7 +4,7 @@ use message_io::network::{Endpoint, NetEvent, Transport, TransportListen};
 use message_io::node::{self, NodeEvent, NodeHandler, NodeListener};
 
 use stellar_protocol::deserialize;
-use stellar_protocol::protocol::{get_all_channels, DebugInfo, GraphicsAPI, Handshake, HostInfo, StellarChannel, StellarDirectControlMessage, StellarMessage, Synchornization};
+use stellar_protocol::protocol::{get_all_channels, DebugInfo, GraphicsAPI, Handshake, HostInfo, InputEvent, StellarChannel, StellarDirectControlMessage, StellarMessage, Synchornization};
 
 use crossbeam_queue::SegQueue;
 
@@ -23,6 +23,7 @@ use std::thread; // for test func
 
 use crate::constants::{BLACKLISTED_PROCESS_NAMES, GAMEPAD_NAME};
 use crate::hooks::dlsym::check_cache_integrity;
+use crate::platform::sdl2::{calc_axes_for_virtual_gamepad, calc_btns_for_virtual_gamepad};
 use crate::{bind, shim};
 use crate::utils::{config::Config, pointer::Pointer};
 use lazy_static::lazy_static;
@@ -213,7 +214,10 @@ impl ApplicationHost {
                         StellarDirectControlMessage::AddGamepad { local_id, product_type, axes, buttons, hats } => {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
-                                let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type, GamepadInitializationSpecs { axes, buttons, hats });
+                                // TODO; fail when we have unreasonable amount of axes/buttons
+                                let internal_axes = calc_axes_for_virtual_gamepad(axes as u8);
+                                let internal_buttons = calc_btns_for_virtual_gamepad(buttons as u8);
+                                let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type, GamepadInitializationSpecs { axes: internal_axes as i32, buttons: internal_buttons as i32, hats });
                                 let chosen_id = gamepad.id.clone();
                                 let index = input_manager_locked.add_gamepad(gamepad);
                                 let added_message = format!("Added gamepad {}", index + 1);
@@ -451,11 +455,11 @@ impl ApplicationHost {
                                                     stellar_protocol::protocol::StellarDirectControlMessage::RequestTitle => {
                                                         
                                                     },
-                                                    StellarDirectControlMessage::UpdateGamepad { .. } => {
+                                                    StellarDirectControlMessage::UpdateGamepad { remote_id, axes, buttons, hats } => {
                                                         {
                                                             let mut input_manager_locked = input_manager.lock().unwrap();
                                                             // input_manager_locked.update_gamepad(remote_id, axes, buttons, hats);
-                                                            
+                                                            input_manager_locked.process_event(InputEvent::new(stellar_protocol::protocol::InputEventPayload::JoystickBrowserUpdate { id: remote_id, axis: axes, buttons: buttons }))   
                                                         }
                                                     },
                                                     StellarDirectControlMessage::RemoveGamepad { .. } => {
