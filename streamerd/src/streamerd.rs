@@ -1416,7 +1416,7 @@ impl Streamer {
                                     let handler = handler_wrapper.lock().unwrap();
                                     let network = handler.network();
                                     let message = stellar_protocol::protocol::StellarMessage::UserInputEvent(input_event);
-                                    println!("sent input");
+                                    // println!("sent input");
                                     if let Some(endpoint) = &current_endpoint {
                                         network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
                                     }
@@ -1437,7 +1437,7 @@ impl Streamer {
                                     let handler = handler_wrapper.lock().unwrap();
                                     let network = handler.network();
                                     let message = stellar_protocol::protocol::StellarMessage::ForwardedDataChannelMessage(source_socket_id, message);
-                                    println!("sent forwarded data channel message to hyperwarp");
+                                    // println!("sent forwarded data channel message to hyperwarp");
                                     if let Some(endpoint) = &current_endpoint {
                                         network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
                                     }

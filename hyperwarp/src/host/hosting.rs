@@ -219,6 +219,7 @@ impl ApplicationHost {
                                 let internal_buttons = calc_btns_for_virtual_gamepad(buttons as u8);
                                 let gamepad = Gamepad::from_product_type(GAMEPAD_NAME.to_string(), product_type, GamepadInitializationSpecs { axes: internal_axes as i32, buttons: internal_buttons as i32, hats });
                                 let chosen_id = gamepad.id.clone();
+                                println!("adding gamepad {}", chosen_id);
                                 let index = input_manager_locked.add_gamepad(gamepad);
                                 let added_message = format!("Added gamepad {}", index + 1);
                                 let direct_message = StellarDirectControlMessage::AddGamepadReply { local_id, remote_id: chosen_id, success: true, message: added_message };
@@ -232,9 +233,11 @@ impl ApplicationHost {
                             {
                                 let mut input_manager_locked = self.input_manager.lock().unwrap();
                                 if let Some(gamepad) = input_manager_locked.remove_gamepad(&remote_id) {
+                                    println!("Removed gamepad {}", gamepad.id);
                                     let direct_message = StellarDirectControlMessage::RemoveGamepadReply { remote_id, success: true, message: format!("Removed gamepad {}", gamepad.id) };
                                     self.send_to(endpoint, &StellarMessage::BroadcastDataChannelMessage("reliable".to_string(), direct_message));
                                 } else {
+                                    println!("Gamepad removal failed");
                                     let direct_message = StellarDirectControlMessage::RemoveGamepadReply { remote_id: remote_id.clone(), success: false, message: format!("Could not find gamepad {}, perhaps it was removed earlier?", &remote_id) };
                                     self.send_to(endpoint, &StellarMessage::ReplyDataChannelMessage(source, "reliable".to_string(), direct_message));
                                 }
@@ -392,7 +395,7 @@ impl ApplicationHost {
                             NetEvent::Accepted(_endpoint, _listener) => {}
                             NetEvent::Message(endpoint, data) => {
                                 if config.debug_mode {
-                                    println!("I got a message from {:?}", endpoint.addr());
+                                    // println!("I got a message from {:?}", endpoint.addr());
                                 }
                                 match stellar_protocol::deserialize_safe(data) { 
                                     Some(message) => {
@@ -428,7 +431,7 @@ impl ApplicationHost {
                                             },
                                             StellarMessage::UserInputEvent(input_event) => {
                                                 if config.debug_mode {
-                                                    println!("User input event received from {:?} {:?}", endpoint.addr(), input_event);
+                                                    // println!("User input event received from {:?} {:?}", endpoint.addr(), input_event);
                                                 }
                                                 {
                                                     let mut input_event = input_event.clone();
