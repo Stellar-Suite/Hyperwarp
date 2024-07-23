@@ -1176,13 +1176,19 @@ impl Streamer {
                         }
                     },
                     InternalMessage::BroadcastDirectMessage(channel_label, message) => {
+                        println!("broadcasting direct message to channel {} {:#?}", channel_label, message);
                         for (socket_id, rtc_peer) in downstream_peers.iter() {
                             rtc_peer.get_data_channels().iter().for_each(|channel| {
-                                let serialized_message = serde_json::to_string(&message).expect("Could not serialize message");
-                                channel.send_string(Some(&serialized_message))
+                                let label = channel.label();
+                                if let Some(label) = label {
+                                    if label.as_str() == channel_label {
+                                        let serialized_message = serde_json::to_string(&message).expect("Could not serialize message");
+                                        channel.send_string(Some(&serialized_message));
+                                    }
+                                }
                             })
                         }
-                    }
+                    },
                     _ => { // if thi warns about unreachable code, it's very good because we implemented everything
                         // TODO: print more descriptive
                         println!("BAD: Unimplemented message {:#?}", imsg.type_id());
