@@ -135,6 +135,9 @@ impl WebRTCPeer {
         // .property_from_str("bundle-policy", "max-bundle")
         .build().expect("could not create webrtcbin element");
         let queue = gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element");
+        // this reduces freeze on low motion
+        queue.set_property_from_str("max-size-time", "0");
+        queue.set_property_from_str("max-size-bytes", "0");
         // may be temp disabled for debugging, this will work on local network anyways (at least i hope)
         // webrtcbin.set_property_from_str("stun-server", "stun://stun.l.google.com:19302");
         // webrtcbin.set_property_from_str("bundle-policy", "max-bundle");
@@ -701,7 +704,7 @@ impl WebRTCPreprocessor {
                         // set for h264parse
                         self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
                         self.encoder.set_property("aud", false);
-                        self.encoder.set_property_from_str("target-usage", "6");
+                        self.encoder.set_property_from_str("target-usage", "4");
                     },
                     _ => {}
                 }
