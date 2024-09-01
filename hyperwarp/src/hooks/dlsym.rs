@@ -115,10 +115,12 @@ redhook::hook! {
             if cache_hit_dynapi {
                 if LOG_DLSYM {
                     println!("using dynapi bypass for {}", symbol_name);
-                    let ptr = DLSYM_CACHE.lock().unwrap().get(&format!("{}_hw_sdl_dynapi", real_symbol_name)).unwrap().as_mut_func();
-                    println!("dynapi bypass gave {}", ptr as usize);
-                    return ptr;
                 }
+                let ptr = DLSYM_CACHE.lock().unwrap().get(&format!("{}_hw_sdl_dynapi", real_symbol_name)).unwrap().as_mut_func();
+                if LOG_DLSYM {    
+                    println!("dynapi bypass gave {}", ptr as usize);
+                }
+                return ptr;
             }
             let pointer = odlsym(handle, symbol_string.as_ptr() as *const c_char);
             if pointer.is_null() {
