@@ -194,6 +194,7 @@ impl ApplicationHost {
                     }
                     let handshake = self.get_handshake();
                     self.send_to(endpoint, &StellarMessage::HandshakeResponse(handshake));
+                    self.sync();
                 },
                 MainTickMessage::RequestDebugInfoV2(endpoint) => {
                     // prepare debug info that can be sent without waiting for tick
@@ -390,6 +391,9 @@ impl ApplicationHost {
                                     if config.debug_mode {
                                         println!("One client did not successfully ready. {}", endpoint.addr());
                                     }
+                                }
+                                if config.debug_mode {
+                                    println!("connection from {}", endpoint.addr());
                                 }
                             }
                             NetEvent::Accepted(_endpoint, _listener) => {}

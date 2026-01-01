@@ -1,6 +1,6 @@
 [package]
 name = "streamerd"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,15 +10,16 @@ anyhow = "1.0.79"
 clap = { version = "4.5.4", features = ["derive", "env"] }
 crossbeam-channel = "0.5.13"
 crossbeam-queue = "0.3.11"
-gio = "0.19.5"
-gstreamer = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-app = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-base = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-gl = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-rtp = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-video = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-webrtc = { version ="0.22.6", features = ["v1_24"] }
-gstreamer-sdp = { version ="0.22.6", features = ["v1_24"] }
+gio = "0.21.5"
+gstreamer = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-app = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-base = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-gl = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-rtp = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-video = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-webrtc = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-sdp = { version ="0.24.4", features = ["v1_24"] }
+gstreamer-allocators = { version = "0.24.4", features = ["v1_24"] }
 message-io = { git = "https://github.com/javaarchive/message-io", version = "0.18.1", default-features = false, features = ["udp", "tcp", "unixsocket" ], branch = "netaddress-type" }
 # stellar_core = { path = "../stellar_core" }
 stellar_protocol = { path = "../stellar_protocol" }

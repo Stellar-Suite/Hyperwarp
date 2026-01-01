@@ -197,7 +197,10 @@ int __libc_start_main(
     main_t init,
     void (*fini)(void), void (*rtld_fini)(void), void *stack_end)
 {
-  static int (*real___libc_start_main)() = NULL;
+  static int (*real___libc_start_main)(
+    main_t main, int argc, char **argv,
+    main_t init,
+    void (*fini)(void), void (*rtld_fini)(void), void *stack_end) = NULL;
   if (!real___libc_start_main)
   {
     if (DEBUG)

@@ -39,7 +39,10 @@ pub enum PipelineOptimization {
     None,
     Intel,
     NVIDIA,
-    AMD
+    AMD,
+    // TODO: merge intel and AMD because I'm not sure if they matter at all?
+    DMABuf,
+    CUDA,
 }
 
 use strum::IntoEnumIterator;
@@ -76,7 +79,7 @@ pub fn session_state_to_u8(state: SessionState) -> u8 {
     }
 }
 
-#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Copy, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Copy, Clone, Display)]
 #[repr(u8)]
 pub enum StreamerState {
     Initalizing = 0,
@@ -182,6 +185,9 @@ pub enum StellarFrontendMessage {
     Error {
         error: String
     },
+    Message { // user message for toasts
+        message: String
+    },
     DebugInfoRequest {
         debug_info_request: u64
     },
@@ -202,12 +208,16 @@ pub enum StellarFrontendMessage {
         hyperwarp_debug: String,
         source: String
     },
+    EndSessionRequest {
+        end_session_request: u64
+    },
 }
 
 // js usable protocol
 // bypass stargate so faster
 // use rename for clientbound
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+// cheap to copy
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub enum StellarDirectControlMessage {
     #[serde(rename = "update_window_title")]
     UpdateWindowTitle {
@@ -248,6 +258,12 @@ pub enum StellarDirectControlMessage {
     #[serde(rename = "mouse_lock")]
     MouseLock {
         state: bool
+    },
+    #[serde(alias = "mouse_wheel")]
+    MouseScroll { // mb bad name?
+        delta_x: f32,
+        delta_y: f32,
+        timestamp: u64,
     },
     #[serde(rename = "request_title")]
     RequestTitle,

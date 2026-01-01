@@ -159,6 +159,10 @@ redhook::hook! {
     unsafe fn SDL_SetWindowTitle(display: *mut SDL_Window, title: *const c_char) => sdl_setwindowtitle_first {
         if HOST.config.debug_mode {
             println!("SDL_SetWindowTitle called");
+            let bt = backtrace::Backtrace::new();
+            println!("init backtrace {:?}", bt);
+            let resolved = redhook::real!(SDL_SetWindowTitle_hw_direct);
+            println!("SDL_SetWindowTitle_hw_direct resolved to {}", resolved as usize);
         }
 
         if HOST.config.enable_sdl2 {

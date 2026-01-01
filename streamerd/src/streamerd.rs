@@ -1,5 +1,5 @@
 use core::prelude::rust_2015;
-use std::{any::Any, cmp, collections::HashMap, io::{Read, Seek}, path::PathBuf, sync::{atomic::AtomicBool, Arc, Mutex, MutexGuard, RwLock}, thread::JoinHandle};
+use std::{any::Any, cmp, collections::HashMap, io::{Read, Seek}, path::PathBuf, str::FromStr, sync::{Arc, Mutex, MutexGuard, RwLock, atomic::AtomicBool}, thread::JoinHandle, time::{SystemTime, UNIX_EPOCH}};
 
 use clap::{Parser, ValueEnum, command};
 
@@ -18,7 +18,7 @@ use message_io::{adapters::unix_socket::{create_null_socketaddr, UnixSocketConne
 use rust_socketio::{client::Client, ClientBuilder};
 use serde_json::json;
 use stellar_protocol::protocol::{create_default_acl, may_mutate_pipeline, streamer_state_to_u8, EncodingPreset, GraphicsAPI, InputEvent, InputEventPayload, PipelineOptimization, PrivligeDefinition, StellarChannel, StellarDirectControlMessage, StellarFrontendMessage, StellarMessage, StreamerState};
-use stellar_shared::constants::sdl2::{decode_keyevent_code_int, decode_keyevent_key_int};
+use stellar_shared::constants::{linux::{WEB_BTN_TO_LINUX_BUTTON, decode_keyevent_code_to_evdev}, sdl2::{decode_keyevent_code_int, decode_keyevent_key_int}};
 
 use std::time::Instant;
 
@@ -29,7 +29,18 @@ use crate::webrtc::{self, WebRTCPeer, WebRTCPreprocessor};
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OperationMode {
     Hyperwarp,
-    Ingest
+    Ingest, // unimpl future mode where data is sent in oversocket mb?
+    WaylandDesktop
+}
+
+impl OperationMode {
+    pub fn is_external_capture(&self) -> bool {
+        if matches!(self, OperationMode::Hyperwarp) {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -89,10 +100,16 @@ pub struct StreamerConfig {
     pub encoder: EncodingPreset,
     #[arg(short = 'O', long = "optimizations", default_value_t = PipelineOptimization::None, help = "extra pipeline optimizations to apply")]
     pub optimizations: PipelineOptimization,
-    #[arg(short, long = "fps", default_value = "60", help = "fps to use in streaming pipeline")]
-    fps: Option<u32>,
-    #[arg(long = "mtu", default_value = "1200", help = "fps to use in streaming pipeline")]
+    #[arg(short, long = "fps", default_value = "60", help = "fps to use in streaming pipeline", env = "STREAMER_FPS")]
+    fps: u32,
+    #[arg(long = "mtu", default_value = "1200", help = "optional mtu to use for some network interfaces")]
     mtu: Option<u32>,
+    #[arg(long = "width", default_value_t = 1920, help = "width of the stream for modes that support it", env = "STREAMER_WIDTH")]
+    width: u32,
+    #[arg(long = "height", default_value_t = 1080, help = "height of the stream for modes that support it", env = "STREAMER_HEIGHT")]
+    height: u32,
+    #[arg(long, help = "render node to use on the Wayland compositor")]
+    render_node: Option<String>,
 }
 
 impl std::fmt::Display for OperationMode {
@@ -234,6 +251,10 @@ impl Streamer {
         }
     }
 
+    pub fn is_externally_capturing(&self) -> bool {
+        self.config.mode.is_external_capture()
+    }
+
     /*pub fn get_acl(&self, socket_id: &str) -> &PrivligeDefinition {
         if let Some(acl_ref) = self.acls.get(socket_id) {
             acl_ref.value()
@@ -277,13 +298,18 @@ impl Streamer {
         let stopper = self.stop.clone();
         let socket = self.get_socket();
         let my_comms_queue = self.client_comms_command_recv.clone();
-        let handler_lock = self.messaging_handler.clone().unwrap();
+        let main_thread_queue_sender = self.streaming_command_queue.clone();
+        let handler_lock_option = self.messaging_handler.clone();
         std::thread::spawn(move || {
             println!("Starting data channel message processing thread");
             while let Ok(msg) = my_comms_queue.recv() {
                 match msg {
                     InternalMessage::ProcessDirectMessage(source_socket_id, message ) => {
-                        let handler = handler_lock.lock().unwrap(); // TODO: mimimize locking this
+                        let handler_option: Option<MutexGuard<'_, NodeHandler<StreamerSignal>>> = match &handler_lock_option { 
+                            Some(handler_lock) => Some(handler_lock.lock().unwrap()),
+                            None => None,
+                        };
+                        //handler_lock.lock().unwrap(); // TODO: mimimize locking this
                         match message {
                             StellarDirectControlMessage::KeyChange { key, code, composition, state, timestamp } => {
                                 let input_event = InputEvent::new(InputEventPayload::KeyEvent {
@@ -293,26 +319,39 @@ impl Streamer {
                                      modifiers: 0 // will be calculated by Hyperwarp
                                 });
                                 // send signal
-                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                if let Some(handler) = handler_option {
+                                    handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                }
                             },
                             StellarDirectControlMessage::MouseMoveRelative { x, y, timestamp } => {
                                 // x_absolute, y_absolute not used yet (ignored), it is calculated manually in the input manager
                                 let input_event = InputEvent::new(InputEventPayload::MouseMoveRelative { x: x, y: y, x_absolute: -1, y_absolute: -1 });
-                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                if let Some(handler) = handler_option {
+                                    handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                }
                             },
                             StellarDirectControlMessage::MouseMoveAbsolute { x, y, timestamp } => {
                                 // relative x,y not used, calculated manually in the input manager
                                 let input_event = InputEvent::new(InputEventPayload::MouseMoveAbsolute(x,y,0,0));
-                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                if let Some(handler) = handler_option {
+                                    handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                }
                             },
                             StellarDirectControlMessage::MouseButton { change, buttons, state, timestamp } => {
                                 let input_event = InputEvent::new(InputEventPayload::MouseButtonsSet { buttons: buttons });
-                                handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                if let Some(handler) = handler_option {
+                                    handler.signals().send(StreamerSignal::ProcessInput(input_event));
+                                }
                             },
                             _ => {
                                 // check if is forwardable
                                 if should_forward_data_channel_message(&message) {
-                                    handler.signals().send(StreamerSignal::ForwardedDataChannelMessage(source_socket_id.clone(), message));
+                                    if let Some(handler) = handler_option {
+                                        handler.signals().send(StreamerSignal::ForwardedDataChannelMessage(source_socket_id.clone(), message));
+                                    } else {
+                                        println!("Unhandled direct message {:?} from socket id {:?} (nowhere to forward)", message, source_socket_id);
+                                        // this just means an internal streamerd impl has not handled this in addition for other modes
+                                    }
                                 } else {
                                     println!("Unhandled direct message {:?} from socket id {:?}", message, source_socket_id);
                                 }
@@ -346,6 +385,7 @@ impl Streamer {
         print!("loaded streaming library");
 
         let pipeline = gstreamer::Pipeline::default();
+        
 
         println!("pipeline initalizing");
 
@@ -353,14 +393,27 @@ impl Streamer {
         pipeline.debug_to_dot_data(DebugGraphDetails::all());
 
         // let videoupload = gstreamer::ElementFactory::make("cudaupload").build().expect("could not create video processor");
-        let ximagesrc = gstreamer::ElementFactory::make("ximagesrc").name("ximagesrc").build().expect("could not create ximagesrc element");
+        let capture_el = {
+            if self.is_externally_capturing() {
+                gstreamer::ElementFactory::make("ximagesrc").name("capture").build()
+            } else if self.config.mode == OperationMode::WaylandDesktop {
+                let mut builder = gstreamer::ElementFactory::make("waylanddisplaysrc").name("capture");
+                if self.config.optimizations == PipelineOptimization::None {
+                    // force software rendering.
+                    builder = builder.property("render_node", "software");
+                }
+                builder.build()
+            }else {
+                gstreamer::ElementFactory::make("videotestsrc").name("capture").build() // fake "capture"
+            }
+        }.expect("could not create capture element");
         let videoconvert = gstreamer::ElementFactory::make("videoconvert").build().expect("could not create video processor");
         let videoflip = gstreamer::ElementFactory::make("videoflip").build().expect("could not create optional video flipper");
         let debug_tee = gstreamer::ElementFactory::make("tee").name("debug_tee").build().expect("could not create debugtee");
         let sink = gstreamer::ElementFactory::make("autovideosink").build().expect("could not create output");
         
-        if INTERNAL_DEBUG {
-            pipeline.add(&ximagesrc).expect("adding debug ximagesrc to pipeline failed");
+        if INTERNAL_DEBUG || !self.is_externally_capturing() {
+            pipeline.add(&capture_el).expect("adding debug ximagesrc to pipeline failed");
         }
 
         // let caps_filter_1 = build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create capsfilter");
@@ -381,11 +434,11 @@ impl Streamer {
     //         .fps(gst::Fraction::new(2, 1))
            // .flags(VideoFlags::VARIABLE_FPS)
             .interlace_mode(VideoInterlaceMode::Progressive)
-            .fps(gstreamer::Fraction::new(self.config.fps.unwrap_or(60) as i32, 1))
+            .fps(gstreamer::Fraction::new(self.config.fps as i32, 1))
             .build()
             .expect("Failed to create video info on demand for source");
 
-        let preview_sink = true;
+        let preview_sink = false;
 
         let appsrc = gstreamer_app::AppSrc::builder()
         .caps(&video_info.to_caps().expect("Cap generation failed"))
@@ -400,31 +453,63 @@ impl Streamer {
         .format(gstreamer::Format::Time)
         .build();
 
-        let mut intiial_link = match INTERNAL_DEBUG {
-            true => vec![&ximagesrc], //vec![appsrc.upcast_ref::<Element>()];
-            false => vec![appsrc.upcast_ref::<Element>()],
+        let mut initial_link = match !INTERNAL_DEBUG && self.is_externally_capturing() {
+            true => vec![appsrc.upcast_ref::<Element>()],
+            false => vec![&capture_el], //vec![appsrc.upcast_ref::<Element>()];
         };
-        // intiial_link.push(&videoupload);
-        intiial_link.push(&videoconvert);
-        intiial_link.push(&videoflip);
-        intiial_link.push(&debug_tee);
-        if preview_sink {
-            intiial_link.push(&sink);
+
+        let mut extra_els: HashMap<String, Element> = HashMap::new();
+
+        if self.config.mode == OperationMode::WaylandDesktop {
+            // negotiate dmabuf
+            let caps_ = gstreamer::Caps::builder("video/x-raw")
+                .field("framerate", gstreamer::Fraction::new(self.config.fps as i32, 1))
+                .field("width", self.config.width)
+                .field("height", self.config.height)
+                .features(["memory:DMABuf"]
+            ).build();
+
+            let caps = if self.config.optimizations == PipelineOptimization::DMABuf {
+                gstreamer::Caps::from_str(&format!("video/x-raw(memory:DMABuf),width={},height={},framerate={}/1", self.config.width, self.config.height, self.config.fps)).expect("could not create caps from parsed str")
+            } else if self.config.optimizations == PipelineOptimization::NVIDIA {
+                gstreamer::Caps::from_str(&format!("video/x-raw(memory:CUDAMemory),width={},height={},framerate={}/1", self.config.width, self.config.height, self.config.fps)).expect("could not create caps from parsed str")
+            } else {
+                gstreamer::Caps::from_str(&format!("video/x-raw,width={},height={},format=RGBx,framerate={}/1", self.config.width, self.config.height, self.config.fps)).expect("could not create caps from parsed str")
+            };
+
+            let capsfilter_wayland_display = build_capsfilter(caps)
+            .expect("could not create capsfilter");
+            pipeline.add(&capsfilter_wayland_display).expect("adding dmabuf capsfilter to pipeline failed");
+            extra_els.insert("wayland_display_capfilter".to_string(), capsfilter_wayland_display);
+            initial_link.push(&extra_els["wayland_display_capfilter"]);
         }
+
+        // intiial_link.push(&videoupload);
+        if self.config.mode == OperationMode::Hyperwarp  || self.config.optimizations == PipelineOptimization::None {
+            initial_link.push(&videoconvert);
+        }
+        if self.config.mode == OperationMode::Hyperwarp {
+            // unflip framebuffers
+            initial_link.push(&videoflip);
+            initial_link.push(&debug_tee);
+            // preview sink doesn't work with dmabuf and can cause issues
+            if preview_sink {
+                initial_link.push(&sink);
+            }
+        }
+        
 
         // link
         // pipeline.add(&videoupload).expect("adding upload element to pipeline failed");
         // pipeline.add(&caps_filter_1).expect("adding capsfilter to pipeline failed");
-        if !INTERNAL_DEBUG {
+        if !INTERNAL_DEBUG && self.is_externally_capturing() {
             pipeline.add(appsrc.upcast_ref::<Element>()).expect("adding frames source element to pipeline failed");
         }
         if preview_sink {
             pipeline.add(&sink).expect("adding preview sink to pipeline failed");
         }
         pipeline.add_many([&videoconvert, &videoflip, &debug_tee]).expect("adding els failed");
-        gstreamer::Element::link_many(intiial_link).expect("linking failed");
-
-        
+        gstreamer::Element::link_many(&initial_link).expect("linking failed");
 
         /*println!("create queue before preprocessor");
         let queue = gstreamer::ElementFactory::make("queue").build().expect("could not create queue element");
@@ -433,7 +518,7 @@ impl Streamer {
 
         println!("initing preprocessor");
 
-        let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations);
+        let mut preprocessor = WebRTCPreprocessor::new_preset(self.config.encoder, self.config.optimizations, self.config.mode);
         preprocessor.set_config(config.clone());
         preprocessor.add_congestion_control_extension();
         if self.config.experimental_realtime {
@@ -444,11 +529,18 @@ impl Streamer {
             println!("setting mtu to {}", mtu);
             preprocessor.payloader.set_property("mtu", mtu);
         }
-        preprocessor.attach_to_pipeline(&pipeline, &debug_tee);
+        preprocessor.attach_to_pipeline(&pipeline, {
+            if self.config.mode == OperationMode::Hyperwarp {
+                &debug_tee
+            } else { // TODO: is last sufficient?
+                // on wayland this is prob going to just be the caps filter after capture element
+                initial_link.last().unwrap()
+            }
+        });
 
         println!("setting up second tee element");
 
-        let video_tee = gstreamer::ElementFactory::make("tee").name("video_tee").build().expect("could not create video tee");
+        let video_tee = gstreamer::ElementFactory::make("tee").property("allow-not-linked", true).name("video_tee").build().expect("could not create video tee");
         // connect video tee to preprocessor\
         pipeline.add(&video_tee).expect("adding video tee to pipeline failed");
         gstreamer::Element::link_many([preprocessor.get_last_element(), &video_tee]).expect("linking video tee to preprocessor failed");
@@ -464,6 +556,8 @@ impl Streamer {
 
         let mut should_update = false;
         let mut socket_connected = false;
+        let mut socket_authed = false;
+        let mut wayland_display: Option<String> = None;
         let mut graphics_api = config.graphics_api;
         let mut streamer_state = StreamerState::Handshaking;
 
@@ -615,6 +709,10 @@ impl Streamer {
         }*/
         println!("entering run loop");
 
+        bus.add_watch(|bus, msg| {
+            glib::ControlFlow::Continue
+        }).expect("Could not add bus watch");
+
         while running {
             let mut temp_update = false;
             // println!("iter loop");
@@ -623,7 +721,21 @@ impl Streamer {
                 use gstreamer::MessageView;
                 // qos is spammy
                 // if !matches!(msg.view(), MessageView::Qos(..)) {
-                    println!("{:?}", msg);
+                    println!("gst: {:?}", msg);
+                    if msg.type_() == gstreamer::MessageType::Application {
+                        let structure_opt = msg.structure();
+                        if let Some(structure) = structure_opt {
+                            if self.config.mode == OperationMode::WaylandDesktop && structure.name() == "wayland.src" {
+                                // found wayland src
+                                let display_value: String = structure.get("WAYLAND_DISPLAY").unwrap();
+                                println!("wayland display value {}", display_value);
+                                if socket_authed {
+                                    self.get_socket().emit("ext_wayland_init", json!(display_value)).expect("Could not send wayland init to socket");
+                                }
+                                wayland_display = Some(display_value);
+                            }
+                        }
+                    }
                 // }
 
                 if INTERNAL_DEBUG {
@@ -633,23 +745,38 @@ impl Streamer {
                 match msg.view() {
                     MessageView::Eos(..) => {
                         println!("Exiting at end of stream.");
-                        break;
+                        return Ok(());
                     },
                     MessageView::Error(err) => {
                         println!("Error: {} {:?}", err.error(), err.debug());
                         pipeline.debug_to_dot_file_with_ts(DebugGraphDetails::all(), PathBuf::from("errordump.dot"));
                         if let Some(src) = err.src() {
                             // enum webrtc peers
-                            for webrtc_peer in downstream_peers.values() {
+                            let mut to_remove: Vec<String> = vec![];
+                            for (peer_id, webrtc_peer) in downstream_peers.iter() {
                                 if src.has_ancestor(&webrtc_peer.bin) {
+                                    // TODO: handle disconnect by detaching
                                     println!("traced error a webrtc component, stopping webrtc peer");
+                                    to_remove.push(peer_id.clone());
+                                }
+                            }
+
+                            for peer_id in to_remove {
+                                let downstream_peer = downstream_peers.remove(&peer_id);
+                                if let Some(downstream_peer) = downstream_peer {
+                                    if let Err(err) = downstream_peer.destroy(&pipeline, &video_tee) {
+                                        println!("Error destroying peer on error/disconnect: {:?}", err);
+                                    } else {
+                                        println!("Destroyed peer on error/disconnect {}", peer_id);
+                                    }
+                                } else {
+                                    println!("unexpected missing peer on remove? {}", peer_id);
                                 }
                             }
                         };
-                        pipeline.set_state(gstreamer::State::Null).expect("could not reset pipeline state");
-                        running = false;
-                        println!("Error (repeat): {} {:?}", err.error(), err.debug());
-                        return Ok(());
+                        pipeline.set_state(gstreamer::State::Playing).expect("could not reset pipeline state");
+                        // running = false;
+                        // println!("Error (repeat): {} {:?}", err.error(), err.debug());
                     }
                     _ => (),
                 }
@@ -667,27 +794,29 @@ impl Streamer {
                     // TODO: deduplicate code between handshake and sync, but closure does not currently work because it needs to mutate video_info
                     InternalMessage::HandshakeReceived(handshake) => {
                         println!("handshake details {:#?}", handshake);
-                        let res=  handshake.resolution;
-                        println!("updating to {:?}", res);
-                        video_info =
-                            gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
-                            //         .fps(gst::Fraction::new(2, 1))
-                            .fps(gstreamer::Fraction::new(self.config.fps.unwrap_or(60) as i32, 1))
-                                .build()
-                                .expect("Failed to create video info on demand for source");
-                        println!("video info {:#?}",video_info);
-                        if !INTERNAL_DEBUG {
-                            appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
-                        }
-                        println!("Adjusted caps for resolution {:?}", res);
-                        graphics_api = handshake.graphics_api;
-                        println!("setting graphics api to {:?}", graphics_api);
-                        let flip = stellar_protocol::protocol::should_flip_buffers_for_graphics_api(graphics_api);
-                        if flip {
-                            // wow gstreamer needs to make like constants for these
-                            videoflip.set_property_from_str("method", "vertical-flip");
-                        } else {
-                            videoflip.set_property_from_str("method", "none");
+                        if self.is_externally_capturing() {
+                            let res=  handshake.resolution;
+                            println!("updating to {:?}", res);
+                            video_info =
+                                gstreamer_video::VideoInfo::builder(gstreamer_video::VideoFormat::Rgba, res.0, res.1)
+                                //         .fps(gst::Fraction::new(2, 1))
+                                .fps(gstreamer::Fraction::new(self.config.fps as i32, 1))
+                                    .build()
+                                    .expect("Failed to create video info on demand for source");
+                            println!("video info {:#?}",video_info);
+                            if !INTERNAL_DEBUG && self.is_externally_capturing() {
+                                appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
+                            }
+                            println!("Adjusted caps for resolution {:?}", res);
+                            graphics_api = handshake.graphics_api;
+                            println!("setting graphics api to {:?}", graphics_api);
+                            let flip = stellar_protocol::protocol::should_flip_buffers_for_graphics_api(graphics_api);
+                            if flip {
+                                // wow gstreamer needs to make like constants for these
+                                videoflip.set_property_from_str("method", "vertical-flip");
+                            } else {
+                                videoflip.set_property_from_str("method", "none");
+                            }
                         }
                         streamer_state = StreamerState::Running;
                         {
@@ -715,7 +844,7 @@ impl Streamer {
                                 .build()
                                 .expect("Failed to create video info on demand for source");
                             println!("video info {:#?}",video_info);
-                            if !INTERNAL_DEBUG {
+                            if !INTERNAL_DEBUG && self.is_externally_capturing() {
                                 appsrc.set_caps(Some(&video_info.to_caps().expect("Cap generation failed")));
                             }
                             println!("Adjusted caps for resolution {:?}", res);
@@ -734,7 +863,9 @@ impl Streamer {
                         
                         }
 
-                        appsrc.set_state(gstreamer::State::Playing);
+                        if !INTERNAL_DEBUG && self.is_externally_capturing() {
+                            appsrc.set_state(gstreamer::State::Playing);
+                        }
                     },
                     InternalMessage::SocketConnected => {
                         if !socket_connected {
@@ -747,20 +878,36 @@ impl Streamer {
                         }
                     },
                     InternalMessage::SocketAuthenticated => {
+                        socket_authed = true;
                         let socket =  self.get_socket();
                         // this tells the ui to switch out of the loading screen
+
+                        // start stream independently if not waiting for external capture
+                        if !self.is_externally_capturing() {
+                            streamer_state = StreamerState::Running;
+
+                            if let Some(wayland_display) = &wayland_display {
+                                // wayland display was set up before we finished authenticating
+                                socket.emit("ext_wayland_init", json!(wayland_display)).expect("Could not send wayland init to socket after auth");
+                            }
+                        }
                         if let Err(err) = socket.emit("set_session_state", json!(streamer_state_to_u8(streamer_state))) {
                             println!("Error setting session state on remote Stargate server: {:?}", err);
                         }else{
-                            println!("Request to set session state on remote Stargate server.");
+                            println!("Request to set session state on remote Stargate server. New state {}", streamer_state);
                         }
                     },
                     InternalMessage::SocketPeerFrontendMessageWithPipeline(origin_socketid, frontend_message) => {
                         match frontend_message {
-                            StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => {
+                            StellarFrontendMessage::ProvisionWebRTC { rtc_provision_start } => 'handle_provisioning_webrtc: {
                                 println!("Provisioning webrtc for socket id {:?} client claim start: {:?}", origin_socketid, rtc_provision_start);
                                 if let Err(err) = preprocessor.play() {
                                     println!("Error forceplaying preprocessor: {:?}", err);
+                                }
+
+                                if downstream_peers.contains_key(&origin_socketid) {
+                                    println!("Already have a peer for socket id {:?}. Duplicate connection?", origin_socketid);
+                                    break 'handle_provisioning_webrtc; // intresting new label syntax
                                 }
                                 // if downstream_peers.is_empty() {
                                     // pipeline.set_state(gstreamer::State::Paused).expect("pause failure");
@@ -843,7 +990,7 @@ impl Streamer {
 
                                 let video_sink_pad = &downstream_peer_el_group.pad; // downstream_peer_el_group.queue.static_pad("sink").expect("Could not get queue sink pad"); // data enters here
 
-                                let video_src_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from video tee"); // data leaves here
+                                // let video_src_pad = video_tee.request_pad_simple("src_%u").expect("Could not get a pad from video tee"); // data leaves here
                                 /*let video_block = video_src_pad
                                     .add_probe(gstreamer::PadProbeType::BLOCK_DOWNSTREAM, |_pad, _info| {
                                         gstreamer::PadProbeReturn::Ok
@@ -854,7 +1001,8 @@ impl Streamer {
                                 // println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
                                 // println!("{}", video_src_pad.allowed_caps().unwrap().to_string());
                                 pipeline.add(&downstream_peer_el_group.bin).expect("Could not add peer bin to pipeline");
-                                video_src_pad.link(video_sink_pad).expect("Linking video src pad to video sink pad failed");
+                                // video_src_pad.link(video_sink_pad).expect("Linking video src pad to video sink pad failed");
+                                video_tee.link(&downstream_peer_el_group.bin).expect("Linking video tee to peer bin failed");
 
                                 let streaming_cmd_queue_for_ready = self.streaming_command_queue.clone();
 
@@ -891,6 +1039,7 @@ impl Streamer {
                                     });
 
                                     let message_handler_queue = self.client_comms_command_queue.clone();
+                                    let streamer_message_handler_queue = self.streaming_command_queue.clone();
                                     let socket_id_for_data_channels = origin_socketid.clone();
 
                                     channel.connect_on_message_string(move |channel, data_opt| {
@@ -904,6 +1053,7 @@ impl Streamer {
                                                 }
                                             };
 
+                                            let _ = streamer_message_handler_queue.send(InternalMessage::ProcessDirectMessage(socket_id_for_data_channels.clone(), message.clone()));
                                             let _ = message_handler_queue.send(InternalMessage::ProcessDirectMessage(socket_id_for_data_channels.clone(), message));
                                         }
                                     });
@@ -1138,6 +1288,7 @@ impl Streamer {
                                 }
                             });
                             let message_handler_queue = self.client_comms_command_queue.clone();
+                            let streamer_message_handler_queue = self.streaming_command_queue.clone();
                             channel.connect_on_message_string(move |channel, data_opt| {
                                 if let Some(data) = data_opt {
                                     // parse it
@@ -1149,7 +1300,9 @@ impl Streamer {
                                         }
                                     };
 
+                                    let _ = streamer_message_handler_queue.send(InternalMessage::ProcessDirectMessage(origin_socketid.clone(), message.clone()));
                                     let _ = message_handler_queue.send(InternalMessage::ProcessDirectMessage(origin_socketid.clone(), message));
+                                    
                                 }
                             });
                             if originated_from_client {
@@ -1189,6 +1342,83 @@ impl Streamer {
                             })
                         }
                     },
+                    InternalMessage::ProcessDirectMessage(source_socket_id, message) => {
+                        // this recieves a copy of every message that the other thread does, it exists to allow lower level handling of events that need to be taken care of within the gstreamer pipeline loop
+                        if self.config.mode == OperationMode::WaylandDesktop {
+                            let mut ignored = false;
+                            match &message {
+                                StellarDirectControlMessage::KeyChange { key, code, composition, state, timestamp } => {
+                                    let key: u32 = decode_keyevent_code_to_evdev(&code);
+                                    let pressed = *state;
+                                    let event_data_structure = gstreamer::Structure::builder("KeyboardKey")
+                                        .field("key", key)
+                                        .field("pressed", pressed)
+                                        .build();
+
+
+                                    capture_el.send_event(gstreamer::event::CustomUpstream::new(event_data_structure));
+                                    // Date.now() - lastKeyEventTime
+                                    // let delta = std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - (*timestamp) as u128;
+                                    // println!("delta {} ms pressed: {}", delta, pressed);
+                                },
+                                StellarDirectControlMessage::MouseMoveRelative { x, y, timestamp } => {
+                                    let event_data_structure = gstreamer::Structure::builder("MouseMoveRelative")
+                                        .field("pointer_x", *x as f64)
+                                        .field("pointer_y", *y as f64)
+                                        .build();
+
+                                    capture_el.send_event(gstreamer::event::CustomUpstream::new(event_data_structure));
+                                },
+                                StellarDirectControlMessage::MouseMoveAbsolute { x, y, timestamp } => {
+                                    let event_data_structure = gstreamer::Structure::builder("MouseMoveAbsolute")
+                                        .field("pointer_x", *x as f64)
+                                        .field("pointer_y", *y as f64)
+                                        .build();
+
+                                    capture_el.send_event(gstreamer::event::CustomUpstream::new(event_data_structure));
+                                },
+                                StellarDirectControlMessage::MouseButton { change, buttons, state, timestamp } => {
+                                    let button_index_web = change.ilog2() as u32;
+
+                                    if let Some(button_index_linux) = WEB_BTN_TO_LINUX_BUTTON.get(button_index_web as usize) {
+                                        let event_data_structure = gstreamer::Structure::builder("MouseButton")
+                                            .field("button", *button_index_linux)
+                                            .field("pressed", state)
+                                            .build();
+
+                                        capture_el.send_event(gstreamer::event::CustomUpstream::new(event_data_structure));
+                                    } else {
+                                        println!("Could not map web button index {} to linux button index (illegal mouse button?)", button_index_web);
+                                    }
+                                },
+                                StellarDirectControlMessage::MouseScroll { delta_x, delta_y, timestamp } => {
+                                    let event_data_structure = gstreamer::Structure::builder("MouseAxis")
+                                        .field("x", *delta_x as f64)
+                                        .field("y", *delta_y as f64)
+                                        .field("timestamp", timestamp)
+                                        .build();
+
+                                    capture_el.send_event(gstreamer::event::CustomUpstream::new(event_data_structure));
+                                },
+                                StellarDirectControlMessage::MouseLock { state } => {
+                                    // i don't think the client should be sending this?
+                                },
+                                _ => {
+                                    // ignore
+                                    ignored = true;
+                                }
+                               
+                                /*StellarDirectControlMessage::AddGamepad { local_id, product_type, axes, buttons, hats } => todo!(),
+                                StellarDirectControlMessage::AddGamepadReply { local_id, remote_id, success, message } => todo!(),
+                                StellarDirectControlMessage::UpdateGamepad { remote_id, axes, buttons, hats } => todo!(),
+                                StellarDirectControlMessage::RemoveGamepad { remote_id } => todo!(),
+                                StellarDirectControlMessage::RemoveGamepadReply { remote_id, success, message } => todo!(),*/
+                            }
+                            if !ignored {
+                                println!("Handled direct message {:?} from socket id {:?}", message, source_socket_id);
+                            }
+                        }
+                    },
                     _ => { // if thi warns about unreachable code, it's very good because we implemented everything
                         // TODO: print more descriptive
                         println!("BAD: Unimplemented message {:#?}", imsg.type_id());
@@ -1198,7 +1428,7 @@ impl Streamer {
             if temp_update || should_update {
                 update_frame_func(&appsrc, &video_info);
             }
-            // TOOD: make this loop not thrash cpu by waiting for events
+            // TOOD: make this loop not thrash cpu by waiting for events, does it still/
         }
 
         println!("streamer thread exited cleanly.");
@@ -1215,7 +1445,7 @@ impl Streamer {
 
         let config = self.config.clone();
         
-        let local_message_handler = self.messaging_handler.clone().unwrap();
+        let local_message_handler_option = self.messaging_handler.clone();
 
         socket_builder = socket_builder.on("hello", move |payload, client| {
             main_thread_cmd_queue_1.send(InternalMessage::SocketConnected);
@@ -1247,9 +1477,14 @@ impl Streamer {
                                             // TODO: 
                                         },
                                         StellarFrontendMessage::HyperwarpDebugInfoRequest { hyperwarp_debug_info_request } => {
-                                            // we forward this to hyperwarp
-                                            let handler = local_message_handler.lock().unwrap();
-                                            handler.signals().send(StreamerSignal::DebugInfoRequest);
+                                            // we forward this to hyperwarp, if we have an active connection
+                                            if let Some(message_handler_inner) = &local_message_handler_option {
+                                                let handler = message_handler_inner.lock().unwrap();
+                                                handler.signals().send(StreamerSignal::DebugInfoRequest);
+                                            }
+                                        },
+                                        StellarFrontendMessage::EndSessionRequest { end_session_request } => {
+                                            // not impl
                                         },
                                         other => {
                                             if may_mutate_pipeline(&other) {
@@ -1286,9 +1521,11 @@ impl Streamer {
 
         self.socketio_client = Some(arc);
         // send to hyperwarp client thread via signal
-        let messaging_handler = self.messaging_handler.clone().unwrap();
-        let handler = messaging_handler.lock().unwrap();
-        let _ = handler.signals().send(StreamerSignal::SocketCreated(socket_arc));
+        let messaging_handler_option = self.messaging_handler.clone();
+        if let Some(messaging_handler) = &messaging_handler_option {
+            let handler = messaging_handler.lock().unwrap();
+            let _ = handler.signals().send(StreamerSignal::SocketCreated(socket_arc));
+        }
 
         Ok(())
     }
@@ -1309,6 +1546,7 @@ impl Streamer {
 
         let streaming_cmd_queue = self.streaming_command_queue.clone();
         let frame = self.frame.clone();
+        let is_externally_capturing = self.is_externally_capturing();
 
         std::thread::spawn(move || {
 
@@ -1413,18 +1651,21 @@ impl Streamer {
                                 },
                             }
                         },
+                        // user socket, sent something
                         NodeEvent::Signal(signal) => {
                             match signal {
                                 StreamerSignal::DataChannelContent(_) => {
                                     // unused apparently
                                 },
                                 StreamerSignal::ProcessInput(input_event) => {
-                                    let handler = handler_wrapper.lock().unwrap();
-                                    let network = handler.network();
-                                    let message = stellar_protocol::protocol::StellarMessage::UserInputEvent(input_event);
-                                    // println!("sent input");
-                                    if let Some(endpoint) = &current_endpoint {
-                                        network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
+                                    if is_externally_capturing {
+                                        let handler = handler_wrapper.lock().unwrap();
+                                        let network = handler.network();
+                                        let message = stellar_protocol::protocol::StellarMessage::UserInputEvent(input_event);
+                                        // println!("sent input");
+                                        if let Some(endpoint) = &current_endpoint {
+                                            network.send(endpoint.clone(), &stellar_protocol::serialize(&message));
+                                        }
                                     }
                                 },
                                 StreamerSignal::DebugInfoRequest => {

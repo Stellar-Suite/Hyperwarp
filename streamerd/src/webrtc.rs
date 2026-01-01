@@ -14,7 +14,7 @@ use gio::subclass::prelude::ObjectSubclass;
 
 use lazy_static::lazy_static;
 
-use crate::streamerd::{build_capsfilter, StreamerConfig};
+use crate::streamerd::{OperationMode, StreamerConfig, build_capsfilter};
 
 // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/blob/main/subprojects/gst-examples/webrtc/sendrecv/gst-rust/src/main.rs#L30
 const TWCC_URI: &str = "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01";
@@ -39,6 +39,7 @@ impl ObjectSubclass for PlayoutDelayRTPExperiment {
     const NAME: &'static str = "PlayoutDelayRTPExperiment";
     type Type = inner::PlayoutDelayRTPExperiment;
     type ParentType = gstreamer_rtp::RTPHeaderExtension;
+    type Interfaces = ();
 }
 
 impl ObjectImpl for PlayoutDelayRTPExperiment {}
@@ -76,7 +77,7 @@ impl RTPHeaderExtensionImpl for PlayoutDelayRTPExperiment {
         &self,
         _input: &gstreamer::BufferRef,
         _write_flags: RTPHeaderExtensionFlags,
-        output: &mut gstreamer::BufferRef,
+        output: &gstreamer::BufferRef,
         output_data: &mut [u8],
     ) -> Result<usize, gstreamer::LoggableError> {
         assert!(output_data.len() >= 3);
@@ -132,10 +133,11 @@ impl WebRTCPeer {
         let webrtcbin = gstreamer::ElementFactory::make("webrtcbin")
         .property_from_str("stun-server", "stun://stun.l.google.com:19302")
         .property_from_str("latency", "0")
-        // .property_from_str("bundle-policy", "max-bundle")
+        .property_from_str("bundle-policy", "max-bundle") // n/a yet because we don't do audio
         .build().expect("could not create webrtcbin element");
         let queue = gstreamer::ElementFactory::make("queue").property_from_str("leaky", "downstream").build().expect("could not create queue element");
         // this reduces freeze on low motion
+        queue.set_property_from_str("max-size-buffers", "0");
         queue.set_property_from_str("max-size-time", "0");
         queue.set_property_from_str("max-size-bytes", "0");
         // may be temp disabled for debugging, this will work on local network anyways (at least i hope)
@@ -212,13 +214,15 @@ impl WebRTCPeer {
 
     pub fn add_to_pipeline(&self, pipeline: &gstreamer::Pipeline)-> anyhow::Result<()> {
         // pipeline.add_many([&self.queue, &self.webrtcbin]).expect("adding elements to pipeline failed");
-        pipeline.add(&self.queue)?;
-        pipeline.add(&self.webrtcbin)?;
+        // pipeline.add(&self.queue)?;
+        // pipeline.add(&self.webrtcbin)?;
+        pipeline.add(&self.bin)?;
         Ok(())
     }
 
     pub fn link_with_pipeline(&self, pipeline: &gstreamer::Pipeline, tee: &gstreamer::Element) -> anyhow::Result<()> {
-        gstreamer::Element::link_many([tee, &self.queue, &self.webrtcbin])?;
+        self.link_internally()?;
+        tee.link(&self.bin)?;
         Ok(())
     }
 
@@ -233,7 +237,10 @@ impl WebRTCPeer {
         // ???
 
         // unlink queue and webrtcbin
-        gstreamer::Element::unlink_many([&tee, &self.queue, &self.webrtcbin]);
+        // tee not actually connected with queue
+        tee.unlink(&self.bin);
+        // this line prob does nothing
+        gstreamer::Element::unlink_many([&self.queue, &self.webrtcbin]);
 
         // stop queue and webrtcbin
         self.stop()?;
@@ -254,6 +261,7 @@ impl WebRTCPeer {
     pub fn stop(&self) -> anyhow::Result<()>{
         self.queue.set_state(gstreamer::State::Null)?;
         self.webrtcbin.set_state(gstreamer::State::Null)?;
+        self.bin.set_state(gstreamer::State::Null)?;
         Ok(())
     }
 
@@ -382,7 +390,7 @@ impl WebRTCPreprocessor {
     }
 
     pub fn attach_to_pipeline(&self, pipeline: &gstreamer::Pipeline, after_element: &gstreamer::Element) {
-        pipeline.add_many([&self.encoder, &self.payloader]).expect("adding elements to pipeline failed");
+        pipeline.add_many([&self.encoder, &self.payloader]).expect("adding webrtc elements to pipeline failed");
         // add prefix and suffix elements
         // I might just be able to add them directly with add_many but I'll check later
         pipeline.add_many(&self.extra_prefix_elements).expect("adding prefix elements to pipeline failed");
@@ -402,7 +410,7 @@ impl WebRTCPreprocessor {
             linkage.push(el);
         }
 
-        gstreamer::Element::link_many(linkage).expect("linking elements failed");
+        gstreamer::Element::link_many(linkage).expect("linking elements within webrtc preprocessor failed");
 
         /*if let Some(parser_element) = pipeline.by_name("parser") {
             return;
@@ -456,7 +464,7 @@ impl WebRTCPreprocessor {
     }
 
     // maybe a better name for this is encodertype not preset
-    pub fn new_preset(preset: EncodingPreset, optimizations: PipelineOptimization) -> Self {
+    pub fn new_preset(preset: EncodingPreset, optimizations: PipelineOptimization, mode: OperationMode) -> Self {
         let mut prefix: Vec<gstreamer::Element> = vec![];
         let mut middle: Vec<gstreamer::Element> = vec![];
         let mut suffix: Vec<gstreamer::Element> = vec![];
@@ -471,9 +479,18 @@ impl WebRTCPreprocessor {
         match optimizations {
             PipelineOptimization::NVIDIA | PipelineOptimization::AMD => {
                 // convert to NV12 format
-                prefix.push(gstreamer::ElementFactory::make("videoconvert").name("nvvideoconverter").build().expect("Could not build nvidia videoconverter"));
-                prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create special capsfilter"));
+                if mode == OperationMode::Hyperwarp {
+                    // input is raw RGB, output is NV12
+                    // otherwise data format is alr fine
+                    prefix.push(gstreamer::ElementFactory::make("videoconvert").name("nvvideoconverter").property("qos", true).build().expect("Could not build videoconverter"));
+                    prefix.push(build_capsfilter(gstreamer::Caps::builder("video/x-raw").field("format", "NV12").build()).expect("could not create special capsfilter"));
+                }
             },
+            PipelineOptimization::DMABuf => {
+                prefix.push(gstreamer::ElementFactory::make("vapostproc").name("vapostprocessor").property("qos", true).build().expect("Could not build vapostproc"));
+                // TODO: figure out how to construct the caps in rust
+                prefix.push(build_capsfilter(gstreamer::Caps::from_str("video/x-raw(memory:VAMemory), format=NV12").expect("parsing hardcoded capsfilter string failed for dmabuf")).expect("could not create dmabuf capsfilter"));
+            }
             _ => {
 
             }
@@ -483,9 +500,6 @@ impl WebRTCPreprocessor {
 
         match optimizations {
             PipelineOptimization::NVIDIA => {
-
-                
-
                 match preset {
                     EncodingPreset::H264 => {
                         // prefix.push(gstreamer::ElementFactory::make("cudaupload").build().expect("could not create cudaupload element"));
@@ -497,6 +511,7 @@ impl WebRTCPreprocessor {
                         profile = "main";
                         middle.push(gstreamer::ElementFactory::make("h264parse").name("parser").build().expect("could not create h264parse element"));
                         // great reference: https://github.com/m1k1o/neko/blob/21a4b2b797bb91947ed3702b8d26a99fef4ca157/server/internal/capture/pipelines.go#L158C40-L158C283
+                        // harder optimizations from https://github.com/selkies-project/selkies-gstreamer
                         // video/x-h264,stream-format=byte-stream,profile=constrained-baseline
                         // middle.push(build_capsfilter(gstreamer::Caps::builder("video/x-h264").field("stream-format", "byte-stream").field("profile", "constrained-baseline").build()).expect("could not create special capsfilter"));
                     },
@@ -513,7 +528,7 @@ impl WebRTCPreprocessor {
                     }
                 }
             },
-            PipelineOptimization::AMD => {
+            PipelineOptimization::AMD | PipelineOptimization::DMABuf => {
                 match preset {
                     EncodingPreset::H264 => {
                         println!("pushing capsfilter for h264");
@@ -601,6 +616,7 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::NVIDIA => "nvh264enc".to_string(),
                     PipelineOptimization::Intel => "vah264enc".to_string(),
                     PipelineOptimization::AMD => "vah264enc".to_string(),
+                    PipelineOptimization::DMABuf => "vah264enc".to_string(),
                     _ => "openh264enc".to_string(),
                 }
             },
@@ -609,6 +625,7 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::NVIDIA => "nvh265enc".to_string(),
                     PipelineOptimization::Intel => "vah265enc".to_string(),
                     PipelineOptimization::AMD => "vah265enc".to_string(),
+                    PipelineOptimization::DMABuf => "vah265enc".to_string(),
                     _ => "x265enc".to_string(),
                 }
             },
@@ -686,25 +703,29 @@ impl WebRTCPreprocessor {
                         // https://github.com/m1k1o/neko/blob/master/server/internal/capture/pipelines.go
                         // preset=2 gop-size=25 spatial-aq=true temporal-aq=true bitrate=%d vbv-buffer-size=%d rc-mode=6
                         // self.encoder.set_property_from_str("rc-mode", "3");
-                        /*self.encoder.set_property_from_str("rc-mode", "cbr");
+                        self.encoder.set_property_from_str("rc-mode", "cbr");
                         self.encoder.set_property_from_str("rc-lookahead", "0");
                         self.encoder.set_property("b-adapt", false);
                         self.encoder.set_property("aud", false);
-                        self.encoder.set_property_from_str("bitrate", "1024000");
+                        // self.encoder.set_property_from_str("bitrate", "1024000");
 
                         // self.encoder.set_property_from_str("preset", "2");
-                        self.encoder.set_property_from_str("gop-size", "60");
-                        self.encoder.set_property_from_str("spatial-aq", "true");
-                        self.encoder.set_property_from_str("temporal-aq", "true");*/
+                        // self.encoder.set_property_from_str("gop-size", "60");
+                        // self.encoder.set_property_from_str("spatial-aq", "true");
+                        // self.encoder.set_property_from_str("temporal-aq", "true");
                         // self.encoder.set_property_from_str("bitrate", "1024000");
                         // self.encoder.set_property_from_str("vbv-buffer-size", "1024000");
                         
                     },
-                    PipelineOptimization::AMD => {
+                    PipelineOptimization::AMD | PipelineOptimization::DMABuf => {
                         // set for h264parse
                         self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
                         self.encoder.set_property("aud", false);
+                        self.encoder.set_property_from_str("b-frames", "0");
+                        self.encoder.set_property_from_str("rate-control", "cbr");
                         self.encoder.set_property_from_str("target-usage", "4");
+                        self.encoder.set_property_from_str("num-slices", "1");
+                        self.encoder.set_property_from_str("ref-frames", "1");
                     },
                     _ => {}
                 }
@@ -714,7 +735,7 @@ impl WebRTCPreprocessor {
                     PipelineOptimization::None => {
                         self.set_setting("bitrate", serde_json::json!(1024 * 1024 * 4));
                     },
-                    PipelineOptimization::AMD => {
+                    PipelineOptimization::AMD | PipelineOptimization::DMABuf => {
                         self.extra_middle_elements[0].set_property("config-interval", -1 as i32);
                         self.encoder.set_property("aud", false);
                         self.encoder.set_property_from_str("target-usage", "6");

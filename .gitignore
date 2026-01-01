@@ -4,3 +4,4 @@ libhyperpreglue.so
 preglue
 # valgrind analysis
 vgcore.*
+*.perf
